@@ -25,17 +25,18 @@ const ease = (x: number) => x * x * (3 - 2 * x);
 const span = (t: number, a: number, b: number) => ease(clamp01((t - a) / (b - a)));
 
 /** 2 cel colour → 1 line art → 0 real. Starts to un-draw as the gate is entered. */
-export const styleAt = (t: number) => 2 - span(t, T_GATE, 0.45) - span(t, 0.45, T_EXIT);
+export const styleAt = (t: number) =>
+  2 - span(t, T_GATE, T_GATE + 0.08) - span(t, T_GATE + 0.08, T_GATE + 0.16);
 
 /** The gate is open and glowing as it is approached. */
-export const gateOpen = (t: number) => span(t, 0, 0.12);
+export const gateOpen = (t: number) => 0.9 + 0.1 * span(t, 0, 0.12);
 
 const rel: ShotKey[] = [
   { t: 0, position: [-12, 6, 48], target: [0, 2, -60], fov: 52 },
   // fast push toward the gate, then wide and tight inside the tunnel
-  { t: 0.2, position: [6, 4, 34], target: [0, 0, -50], fov: 60 },
-  { t: 0.45, position: [0, 3, 22], target: [0, 0, -50], fov: 68 },
-  { t: 0.7, position: [-4, 4, 30], target: [0, 0, -60], fov: 56 },
+  { t: 0.2, position: [8, 7, 50], target: [0, 0, -50], fov: 60 },
+  { t: 0.45, position: [0, 6, 46], target: [0, 0, -50], fov: 68 },
+  { t: 0.7, position: [-6, 7, 46], target: [0, 0, -60], fov: 58 },
   // calm: drift out and sideways so the whole planet and the Moon open up
   { t: 0.85, position: [-14, 6, 48], target: [8, -6, -80], fov: 50 },
   { t: 1, position: [-24, 8, 58], target: [14, -12, -90], fov: 48 },
@@ -47,3 +48,6 @@ export function returnShot(t: number, out: ShotState): void {
   out.position.z += z;
   out.target.z += z;
 }
+
+/** The hole swells as the ship leaves the painted sky for it. */
+export const holeRadiusAt = (t: number) => 6 + 10 * span(t, 0, 0.25);

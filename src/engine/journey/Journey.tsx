@@ -1,9 +1,11 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
+import gsap from 'gsap';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Bloom, EffectComposer, SMAA, ToneMapping, wrapEffect } from '@react-three/postprocessing';
 import { StyleBlendEffect } from '../../shaders/styleBlend.ts';
+import { LensEffect } from '../../shaders/lens.ts';
 import { ToneMappingMode } from 'postprocessing';
 import { chapters } from '../../chapters/registry.ts';
 import { implementations } from '../../chapters/implementations.ts';
@@ -27,12 +29,15 @@ import { buildTrack, classifyAspect, progressFor } from '../scroll/resolver.ts';
 import { ScrollTrack } from '../scroll/ScrollTrack.tsx';
 import { usePacedWheel } from '../scroll/usePacedWheel.ts';
 import { useScrollMaster } from '../scroll/useScrollMaster.ts';
+import { preloadJourney } from '../assets/preload.ts';
 import { useJourneyStore } from '../store.ts';
 import styles from './Journey.module.css';
 
-const SCRUB_SECONDS = 0.9;
+const SCRUB_SECONDS = 0.35;
 /** Chapters kept mounted around the active one (lifecycle "warm" window). */
 const WARM_WINDOW = 1;
+/** Slow networks: stop waiting for the full download after this and stream the rest. */
+const PRELOAD_GIVE_UP_MS = 45_000;
 
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -42,6 +47,13 @@ const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: r
  * Without post (Low) the renderer applies AgX itself.
  */
 const StyleBlend = wrapEffect(StyleBlendEffect);
+const Lens = wrapEffect(LensEffect);
+
+/** Copies the black hole's lens state to the lens pass each frame (no React state). */
+function LensSync({ effect }: { effect: RefObject<LensEffect | null> }) {
+  useFrame(() => effect.current?.sync());
+  return null;
+}
 
 /** Copies the Director's art-style value to the style pass each frame (no React state). */
 function StyleSync({
@@ -216,6 +228,7 @@ function JourneyCanvas() {
   const track = useMemo(() => buildTrack(chapters, aspect), [aspect]);
   const frame = useMemo(() => createJourneyFrame(), []);
   const styleRef = useRef<StyleBlendEffect>(null);
+  const lensRef = useRef<LensEffect>(null);
   const links = useMemo<DirectorLinks>(
     () => ({ groups: new Map(), overlays: new Map(), dip: null, progressBar: null, track }),
     // links is created once; track updates are written in the effect below
@@ -224,7 +237,24 @@ function JourneyCanvas() {
   );
   const master = useScrollMaster(trackEl, { scrub: SCRUB_SECONDS });
   // wheel/trackpad: capped per event and followed at a capped speed (one flick no longer flies the whole story)
-  usePacedWheel(!prefersReducedMotion());
+  const entered = useJourneyStore((s) => s.entered);
+  const enter = useJourneyStore((s) => s.enter);
+  const assetsReady = useJourneyStore((s) => s.assetsReady);
+  const setAssetsReady = useJourneyStore((s) => s.setAssetsReady);
+
+  // Download every journey asset before any chapter mounts (the start gate shows the progress).
+  useEffect(() => {
+    const { finished, unsubscribe } = preloadJourney();
+    let live = true;
+    const giveUp = window.setTimeout(setAssetsReady, PRELOAD_GIVE_UP_MS);
+    void finished.then(() => live && setAssetsReady());
+    return () => {
+      live = false;
+      window.clearTimeout(giveUp);
+      unsubscribe();
+    };
+  }, [setAssetsReady]);
+  usePacedWheel(!prefersReducedMotion() && entered);
   const tier = useJourneyStore((s) => s.tier);
   const webgl = useJourneyStore((s) => s.webgl);
   const activeIndex = useJourneyStore((s) => s.activeIndex);
@@ -244,8 +274,40 @@ function JourneyCanvas() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Start gate: scroll stays locked until Begin (programmatic jumps still work).
+  useEffect(() => {
+    if (entered) return;
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = '';
+    };
+  }, [entered]);
+
+  // Hand-off: after Begin, the camera eases into SC02's first rest point (title card) in 1.5 s.
+  // A jump from the header/Flight plan before Begin supplies its own target and skips this.
+  const handoffSkipped = useRef(entered);
+  useEffect(() => {
+    if (!entered || handoffSkipped.current) return;
+    handoffSkipped.current = true;
+    if (prefersReducedMotion()) return;
+    const meta = chapters.find((c) => c.id === 'sc02-room');
+    if (!meta) return;
+    const o = { p: master.state.progress };
+    const tween = gsap.to(o, {
+      p: progressFor(links.track, meta.id, meta.restPoints[0] ?? 0.5),
+      duration: 1.5,
+      ease: 'power2.inOut',
+      onUpdate: () => master.scrollToProgress(o.p, false),
+    });
+    return () => void tween.kill();
+  }, [entered, master, links]);
+
   const jump = useCallback(
     (id: string) => {
+      if (!useJourneyStore.getState().entered) {
+        handoffSkipped.current = true;
+        enter();
+      }
       const meta = chapters.find((c) => c.id === id);
       const target = progressFor(links.track, id, meta?.restPoints[0] ?? 0.05);
       const fade = fadeRef.current;
@@ -259,7 +321,7 @@ function JourneyCanvas() {
         window.setTimeout(() => (fade.style.opacity = '0'), 200);
       }, 180);
     },
-    [links, master],
+    [links, master, enter],
   );
 
   useEffect(() => {
@@ -288,14 +350,17 @@ function JourneyCanvas() {
   }, [track, master]);
 
   const dpr = dprForBudget(viewport.w, viewport.h, window.devicePixelRatio, PIXEL_BUDGET_MP[tier]);
-  const mounted = chapters.filter((_, i) => Math.abs(i - activeIndex) <= WARM_WINDOW);
+  const mounted = assetsReady
+    ? chapters.filter((_, i) => Math.abs(i - activeIndex) <= WARM_WINDOW)
+    : [];
   // Low tier has no post chain; it gets a minimal one only while art-style chapters are near.
   const lowStyle = tier !== 'balanced' && mounted.some((c) => c.act === 'beyond');
   const composer = tier === 'balanced' || lowStyle;
 
   return (
     <>
-      <div className={styles.canvas} aria-hidden="true">
+      {/* data-journey-canvas: the start gate's push-in and parallax (cleared before the journey) */}
+      <div className={styles.canvas} aria-hidden="true" data-journey-canvas>
         <Canvas
           frameloop="never"
           dpr={dpr}
@@ -314,12 +379,14 @@ function JourneyCanvas() {
         >
           <ToneMappingOwner composer={composer} />
           <StyleSync frame={frame} effect={styleRef} />
+          <LensSync effect={lensRef} />
           <Director master={master.state} frame={frame} links={links} />
           {mounted.map((c) => (
             <ChapterSlot key={c.id} id={c.id} frame={frame} links={links} />
           ))}
           {tier === 'balanced' && (
             <EffectComposer multisampling={0}>
+              <Lens ref={lensRef} />
               <Bloom
                 mipmapBlur
                 // HDR threshold: only genuinely bright pixels (screens, strips, light) bloom; a low
@@ -336,6 +403,7 @@ function JourneyCanvas() {
           )}
           {lowStyle && (
             <EffectComposer multisampling={0}>
+              <Lens ref={lensRef} />
               <ToneMapping mode={ToneMappingMode.AGX} />
               <StyleBlend ref={styleRef} />
             </EffectComposer>
@@ -352,7 +420,8 @@ function JourneyCanvas() {
       <OverlayLayer links={links} />
       <div ref={fadeRef} className={styles.jumpFade} aria-hidden="true" />
       <ProgressIndicator links={links} />
-      <FlightPlan onJump={jump} />
+      {/* hidden behind the start gate (its dock owns that corner); the header stays reachable */}
+      {entered && <FlightPlan onJump={jump} />}
 
       {reducedNotice && (
         <div className={styles.notice} role="status">

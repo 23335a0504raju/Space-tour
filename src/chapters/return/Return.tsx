@@ -4,13 +4,13 @@ import * as THREE from 'three';
 import { getKTX2Loader } from '../../engine/assets/loaders.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { useJourneyStore } from '../../engine/store.ts';
-import { createAnomalyMaterial, createTunnelMaterial } from '../../shaders/crossing.ts';
 import { createAtmosphereMaterial, createEarthMaterial } from '../../shaders/earth.ts';
 import { AREAS } from '../anime/anime.ts';
 import { PAINTED_CLOUDS, SUN_BEYOND } from '../anime/clouds.ts';
 import { Clouds, SkyDome } from '../anime/parts.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield } from '../greybox/parts.tsx';
+import { BlackHole } from '../crossing/BlackHole.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
 import {
   DAWN_SUN,
@@ -21,6 +21,7 @@ import {
   T_GATE,
   TUNNEL,
   gateOpen,
+  holeRadiusAt,
   returnShot,
   shipZ,
   styleAt,
@@ -59,19 +60,16 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
     (a.uniforms['uSun']?.value as THREE.Vector3).copy(SUN);
     return { earth: e, atmosphere: a };
   }, [dayMap, nightMap, low]);
-  const anomaly = useMemo(() => createAnomalyMaterial(), []);
-  const tunnel = useMemo(() => createTunnelMaterial(), []);
-  useDisposeOnUnmount(earth, atmosphere, anomaly, tunnel);
+  useDisposeOnUnmount(earth, atmosphere);
 
   const ship = useRef<THREE.Group>(null);
   const dome = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
   const painted = useRef<THREE.Group>(null);
-  const tunnelGroup = useRef<THREE.Group>(null);
   const real = useRef<THREE.Group>(null);
   const stars = useRef<THREE.Group>(null);
   const sunTarget = useMemo(() => new THREE.Object3D(), []);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     if (frame.id === id) {
       const t = frame.t;
       const z = shipZ(t);
@@ -79,17 +77,12 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
       dome.current?.position.set(0, 0, z);
       light.current?.position.set(SUN.x * 100, SUN.y * 100, SUN.z * 100 + z);
       sunTarget.position.set(0, 0, z);
-      anomaly.uniforms['uOpen']!.value = gateOpen(t);
       // which world is on stage is a pure function of t
       if (painted.current) painted.current.visible = t < T_GATE + 0.03;
-      if (tunnelGroup.current) tunnelGroup.current.visible = t > T_GATE - 0.04 && t < T_EXIT + 0.04;
       if (real.current) real.current.visible = t > T_EXIT - 0.05;
       // real stars only exist once the painted sky is behind us
       if (stars.current) stars.current.visible = t > T_GATE + 0.04;
     }
-    // ambient: swirl and a fast tunnel flow
-    anomaly.uniforms['uTime']!.value = clock.elapsedTime;
-    tunnel.uniforms['uTime']!.value = clock.elapsedTime * 2.5;
   });
 
   return (
@@ -115,30 +108,17 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
       <primitive object={sunTarget} />
       <hemisphereLight args={['#5a6f9a', '#06070b', 0.55]} />
 
-      {/* the gate and the tunnel home */}
-      <group position={[0, 0, GATE.z]}>
-        <mesh>
-          <torusGeometry args={[GATE.radius, 0.55, 16, 128]} />
-          <meshBasicMaterial
-            color={new THREE.Color('#d6a756').multiplyScalar(1.4)}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh material={anomaly}>
-          <circleGeometry args={[GATE.radius, 96]} />
-        </mesh>
-      </group>
-      <group ref={tunnelGroup} visible={false}>
-        <mesh
-          position={[0, 0, (TUNNEL.start + TUNNEL.end) / 2]}
-          rotation={[Math.PI / 2, 0, 0]}
-          material={tunnel}
-        >
-          <cylinderGeometry
-            args={[TUNNEL.radius, TUNNEL.radius, TUNNEL.start - TUNNEL.end, 48, 1, true]}
-          />
-        </mesh>
-      </group>
+      {/* the black hole and the fall home */}
+      <BlackHole
+        id={id}
+        frame={frame}
+        z={GATE.z}
+        radius={16}
+        radiusAt={holeRadiusAt}
+        tunnel={TUNNEL}
+        open={gateOpen}
+        flow={2.5}
+      />
 
       {/* real space beyond: Earth with the sun rising on its limb, and the Moon */}
       <group ref={real} visible={false}>

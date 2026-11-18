@@ -2,13 +2,13 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
-import { createAnomalyMaterial, createTunnelMaterial } from '../../shaders/crossing.ts';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield, seeded } from '../greybox/parts.tsx';
 import { PAINTED_CLOUDS, SUN_BEYOND } from '../anime/clouds.ts';
 import { Clouds } from '../anime/parts.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
-import { GATE, TUNNEL, T_GATE, crossingShot, gateOpen, shipZ, styleAt } from './crossing.ts';
+import { BlackHole } from './BlackHole.tsx';
+import { GATE, TUNNEL, crossingShot, holeRadiusAt, gateOpen, shipZ, styleAt } from './crossing.ts';
 
 /**
  * SC10 · The Edge & The Crossing (FINAL_STORYLINE SC10). A quiet, cold edge of the system → the
@@ -50,33 +50,21 @@ function EdgeDust() {
 }
 
 function CrossingScene({ id, frame }: ChapterSceneProps) {
-  const anomaly = useMemo(() => createAnomalyMaterial(), []);
-  const tunnel = useMemo(() => createTunnelMaterial(), []);
-  useDisposeOnUnmount(anomaly, tunnel);
   const ship = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
   const sunTarget = useMemo(() => new THREE.Object3D(), []);
-  const ring = useRef<THREE.Mesh>(null);
-  const tunnelGroup = useRef<THREE.Group>(null);
   const beyond = useRef<THREE.Group>(null);
-  useFrame(({ clock }, delta) => {
-    // story: ship position, gate opening, light follows the ship
-    if (frame.id === id) {
-      const z = shipZ(frame.t);
-      ship.current?.position.set(0, 0, z);
-      light.current?.position.set(SUN_DIR[0] ?? 0, SUN_DIR[1] ?? 0, (SUN_DIR[2] ?? 0) + z);
-      sunTarget.position.set(0, 0, z);
-      anomaly.uniforms['uOpen']!.value = gateOpen(frame.t);
-      // the far side stays hidden until the ship is about to enter (pure function of t)
-      if (tunnelGroup.current) tunnelGroup.current.visible = frame.t > T_GATE - 0.06;
-      if (beyond.current) beyond.current.visible = frame.t > T_GATE;
-    }
-    // ambient: swirl and tunnel flow
-    anomaly.uniforms['uTime']!.value = clock.elapsedTime;
-    tunnel.uniforms['uTime']!.value = clock.elapsedTime;
-    if (ring.current) ring.current.rotation.z -= delta * 0.35;
+  useFrame(({ camera }) => {
+    if (frame.id !== id) return;
+    // story: ship position, light follows the ship
+    const z = shipZ(frame.t);
+    ship.current?.position.set(0, 0, z);
+    light.current?.position.set(SUN_DIR[0] ?? 0, SUN_DIR[1] ?? 0, (SUN_DIR[2] ?? 0) + z);
+    sunTarget.position.set(0, 0, z);
+    // the far side stays hidden until the camera is well into the fall (pure function of t)
+    if (beyond.current)
+      beyond.current.visible = camera.position.z < GATE.z - 0.55 * (TUNNEL.start - TUNNEL.end);
   });
-  const tunnelLen = TUNNEL.start - TUNNEL.end;
   return (
     <group>
       <Starfield count={2200} radius={1500} seed={71} />
@@ -90,37 +78,15 @@ function CrossingScene({ id, frame }: ChapterSceneProps) {
       <primitive object={sunTarget} />
       <hemisphereLight args={['#4a5f8a', '#06070b', 0.5]} />
 
-      {/* the gate */}
-      <group position={[0, 0, GATE.z]}>
-        <mesh>
-          <torusGeometry args={[GATE.radius, 0.55, 16, 128]} />
-          <meshBasicMaterial
-            color={new THREE.Color('#d6a756').multiplyScalar(1.4)}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh ref={ring}>
-          <torusGeometry args={[GATE.radius * 1.12, 0.18, 8, 96]} />
-          <meshBasicMaterial
-            color={new THREE.Color('#9fd0ff').multiplyScalar(1.2)}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh material={anomaly}>
-          <circleGeometry args={[GATE.radius, 96]} />
-        </mesh>
-      </group>
-
-      {/* the tunnel behind the gate */}
-      <group ref={tunnelGroup} visible={false}>
-        <mesh
-          position={[0, 0, (TUNNEL.start + TUNNEL.end) / 2]}
-          rotation={[Math.PI / 2, 0, 0]}
-          material={tunnel}
-        >
-          <cylinderGeometry args={[TUNNEL.radius, TUNNEL.radius, tunnelLen, 48, 1, true]} />
-        </mesh>
-      </group>
+      <BlackHole
+        id={id}
+        frame={frame}
+        z={GATE.z}
+        radius={16}
+        radiusAt={holeRadiusAt}
+        tunnel={TUNNEL}
+        open={gateOpen}
+      />
 
       {/* the world beyond: a big warm sun and painted clouds */}
       <group ref={beyond} visible={false}>

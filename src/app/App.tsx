@@ -4,6 +4,7 @@ import { Journey } from '../engine/journey/Journey.tsx';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
 import { ProjectBay } from '../ui/ProjectBay.tsx';
+import { StartGate } from '../ui/StartGate.tsx';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
 import styles from './App.module.css';
 
@@ -54,6 +55,7 @@ export function App() {
       </header>
 
       <Journey />
+      <StartGate />
       <ProjectBay />
 
       <dialog

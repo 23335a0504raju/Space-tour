@@ -30,7 +30,7 @@ test('journey: a long jump never leaves a passed panel on screen (P4 regression)
 }) => {
   // A jump from the start to SC05 sweeps through SC04's rest points while chapters change. The
   // overlay re-render reset the Director's state and SC04's Education panel stayed visible.
-  await page.goto('/');
+  await page.goto('/?gate=off');
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
   const vp = page.viewportSize() ?? { width: 1440, height: 900 };
   const track = buildTrack(chapters, classifyAspect(vp.width, vp.height));
@@ -55,7 +55,7 @@ test('journey: every rest point shows its content (screenshots for review)', asy
   page,
 }, info) => {
   const errors = collectErrors(page);
-  await page.goto('/');
+  await page.goto('/?gate=off');
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
 
   const vp = page.viewportSize() ?? { width: 1440, height: 900 };
@@ -90,7 +90,7 @@ test('journey: every rest point shows its content (screenshots for review)', asy
 
 test('journey: flight plan jumps straight to a chapter', async ({ page }) => {
   const errors = collectErrors(page);
-  await page.goto('/');
+  await page.goto('/?gate=off');
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
   await page.getByText('Flight plan').click();
   await page.getByRole('button', { name: /Stack/ }).click();
@@ -101,7 +101,7 @@ test('journey: flight plan jumps straight to a chapter', async ({ page }) => {
 });
 
 test('journey: header Projects jumps to the project installations', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?gate=off');
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
   await page
     .getByRole('navigation', { name: 'Primary' })
@@ -125,7 +125,7 @@ test('project bay: opens from an installation, traps scroll, Esc restores the ex
   page,
 }) => {
   const errors = collectErrors(page);
-  await page.goto('/');
+  await page.goto('/?gate=off');
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
   const vp = page.viewportSize() ?? { width: 1440, height: 900 };
   const track = buildTrack(chapters, classifyAspect(vp.width, vp.height));

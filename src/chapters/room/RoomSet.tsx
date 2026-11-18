@@ -10,13 +10,14 @@ import { registerEnvironment } from '../../engine/environment.ts';
 import { useJourneyStore } from '../../engine/store.ts';
 import { Starfield } from '../greybox/parts.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
-import { FLOOR_TEXTURES, PANEL_TEXTURES, ROOM_HDRI, ROOM_MODELS } from './assets.ts';
+import { ROOM_HDRI, ROOM_MODELS } from './assets.ts';
 import { createCodeScreenTexture } from './codeScreen.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { CHAIR_REST, DESK, KEYBOARD, MOUSE, ROOM, WINDOW_PAD } from './layout.ts';
 import { SlidingDoor } from './SlidingDoor.tsx';
 import type { DoorHandle } from './SlidingDoor.tsx';
-import { usePbrMaterial } from './pbr.ts';
+import { useCabinSurface } from './surfaces.ts';
+import { CrewChair, CrewDesk } from './Furniture.tsx';
 
 /**
  * SC02/SC03 set: a compact futuristic developer room (FINAL_STORYLINE.md SC02).
@@ -30,10 +31,6 @@ export interface RoomSetHandle {
   setDoor(open: number): void;
   setChair(x: number, z: number, rotY: number): void;
 }
-
-const WALL_OVERRIDES = { color: new THREE.Color('#8a919e'), envMapIntensity: 0.6 };
-const CEILING_OVERRIDES = { color: new THREE.Color('#4a4f59') };
-const FLOOR_OVERRIDES = { color: new THREE.Color('#9aa0a8') };
 
 // ── Image-based lighting (shared, ref-counted, generated once per renderer + tier) ──
 const iblCache = new Map<
@@ -330,6 +327,25 @@ function OutsideView() {
   );
 }
 
+/** Wall handrail: a bar on three small brackets (x = bar centre, along z). */
+function Handrail({ x, y, z0, z1 }: { x: number; y: number; z0: number; z1: number }) {
+  const len = z1 - z0;
+  return (
+    <group position={[x, y, (z0 + z1) / 2]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.016, 0.016, len, 12]} />
+        <meshStandardMaterial color="#d9dde4" roughness={0.35} metalness={0.6} />
+      </mesh>
+      {[-0.45, 0, 0.45].map((k) => (
+        <mesh key={k} position={[0.03, 0, k * len]}>
+          <boxGeometry args={[0.06, 0.03, 0.03]} />
+          <meshStandardMaterial color="#8a919e" roughness={0.4} metalness={0.5} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 // ── The set ─────────────────────────────────────────────────────────────────
 interface RoomSetProps {
   /** Astronaut (and anything else animated) is placed by the chapter. */
@@ -342,10 +358,10 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
 ) {
   const tier = useJourneyStore((s) => s.tier);
   const shadows = tier === 'balanced';
-  const wall = usePbrMaterial(PANEL_TEXTURES, [3, 1.2], WALL_OVERRIDES);
-  const sideWall = usePbrMaterial(PANEL_TEXTURES, [3, 1.2], WALL_OVERRIDES);
-  const ceiling = usePbrMaterial(PANEL_TEXTURES, [3, 3], CEILING_OVERRIDES);
-  const floor = usePbrMaterial(FLOOR_TEXTURES, [3, 3], FLOOR_OVERRIDES);
+  const wall = useCabinSurface('wall', [2, 3]);
+  const sideWall = useCabinSurface('wall', [6, 3]);
+  const ceiling = useCabinSurface('ceiling', [7, 6]);
+  const floor = useCabinSurface('floor', [7, 6]);
   const { halfW, back, front, height, doorZ, doorW, doorH } = ROOM;
   const door = useRef<DoorHandle>(null);
   const chair = useRef<THREE.Group>(null);
@@ -477,8 +493,64 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
         intensity={2.5}
       />
 
+      {/* right wall: handrail on brackets, cable run under the ceiling */}
+      <Handrail x={halfW - 0.07} y={1.1} z0={back + 0.3} z1={doorZ - doorW / 2 - 0.2} />
+      <mesh position={[halfW - 0.05, height - 0.28, midZ]}>
+        <boxGeometry args={[0.06, 0.05, depth - 0.3]} />
+        <meshStandardMaterial color="#cfd4dc" roughness={0.5} metalness={0.2} />
+      </mesh>
+      <mesh position={[halfW - 0.05, height - 0.37, midZ]}>
+        <boxGeometry args={[0.06, 0.035, depth - 0.3]} />
+        <meshStandardMaterial color="#aab1bc" roughness={0.5} metalness={0.2} />
+      </mesh>
+      {/* left wall: pressure hatch */}
+      <group position={[-halfW + 0.03, 1.2, 1.5]} rotation={[0, Math.PI / 2, 0]}>
+        <mesh>
+          <boxGeometry args={[0.9, 1.3, 0.05]} />
+          <meshStandardMaterial color="#c3c9d2" roughness={0.5} metalness={0.2} />
+        </mesh>
+        <mesh position={[0, 0, 0.03]}>
+          <boxGeometry args={[0.7, 1.1, 0.03]} />
+          <meshStandardMaterial color="#e2e5ea" roughness={0.5} metalness={0.1} />
+        </mesh>
+        <mesh position={[0, 0, 0.06]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.1, 0.1, 0.03, 20]} />
+          <meshStandardMaterial color="#8a919e" roughness={0.4} metalness={0.7} />
+        </mesh>
+        <mesh position={[0.28, 0.3, 0.06]}>
+          <boxGeometry args={[0.1, 0.03, 0.02]} />
+          <meshStandardMaterial color="#d86a3a" roughness={0.5} />
+        </mesh>
+      </group>
+      {/* flush ceiling light panels and a dark skirting around the walls */}
+      {[-0.4, -2.1].map((zz) => (
+        <LightStrip
+          key={'c' + zz}
+          position={[0, height - 0.02, zz]}
+          size={[1.6, 0.03, 0.5]}
+          color="#e4ecff"
+          intensity={1.5}
+        />
+      ))}
+      {[-halfW + 0.02, halfW - 0.02].map((xx) => (
+        <mesh key={'s' + xx} position={[xx, 0.1, midZ]}>
+          <boxGeometry args={[0.04, 0.2, depth - 0.1]} />
+          <meshStandardMaterial color="#2b303a" roughness={0.6} metalness={0.3} />
+        </mesh>
+      ))}
+      {/* deck edge lights */}
+      {[-1, 1].map((k) => (
+        <LightStrip
+          key={'d' + k}
+          position={[k * (halfW - 0.12), 0.012, midZ]}
+          size={[0.025, 0.01, depth - 0.5]}
+          color="#4fd8ff"
+          intensity={1.6}
+        />
+      ))}
+
       {/* furniture (Poly Haven CC0) */}
-      <Prop url={ROOM_MODELS.desk} position={[0, 0, DESK.z]} scale={[1, DESK.scaleY, 1]} />
+      <CrewDesk z={DESK.z} />
       {/* the model faces +z; rotate to face the desk (verified with the seated Mixamo pose) */}
       {/* SC03 pushes it back from the desk as the astronaut stands (RoomSetHandle.setChair) */}
       <group
@@ -486,9 +558,8 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
         position={[CHAIR_REST.x, 0, CHAIR_REST.z]}
         rotation={[0, CHAIR_REST.rotY, 0]}
       >
-        <Prop url={ROOM_MODELS.chair} position={[0, 0, 0]} />
+        <CrewChair />
       </group>
-      <Prop url={ROOM_MODELS.lamp} position={[0.82, DESK.top, -2.62]} rotation={[0, -0.5, 0]} />
       <Prop url={ROOM_MODELS.plant} position={[-0.85, DESK.top, -2.62]} />
       <Prop
         url={ROOM_MODELS.notepads}
@@ -496,12 +567,6 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
         scale={0.45}
         rotation={[0, 0.2, 0]}
       />
-      <Prop
-        url={ROOM_MODELS.shelf}
-        position={[-halfW + 0.02, 0, -1.2]}
-        rotation={[0, Math.PI / 2, 0]}
-      />
-      <Prop url={ROOM_MODELS.ceilingLamp} position={[0, height - 1.172, -0.6]} />
 
       {/* developer workstation (code-built) */}
       <Monitor position={[0, DESK.top + 0.343, -2.7]} rotationY={0} firstLine={60} />

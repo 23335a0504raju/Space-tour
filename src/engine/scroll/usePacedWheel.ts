@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import gsap from 'gsap';
-import { follow, wheelStep } from './pacing.ts';
+import { PACING, clampLead, follow, wheelStep } from './pacing.ts';
 
 /**
  * Desktop wheel/trackpad governor. Touch, keyboard, scrollbar drags and programmatic jumps stay
@@ -12,6 +12,7 @@ export function usePacedWheel(enabled: boolean): void {
     if (!enabled) return;
     let target = window.scrollY;
     let last = window.scrollY;
+    let lastWheel = 0;
     const max = () => document.documentElement.scrollHeight - window.innerHeight;
 
     const onWheel = (e: WheelEvent) => {
@@ -22,8 +23,15 @@ export function usePacedWheel(enabled: boolean): void {
       // someone else moved the page (keyboard, jump): start from where it really is
       if (Math.abs(window.scrollY - last) > 2) target = window.scrollY;
       target = Math.min(max(), Math.max(0, target + wheelStep(e.deltaY, e.deltaMode, innerHeight)));
+      target = clampLead(window.scrollY, target);
+      lastWheel = performance.now();
     };
     const tick = () => {
+      // wheel went quiet: drop whatever lead is left, so nothing drains after input ends
+      if (target !== window.scrollY && performance.now() - lastWheel > PACING.idleMs) {
+        target = window.scrollY;
+        return;
+      }
       if (Math.abs(window.scrollY - last) > 2) {
         target = window.scrollY;
         last = window.scrollY;

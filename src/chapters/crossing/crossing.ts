@@ -20,11 +20,14 @@ const span = (t: number, a: number, b: number) => ease(clamp01((t - a) / (b - a)
 export const T_GATE = -GATE.z / TRAVEL;
 export const T_EXIT = -TUNNEL.end / TRAVEL;
 
-/** 0 realistic · 1 ink line art · 2 cel colour. Line art begins inside the gate, cel floods before the exit. */
-export const styleAt = (t: number) => span(t, T_GATE - 0.03, 0.66) + span(t, 0.66, 0.86);
+/**
+ * 0 realistic · 1 ink line art · 2 cel colour. The fall itself is real (lensing, darkness, a light at
+ * the end); the world is only re-drawn as the ship breaks out into the light.
+ */
+export const styleAt = (t: number) => span(t, 0.74, 0.84) + span(t, 0.84, T_EXIT);
 
-/** The anomaly opens as the ship approaches. */
-export const gateOpen = (t: number) => span(t, 0.1, 0.42);
+/** The disk is already blazing when the story begins; it brightens a little on approach. */
+export const gateOpen = (t: number) => 0.9 + 0.1 * span(t, 0, 0.3);
 
 const rel: ShotKey[] = [
   { t: 0, position: [18, 6, 52], target: [0, 0, -60], fov: 48 },
@@ -41,3 +44,6 @@ export function crossingShot(t: number, out: ShotState): void {
   out.position.z += z;
   out.target.z += z;
 }
+
+/** The hole starts as a distant dim ring and swells as the ship closes in: you watch it grow, then it takes the ship. */
+export const holeRadiusAt = (t: number) => 3 + 13 * span(t, 0, 0.42);

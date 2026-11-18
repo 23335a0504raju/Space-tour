@@ -9,16 +9,4 @@ export const ROOM_MODELS = {
   ceilingLamp: '/assets/models/modern_ceiling_lamp_01.glb',
 } as const;
 
-export const PANEL_TEXTURES = {
-  map: '/assets/textures/metal_plate_diffuse.ktx2',
-  normalMap: '/assets/textures/metal_plate_nor_gl.ktx2',
-  arm: '/assets/textures/metal_plate_arm.ktx2',
-} as const;
-
-export const FLOOR_TEXTURES = {
-  map: '/assets/textures/concrete_floor_painted_diffuse.ktx2',
-  normalMap: '/assets/textures/concrete_floor_painted_nor_gl.ktx2',
-  arm: '/assets/textures/concrete_floor_painted_arm.ktx2',
-} as const;
-
 export const ROOM_HDRI = '/assets/env/empty_warehouse_01_1k.hdr';

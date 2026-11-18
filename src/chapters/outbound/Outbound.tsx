@@ -5,7 +5,8 @@ import { getKTX2Loader } from '../../engine/assets/loaders.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { useJourneyStore } from '../../engine/store.ts';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
-import { Asteroids, Starfield } from '../greybox/parts.tsx';
+import { Starfield } from '../greybox/parts.tsx';
+import { Belt } from './Belt.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
 import {
   createAtmosphereMaterial,
@@ -103,7 +104,7 @@ function OutboundScene({ id, frame }: ChapterSceneProps) {
         <sphereGeometry args={[MARS.radius * 1.06, 48, 32]} />
       </mesh>
       <group position={[...BELT.centre]}>
-        <Asteroids count={low ? 350 : 700} spread={SPREAD} seed={9} />
+        <Belt count={low ? 130 : 520} spread={SPREAD} seed={9} low={low} />
       </group>
       <HelVela ref={ship} engine={ENGINE} rotation={[0, -Math.PI / 2, 0]} />
     </group>

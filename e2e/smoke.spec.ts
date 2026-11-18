@@ -11,7 +11,7 @@ test.describe('P0 smoke', () => {
   });
 
   test('contact sheet opens, closes with Escape, and returns focus', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?gate=off');
     const trigger = page.getByRole('button', { name: 'Contact' });
     await trigger.click();
     await expect(page.getByRole('dialog', { name: 'Contact' })).toBeVisible();
@@ -30,7 +30,7 @@ test.describe('P0 smoke', () => {
     await expect(experience).not.toContainText('Template');
   });
 
-  for (const path of ['/', '/brief/']) {
+  for (const path of ['/', '/?gate=off', '/brief/']) {
     test(`no axe violations on ${path}`, async ({ page }) => {
       await page.goto(path);
       const results = await new AxeBuilder({ page }).analyze();

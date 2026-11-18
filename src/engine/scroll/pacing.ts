@@ -13,7 +13,16 @@ export const PACING = {
   ease: 0.1,
   /** Fastest the page may travel (px per 60 fps frame): about 1.1 screens per second. */
   maxSpeed: 18,
+  /** Furthest the target may run ahead of the page (px). Input beyond it is discarded, never queued. */
+  maxLead: 110,
+  /** Wheel silence (ms) after which the remaining lead is dropped. */
+  idleMs: 120,
 } as const;
+
+/** Keep the target within `maxLead` of where the page really is. */
+export function clampLead(current: number, target: number): number {
+  return Math.max(current - PACING.maxLead, Math.min(current + PACING.maxLead, target));
+}
 
 /** Normalise a wheel event's delta to pixels (line/page modes) and clamp it. */
 export function wheelStep(deltaY: number, deltaMode: number, viewportH: number): number {

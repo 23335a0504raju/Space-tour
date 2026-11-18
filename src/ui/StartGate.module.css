@@ -1,0 +1,350 @@
+/* Opening sequence. Initial (hidden) states live here; GSAP animates them in (StartGate.tsx). */
+.gate {
+  --bar: 76px;
+
+  position: fixed;
+  inset: 0;
+  z-index: 9; /* above overlays and progress, below the header (10) */
+  overflow: hidden;
+}
+
+/* Letterbox: two bars that start closed (black frame) and open into a cinema crop. */
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 50.5%;
+  background: #000;
+}
+
+.barTop {
+  top: 0;
+}
+
+.barBottom {
+  bottom: 0;
+}
+
+/* Legibility for the title, bottom-left, leaving the ship in the window clear. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background:
+    linear-gradient(to top, rgb(5 6 10 / 88%) 0%, rgb(5 6 10 / 35%) 45%, transparent 70%),
+    linear-gradient(to right, rgb(5 6 10 / 60%) 0%, transparent 55%);
+}
+
+.stars {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.starsCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Beat 1: Signal ---- */
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-6);
+  pointer-events: none;
+}
+
+.loaderKicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.dial {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(9rem, 22vmin, 13rem);
+  aspect-ratio: 1;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  animation: spin 40s linear infinite;
+}
+
+.ring circle {
+  fill: none;
+}
+
+.ringTicks {
+  stroke: var(--color-rule);
+  stroke-width: 2.4;
+  stroke-dasharray: 0.25 0.75;
+}
+
+.ringTrack {
+  stroke: var(--color-rule);
+  stroke-width: 0.4;
+}
+
+.ringFill {
+  stroke: var(--color-accent);
+  stroke-width: 1;
+  transition: stroke-dashoffset 300ms linear;
+}
+
+.count {
+  font-family: var(--font-mono);
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  color: var(--color-text);
+}
+
+.log {
+  display: grid;
+  gap: 0.15rem;
+  min-height: 4.6em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.log li {
+  opacity: 0.45;
+}
+
+.log li:last-child {
+  opacity: 1;
+  color: var(--color-text);
+}
+
+.log li::before {
+  content: '↓ ';
+  color: var(--color-accent);
+}
+
+/* ---- Beat 2: Title ---- */
+.title {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: calc(var(--bar) + clamp(1.5rem, 5vh, 3.5rem));
+  z-index: 1;
+  display: grid;
+  gap: var(--space-3);
+  max-width: 62rem;
+}
+
+.kicker,
+.name,
+.role {
+  margin: 0;
+  opacity: 0;
+}
+
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.kicker::before {
+  content: '';
+  width: 2.5rem;
+  height: 1px;
+  background: var(--color-accent);
+}
+
+.name {
+  font-family: var(--font-display);
+  font-size: clamp(2.75rem, 1rem + 7.5vw, 8.5rem);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  text-shadow: 0 2px 30px rgb(5 6 10 / 60%);
+}
+
+.role {
+  font-family: var(--font-mono);
+  font-size: clamp(0.8rem, 0.7rem + 0.4vw, 1rem);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+/* Bottom bar dock: status left, the one action right. */
+.dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  height: var(--bar);
+  padding: 0 var(--gutter);
+  opacity: 0;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.begin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--target-min);
+  padding: 0 var(--space-6);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.begin span {
+  transition: transform 200ms ease;
+}
+
+.begin:hover:not(:disabled) {
+  background: transparent;
+  color: var(--color-accent);
+}
+
+.begin:hover:not(:disabled) span {
+  transform: translateX(4px);
+}
+
+.begin:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+.begin:disabled {
+  cursor: progress;
+}
+
+/* ---- After the hand-off ---- */
+.hint {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-12);
+  z-index: 8;
+  margin: 0;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-text);
+  pointer-events: none;
+  animation: hint-in 600ms ease 1.2s both;
+  transition: opacity 400ms ease;
+}
+
+.hintGone {
+  opacity: 0 !important;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes hint-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 0.85;
+  }
+}
+
+@media (orientation: portrait) {
+  .status {
+    display: none;
+  }
+
+  .begin {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring,
+  .dot,
+  .hint {
+    animation: none;
+  }
+
+  .ringFill,
+  .hint {
+    transition: none;
+  }
+
+  .hint {
+    opacity: 0.85;
+  }
+}
