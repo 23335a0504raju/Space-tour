@@ -1,0 +1,180 @@
+.canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.dip,
+.jumpFade {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.jumpFade {
+  z-index: 9;
+  transition: opacity 180ms linear;
+}
+
+.progress {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 8;
+  padding: 0 var(--gutter) var(--space-3);
+  pointer-events: none;
+  background: linear-gradient(rgb(5 6 10 / 0%), rgb(5 6 10 / 88%) 45%);
+}
+
+.progressFill {
+  height: 2px;
+  margin-bottom: var(--space-2);
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.progressLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-muted);
+  text-align: right;
+}
+
+.plan {
+  position: fixed;
+  left: var(--gutter);
+  bottom: var(--space-8);
+  z-index: 10;
+  max-width: min(18rem, calc(100vw - 2 * var(--gutter)));
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+}
+
+.plan summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-rule);
+  background: var(--color-scrim);
+  cursor: pointer;
+  list-style: none;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+}
+
+.plan summary::-webkit-details-marker {
+  display: none;
+}
+
+.plan[open] summary {
+  border-color: var(--color-accent);
+}
+
+.plan ol {
+  display: grid;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+}
+
+.plan button {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  min-height: var(--target-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan button:hover {
+  color: var(--color-accent);
+}
+
+.planScene {
+  color: var(--color-muted);
+  min-width: 3.5em;
+}
+
+.quality {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+}
+
+.quality button {
+  width: auto;
+  border: 1px solid var(--color-rule);
+  padding: 0 var(--space-3);
+}
+
+.quality button[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.notice {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
+  z-index: 11;
+  transform: translateX(-50%);
+  display: grid;
+  gap: var(--space-3);
+  width: min(32rem, calc(100vw - 2 * var(--gutter)));
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font-size: var(--text-sm);
+}
+
+.notice button {
+  justify-self: start;
+  min-height: var(--target-min);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fallback {
+  display: grid;
+  gap: var(--space-6);
+  width: min(100% - 2 * var(--gutter), 40rem);
+  margin: 0 auto;
+  padding: 8rem 0 var(--space-16);
+}
+
+.fallback h1 {
+  font-size: var(--text-xl);
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-accent);
+}

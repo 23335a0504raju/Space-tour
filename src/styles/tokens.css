@@ -1,0 +1,53 @@
+/*
+ * Design tokens: one dark palette, one accent (visor gold). PROJECT_VISION.md §3.
+ * Contrast (estimated against --color-bg; verified by axe in later phases):
+ *   text ≈ 17:1, muted ≈ 7:1, accent ≈ 9:1.
+ * Typeface choice is pending the look-dev sheet; system stacks are placeholders.
+ */
+:root {
+  --color-bg: #05060a;
+  --color-surface: #0c0e14;
+  --color-text: #e9e7e1;
+  --color-muted: #a3a097;
+  --color-accent: #d6a756;
+  --color-rule: rgb(233 231 225 / 16%);
+  --color-scrim: rgb(5 6 10 / 72%);
+  --color-dev-flag: #ff8a3d;
+
+  --font-display: ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-body: ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
+  --text-xl: clamp(1.5rem, 1.2rem + 1.4vw, 2.25rem);
+  --text-display: clamp(2.5rem, 1.6rem + 4.5vw, 5.5rem);
+
+  --tracking-caps: 0.18em;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  --gutter: clamp(1rem, 0.5rem + 2.5vw, 3rem);
+  --radius: 2px;
+  --target-min: 44px;
+
+  --duration-fast: 160ms;
+  --duration-base: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}

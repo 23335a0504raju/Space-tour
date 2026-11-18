@@ -1,0 +1,14 @@
+/* Development-only marker for unconfirmed content. Never present in production output. */
+.flag {
+  text-decoration: underline dotted var(--color-dev-flag);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.25em;
+  cursor: help;
+}
+
+.flag[data-status='missing'] {
+  outline: 1px dashed var(--color-dev-flag);
+  outline-offset: 2px;
+  text-decoration: none;
+  opacity: 0.75;
+}

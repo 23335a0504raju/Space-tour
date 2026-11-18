@@ -1,0 +1,11 @@
+# Project rules for Claude Code
+
+- **Plan of record:** `docs/FINAL_STORYLINE.md`, `docs/TECHNICAL_BLUEPRINT.md`, `docs/DEVELOPMENT_WORKFLOW.md`. Superseded Batch 1 sections are marked `[SUPERSEDED B3]`.
+- **Current phase:** P4 remaining chapters (P3 approved 2026-11-17). SC06–SC09 built (reports in docs/reports), awaiting approval; Project Bay built (src/ui/ProjectBay.tsx); SC10 built (screen-space style blend, `frame.style`); SC11 built as stand-ins; SC12 Return built; SC13 built: all 13 chapters exist. Next: P5 polish (performance, Android, emblem, open content gaps). Wheel pacing: engine/scroll/pacing.ts. SC05 approved, then reworked for the user-supplied HelVela II hero ship (`src/chapters/ship/HelVela.tsx`, `npm run assets:ship`; VTOL launch). SC06 next: strengths confirmed, NASA textures in `public/assets/textures/`. A024 needs the Sketchfab URL + author. The astronaut stays the Mixamo Y Bot (user decision: do not replace it). Astronaut: `src/chapters/astronaut/Astronaut.tsx` (chapters pass a pure `Drive`); re-convert with `npm run assets:mixamo`. Rendering lessons: `.claude/skills/r3f-scenes/SKILL.md`. Review frames with `node scripts/capture-shots.ts <chapter>:<t,...> [--perf] [--low] [--portrait]` against `npm run preview` (`--perf` also prints draw calls, triangles and live GPU textures/buffers).
+- **Personal content** lives only in `src/content/`, as `Fact` values with a source. Never invent experience, metrics, achievements, responsibilities or links. Unknowns use `missing(...)` templates.
+- **Never modify** `c:\projects\MainPortfolio\` (the live site; read-only source of truth).
+- **Animation law:** one clock, one progress value, one animation system (GSAP). Story state is a pure function of scroll progress, so reverse scrolling is exact. No `setState` in frame or scroll loops.
+- **Assets:** free only, registered in `assets/ASSET_REGISTER.md` before committing. `.blend` and raw sources stay outside the repo.
+- **Hardware reality:** Radeon 780M laptop plus an Android phone. Respect `docs/PERFORMANCE_AND_ACCESSIBILITY_PLAN.md` budgets.
+- **Before claiming done:** run `npm run verify` and `npm run build`, and report the actual output.
+- Load the matching skill in `.claude/skills/` before 3D, timeline, UI, asset or performance work.

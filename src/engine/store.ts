@@ -1,0 +1,38 @@
+import { create } from 'zustand';
+import type { QualityTier } from './quality/pixelBudget.ts';
+
+/**
+ * Discrete app state only (STACK_DECISIONS.md §3.7). Per-frame values (progress, camera,
+ * local t) never live here; they are in the mutable JourneyFrame read by render loops.
+ */
+export type WebglStatus = 'ok' | 'unsupported' | 'lost';
+
+interface JourneyStore {
+  readonly activeIndex: number;
+  readonly tier: QualityTier;
+  readonly webgl: WebglStatus;
+  /** Jump to a chapter; registered by the journey once it is ready (null before). */
+  readonly navigate: ((chapterId: string) => void) | null;
+  /** Project Bay: the open project's id, or null when closed. */
+  readonly bayProject: string | null;
+  setActiveIndex(index: number): void;
+  setTier(tier: QualityTier): void;
+  setWebgl(status: WebglStatus): void;
+  setNavigate(fn: ((chapterId: string) => void) | null): void;
+  openBay(projectId: string): void;
+  closeBay(): void;
+}
+
+export const useJourneyStore = create<JourneyStore>((set) => ({
+  activeIndex: 0,
+  tier: 'balanced',
+  webgl: 'ok',
+  navigate: null,
+  bayProject: null,
+  setActiveIndex: (activeIndex) => set({ activeIndex }),
+  setTier: (tier) => set({ tier }),
+  setWebgl: (webgl) => set({ webgl }),
+  setNavigate: (navigate) => set({ navigate }),
+  openBay: (bayProject) => set({ bayProject }),
+  closeBay: () => set({ bayProject: null }),
+}));

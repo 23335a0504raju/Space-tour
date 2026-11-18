@@ -1,0 +1,43 @@
+import { sampleKeys } from '../../engine/camera/shots.ts';
+import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
+
+/**
+ * SC10 The Edge & The Crossing story maths (no React; unit-tested). The ship flies down -z through
+ * the quiet edge of the system, the gate, a tunnel, and out into a painted sky. The art-style blend
+ * (realistic → ink line art → cel colour) is a pure function of t, so scrolling back un-draws it.
+ */
+export const TRAVEL = 220;
+export const shipZ = (t: number) => -Math.min(1, Math.max(0, t)) * TRAVEL;
+
+export const GATE = { z: -110, radius: 14 } as const;
+export const TUNNEL = { start: -110, end: -200, radius: 11 } as const;
+
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const ease = (x: number) => x * x * (3 - 2 * x);
+const span = (t: number, a: number, b: number) => ease(clamp01((t - a) / (b - a)));
+
+/** Story time at which the ship passes the gate / leaves the tunnel. */
+export const T_GATE = -GATE.z / TRAVEL;
+export const T_EXIT = -TUNNEL.end / TRAVEL;
+
+/** 0 realistic · 1 ink line art · 2 cel colour. Line art begins inside the gate, cel floods before the exit. */
+export const styleAt = (t: number) => span(t, T_GATE - 0.03, 0.66) + span(t, 0.66, 0.86);
+
+/** The anomaly opens as the ship approaches. */
+export const gateOpen = (t: number) => span(t, 0.1, 0.42);
+
+const rel: ShotKey[] = [
+  { t: 0, position: [18, 6, 52], target: [0, 0, -60], fov: 48 },
+  { t: 0.3, position: [22, 8, 54], target: [0, 0, -50], fov: 50 },
+  { t: 0.48, position: [14, 6, 46], target: [0, 0, -50], fov: 54 },
+  { t: 0.7, position: [4, 5, 40], target: [0, 0, -50], fov: 60 },
+  { t: 0.9, position: [-14, 7, 46], target: [0, 2, -40], fov: 54 },
+  { t: 1, position: [-22, 9, 52], target: [0, 3, -30], fov: 50 },
+];
+
+export function crossingShot(t: number, out: ShotState): void {
+  sampleKeys(rel, t, out);
+  const z = shipZ(t);
+  out.position.z += z;
+  out.target.z += z;
+}
