@@ -5,20 +5,65 @@
   pointer-events: none;
 }
 
+/*
+ * Side panel (the default type). The Director writes one number per panel, --o in [0, 1], from
+ * scroll progress. The panel box fades in on the first part of it and its parts follow in order
+ * (kicker → heading → body → actions), each rising a little. Pure CSS from --o, so the stagger
+ * reverses exactly with the scroll.
+ */
 .panel {
+  --o: 0;
+
   position: absolute;
   display: grid;
   gap: var(--space-3);
-  max-width: min(30rem, calc(100vw - 2 * var(--gutter)));
-  max-height: calc(100svh - 9rem);
+  max-width: min(38rem, calc(100vw - 2 * var(--gutter)));
+  max-height: calc(100svh - 11rem);
   overflow: auto;
-  padding: var(--space-6);
-  background: var(--color-scrim);
-  border-left: 1px solid var(--color-accent);
-  opacity: 0;
+  padding: var(--space-8);
+  background: linear-gradient(160deg, rgb(14 16 23 / 86%), rgb(5 6 10 / 80%));
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 35%);
+  opacity: clamp(0, calc(var(--o) * 2.5), 1);
   visibility: hidden;
   pointer-events: auto;
   overscroll-behavior: contain;
+}
+
+/* frosted only on the High tier, where the GPU has room for it (UI_SCROLL_AUDIT.md §9) */
+:root[data-tier='balanced'] .panel:not(.editorial) {
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+
+.panel > * {
+  --d: 0;
+  --k: clamp(0, calc((var(--o) - var(--d)) * 2.4), 1);
+
+  opacity: var(--k);
+  transform: translateY(calc((1 - var(--k)) * 16px));
+}
+
+.panel > :nth-child(2) {
+  --d: 0.1;
+}
+
+.panel > :nth-child(3) {
+  --d: 0.2;
+}
+
+.panel > :nth-child(4) {
+  --d: 0.28;
+}
+
+.panel > :nth-child(n + 5) {
+  --d: 0.36;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel > * {
+    transform: none;
+  }
 }
 
 .center {
@@ -59,7 +104,10 @@
   overflow: visible;
   padding: var(--space-6) 0;
   background: none;
-  border-left: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: 1;
   text-shadow: 0 1px 18px rgb(5 6 10 / 55%);
 }
 
@@ -74,6 +122,7 @@
     rgb(5 6 10 / 62%) 45%,
     rgb(5 6 10 / 0%) 100%
   );
+  opacity: var(--o);
   pointer-events: none;
 }
 
@@ -157,6 +206,15 @@
   font-size: clamp(2.25rem, 1.4rem + 3vw, 4rem);
   overflow-wrap: anywhere;
   letter-spacing: -0.02em;
+}
+
+/* side-panel heading: the section name, large, in the display face */
+.heading {
+  margin-top: calc(-1 * var(--space-1));
+  font-size: clamp(2rem, 1.4rem + 1.6vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
 }
 
 .title {

@@ -284,6 +284,31 @@ Checks: `npm run verify` passes (105 tests). `npm run build` passes. `npx playwr
 
 Known, for later steps: the gate headline sits over the ship in the window and the SC02 summary partly over the helmet (camera framing, step 5). Phone layout is deferred.
 
+---
+
+## Step 4 result: panels and navigation (desktop), 2026-11-19
+
+### Changes
+
+| Area | Change |
+|---|---|
+| Sections | New [sections.ts](../../src/chapters/sections.ts): the 14 chapters grouped into 7 visitor sections (Introduction, Experience, Strengths, Projects, Tech Stack, Beyond, Contact). Unit-tested against the registry. The header, ticks, label and Flight Plan all use it, and no SC codes are shown to visitors. |
+| Header | About · Experience · Projects · Skills (jumps) · Contact (sheet) · Resume (once supplied) │ Mission Brief (secondary). The current section is gold with an underline (`aria-current="location"`). The highlight changes once per chapter, never per frame. |
+| Bottom bar | One row: Flight Plan · progress track with 7 clickable section ticks (passed, current, ahead) · "02 / 07 Experience" (polite live region) · ← / → buttons sharing the arrow-key stepping. Fixes F6 (the bar ran under Flight Plan). The Flight Plan lists sections, with the quality setting in its own "Graphics" row. |
+| Side panels | 38 rem wide, 6 px radius, gradient scrim, hairline border, soft shadow, frosted blur on the High tier only. Each gets a large display-face heading (Experience, Education, Core strengths, More projects, Tech stack, Certifications, Achievements); the kicker keeps the story name. |
+| Staged reveal | The Director writes one `--o` per panel instead of opacity. CSS fades the box in first, then kicker → heading → body → actions, each rising 16 px. Still a pure function of progress, so it reverses exactly. No transforms with reduced motion. |
+| Readable band | Default ±0.16 of a chapter (was ±0.12, fully readable only ±0.07). SC08 projects keep ±0.12 (stops 0.25 apart). The fade ramp scales with the band. |
+| Jumps (J1) | The jump fade lifts only once the target chapter has drawn meshes for 3 frames (2.5 s cap). Header → Projects from the opening: covered for 1.1 s, then SC08 is already drawn with its panel. |
+
+### Measured
+
+- Blur cost (uncapped, High tier): SC04 median frame 2.6 ms → **3.1 ms**; SC06/SC08/SC09 within 0.3 ms of the baseline. About 150 fps headroom remains.
+- Draw calls unchanged (DOM-only work): SC04 105 at the panel. The 173 at SC04 t 0.1, while the room is still warm, is the room's pre-existing overage.
+
+Checks: `npm run verify` passes (109 tests, 4 new for sections). `npm run build` passes. `npx playwright test` passes 24/24, including axe on `/`, `/?gate=off` and `/brief/`.
+
+Not done, needs your copy: short captions for SC05, SC10 and SC12 (the three chapters with no text). Anything there would be new copy, so I won't write it unasked.
+
 ### Decisions I need from you
 
 1. **Name and role (Q1):** "Raju Chowdavada" and which role: "Software Engineer", or the site's "Full-Stack Software Engineer & AI Builder"?

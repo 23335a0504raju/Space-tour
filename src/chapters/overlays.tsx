@@ -109,7 +109,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'Experience',
     render: () => (
       <>
-        <Kicker>Crew record · Experience</Kicker>
+        <Kicker>Crew record</Kicker>
+        <h2 className={styles.heading}>Experience</h2>
         <ol className={styles.record}>
           {experience.map((job) => (
             <li key={job.id}>
@@ -139,7 +140,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'Education',
     render: () => (
       <>
-        <Kicker>Crew record · Education</Kicker>
+        <Kicker>Crew record</Kicker>
+        <h2 className={styles.heading}>Education</h2>
         <ol className={styles.record}>
           {education
             .filter((e) => e.placement === 'journey')
@@ -170,6 +172,7 @@ const allOverlayDefs: readonly OverlayDef[] = [
     render: () => (
       <>
         <Kicker>You can tell what a star is made of by its light</Kicker>
+        <h2 className={styles.heading}>Core strengths</h2>
         <div className={styles.spectrum} aria-hidden="true" />
         <ul className={styles.lines}>
           {strengths.value.map((s) => (
@@ -189,7 +192,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'More projects',
     render: () => (
       <>
-        <Kicker>Beacons in the belt · More projects</Kicker>
+        <Kicker>Beacons in the belt</Kicker>
+        <h2 className={styles.heading}>More projects</h2>
         <ul className={styles.beacons}>
           {supporting.map((p) => (
             <li key={p.id}>
@@ -210,6 +214,7 @@ const allOverlayDefs: readonly OverlayDef[] = [
     key: `flagship-${p.id}`,
     chapterId: 'sc08-jupiter',
     rest: [0.25, 0.5, 0.75][i] ?? 0.5,
+    band: 0.12, // rest points 0.25 apart: neighbours must not overlap
     placement: i % 2 ? 'left' : 'right',
     label: p.name.value,
     render: () => (
@@ -248,7 +253,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'Technology stack',
     render: () => (
       <>
-        <Kicker>Rings · Technology stack</Kicker>
+        <Kicker>Rings</Kicker>
+        <h2 className={styles.heading}>Tech stack</h2>
         <dl className={styles.rings}>
           {stack.map((g) => (
             <div key={g.id}>
@@ -270,7 +276,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'Certifications',
     render: () => (
       <>
-        <Kicker>Discipline · Certifications</Kicker>
+        <Kicker>Discipline</Kicker>
+        <h2 className={styles.heading}>Certifications</h2>
         <ul className={styles.lines}>
           {certifications.value.map((c) => (
             <li key={c.name}>
@@ -294,7 +301,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'Achievements',
     render: () => (
       <>
-        <Kicker>Proof · Achievements</Kicker>
+        <Kicker>Proof</Kicker>
+        <h2 className={styles.heading}>Achievements</h2>
         <ul className={styles.lines}>
           {achievements.filter(shouldShow).map((a) => (
             <li key={a.value}>
@@ -315,7 +323,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'What comes next',
     render: () => (
       <>
-        <Kicker>Horizon · What comes next</Kicker>
+        <Kicker>Horizon</Kicker>
+        <h2 className={styles.heading}>What comes next</h2>
         <p className={styles.lead}>
           <FactText fact={content.learning} />
         </p>

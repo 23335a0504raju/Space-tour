@@ -109,7 +109,9 @@ export function Director({ master, frame, links }: Props) {
           : 0;
       if (Math.abs(o - entry.last) < 0.002) continue;
       entry.last = o;
-      entry.el.style.opacity = o.toFixed(3);
+      // one value per panel; CSS derives the panel fade and the staged reveal of its parts from
+      // it (overlays.module.css), so the stagger is still a pure function of progress
+      entry.el.style.setProperty('--o', o.toFixed(3));
       const visible = o > 0.01;
       if (visible !== entry.visible) {
         entry.visible = visible;

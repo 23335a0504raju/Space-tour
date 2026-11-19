@@ -26,6 +26,8 @@ import {
 import { dprForBudget, PIXEL_BUDGET_MP } from '../quality/pixelBudget.ts';
 import type { QualityTier } from '../quality/pixelBudget.ts';
 import { buildTrack, classifyAspect, progressFor } from '../scroll/resolver.ts';
+import type { Track } from '../scroll/resolver.ts';
+import { sectionIndexFor, sections } from '../../chapters/sections.ts';
 import { ScrollTrack } from '../scroll/ScrollTrack.tsx';
 import { usePacedWheel } from '../scroll/usePacedWheel.ts';
 import { useScrollMaster } from '../scroll/useScrollMaster.ts';
@@ -40,6 +42,39 @@ const WARM_WINDOW = 1;
 const PRELOAD_GIVE_UP_MS = 45_000;
 
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Readable band around a rest point, in local t (was 0.12 with a 0.05 ramp: text was fully readable
+ * for only ±7 % of a chapter). Chapters with rest points closer than 2 × band set their own.
+ */
+const DEFAULT_BAND = 0.16;
+
+/** Longest a jump keeps its fade up while the target chapter mounts. */
+const JUMP_WAIT_MAX_MS = 2500;
+
+/**
+ * Resolves once chapter `id` is mounted and has drawn meshes for a few frames (or after
+ * JUMP_WAIT_MAX_MS). Runs on the GSAP ticker, the one clock; touches no story state.
+ */
+function waitForChapter(links: DirectorLinks, id: string): Promise<void> {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    let drawn = 0;
+    const tick = () => {
+      const group = links.groups.get(id);
+      let meshes = 0;
+      group?.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) meshes += 1;
+      });
+      if (meshes > 0) drawn += 1;
+      if (drawn >= 3 || performance.now() - start > JUMP_WAIT_MAX_MS) {
+        gsap.ticker.remove(tick);
+        resolve();
+      }
+    };
+    gsap.ticker.add(tick);
+  });
+}
 
 /**
  * Exactly one tone-mapping stage. With the post chain (Balanced) the ToneMapping effect owns it and
@@ -133,13 +168,13 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
               if (links.overlays.get(def.key)?.el === el) return;
               el.inert = true;
               el.setAttribute('aria-hidden', 'true');
-              el.style.opacity = '0';
+              el.style.setProperty('--o', '0');
               el.style.visibility = 'hidden';
               links.overlays.set(def.key, {
                 el,
                 chapterId: def.chapterId,
                 rest: def.rest,
-                half: def.band ?? 0.12,
+                half: def.band ?? DEFAULT_BAND,
                 holdToEnd: def.holdToEnd ?? false,
                 last: 0,
                 visible: false,
@@ -156,25 +191,76 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
   );
 }
 
-function ProgressIndicator({ links }: { links: DirectorLinks }) {
-  const index = useJourneyStore((s) => s.activeIndex);
-  const meta = chapters[index];
+const num = (i: number) => String(i + 1).padStart(2, '0');
+
+/**
+ * Bottom bar: Flight Plan menu, the progress track with one tick per visitor section, the current
+ * section, and previous/next. The fill is written by the Director every frame (no React state);
+ * the label changes once per chapter.
+ */
+function BottomBar({
+  links,
+  track,
+  entered,
+  onJump,
+  onStep,
+}: {
+  links: DirectorLinks;
+  track: Track;
+  entered: boolean;
+  onJump: (id: string) => void;
+  onStep: (dir: 1 | -1) => void;
+}) {
+  const current = useJourneyStore((s) => sectionIndexFor(s.activeIndex));
+  const section = sections[current];
   return (
-    <div className={styles.progress}>
-      <div
-        className={styles.progressFill}
-        ref={(el) => {
-          links.progressBar = el;
-        }}
-      />
+    <div className={styles.bottom}>
+      {/* hidden behind the start gate (its dock owns that corner); the header stays reachable */}
+      {entered && <FlightPlan current={current} onJump={onJump} />}
+      <div className={styles.track}>
+        <div
+          className={styles.progressFill}
+          ref={(el) => {
+            links.progressBar = el;
+          }}
+        />
+        {/* pointer shortcut only: the Flight Plan menu is the accessible list of the same jumps */}
+        {sections.map((s, i) => (
+          <button
+            key={s.id}
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            className={styles.tick}
+            data-current={i === current || undefined}
+            data-passed={i < current || undefined}
+            style={{ left: `${progressFor(track, s.chapterIds[0] ?? s.target, 0) * 100}%` }}
+            title={s.label}
+            onClick={() => onJump(s.target)}
+          />
+        ))}
+      </div>
       <p className={styles.progressLabel} aria-live="polite">
-        {meta ? `${meta.scene} · ${meta.title}` : ''}
+        <span className={styles.progressCount}>
+          {num(current)} / {num(sections.length - 1)}
+        </span>{' '}
+        {section?.label}
       </p>
+      {entered && (
+        <span className={styles.stepper}>
+          <button type="button" aria-label="Previous stop" onClick={() => onStep(-1)}>
+            ←
+          </button>
+          <button type="button" aria-label="Next stop" onClick={() => onStep(1)}>
+            →
+          </button>
+        </span>
+      )}
     </div>
   );
 }
 
-function FlightPlan({ onJump }: { onJump: (id: string) => void }) {
+function FlightPlan({ current, onJump }: { current: number; onJump: (id: string) => void }) {
   const tier = useJourneyStore((s) => s.tier);
   const setTier = useJourneyStore((s) => s.setTier);
   const choose = (t: QualityTier) => {
@@ -184,25 +270,29 @@ function FlightPlan({ onJump }: { onJump: (id: string) => void }) {
   return (
     <details className={styles.plan}>
       <summary>Flight plan</summary>
-      <ol>
-        {chapters
-          .filter((c) => c.navLabel)
-          .map((c) => (
-            <li key={c.id}>
-              <button type="button" onClick={() => onJump(c.id)}>
-                <span className={styles.planScene}>{c.scene}</span> {c.navLabel}
+      <div className={styles.planBody}>
+        <ol>
+          {sections.map((s, i) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                aria-current={i === current ? 'location' : undefined}
+                onClick={() => onJump(s.target)}
+              >
+                <span className={styles.planScene}>{num(i)}</span> {s.label}
               </button>
             </li>
           ))}
-      </ol>
-      <p className={styles.quality}>
-        Quality:{' '}
-        {(['balanced', 'low'] as const).map((t) => (
-          <button key={t} type="button" aria-pressed={tier === t} onClick={() => choose(t)}>
-            {t === 'balanced' ? 'High' : 'Low'}
-          </button>
-        ))}
-      </p>
+        </ol>
+        <p className={styles.quality}>
+          Graphics{' '}
+          {(['balanced', 'low'] as const).map((t) => (
+            <button key={t} type="button" aria-pressed={tier === t} onClick={() => choose(t)}>
+              {t === 'balanced' ? 'High' : 'Low'}
+            </button>
+          ))}
+        </p>
+      </div>
     </details>
   );
 }
@@ -321,36 +411,49 @@ function JourneyCanvas() {
       fade.style.opacity = '1';
       window.setTimeout(() => {
         master.jumpTo(target);
-        window.setTimeout(() => (fade.style.opacity = '0'), 200);
+        // lift the fade only once the target chapter has drawn (a cold chapter used to show
+        // black for over 1.5 s after the fade: UI_SCROLL_AUDIT.md J1)
+        void waitForChapter(links, id).then(() => (fade.style.opacity = '0'));
       }, 180);
     },
     [links, master, enter],
   );
+
+  // ←/→ keys and the bottom bar's buttons step between rest points (native scroll keys still work)
+  const step = useCallback(
+    (dir: 1 | -1) => {
+      const rests = chapters.flatMap((c) => c.restPoints.map((r) => progressFor(track, c.id, r)));
+      const p = master.state.progress;
+      const next =
+        dir > 0
+          ? rests.find((r) => r > p + 0.002)
+          : [...rests].reverse().find((r) => r < p - 0.002);
+      if (next !== undefined) master.scrollToProgress(next, !prefersReducedMotion());
+      return next !== undefined;
+    },
+    [track, master],
+  );
+
+  // the quality tier as a document attribute, for tier-gated CSS (panel blur on High only)
+  useEffect(() => {
+    document.documentElement.dataset.tier = tier;
+  }, [tier]);
 
   useEffect(() => {
     setNavigate(jump);
     return () => setNavigate(null);
   }, [jump, setNavigate]);
 
-  // Keyboard: ←/→ step between rest points (native scrolling keys keep working).
   useEffect(() => {
-    const rests = chapters.flatMap((c) => c.restPoints.map((r) => progressFor(track, c.id, r)));
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
       const target = e.target as HTMLElement | null;
       if (target?.closest('input, textarea, select, dialog[open]')) return;
-      const p = master.state.progress;
-      const next =
-        e.key === 'ArrowRight'
-          ? rests.find((r) => r > p + 0.002)
-          : [...rests].reverse().find((r) => r < p - 0.002);
-      if (next === undefined) return;
-      e.preventDefault();
-      master.scrollToProgress(next, !prefersReducedMotion());
+      if (step(e.key === 'ArrowRight' ? 1 : -1)) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [track, master]);
+  }, [step]);
 
   const dpr = dprForBudget(viewport.w, viewport.h, window.devicePixelRatio, PIXEL_BUDGET_MP[tier]);
   const mounted = assetsReady
@@ -422,9 +525,7 @@ function JourneyCanvas() {
       />
       <OverlayLayer links={links} />
       <div ref={fadeRef} className={styles.jumpFade} aria-hidden="true" />
-      <ProgressIndicator links={links} />
-      {/* hidden behind the start gate (its dock owns that corner); the header stays reachable */}
-      {entered && <FlightPlan onJump={jump} />}
+      <BottomBar links={links} track={track} entered={entered} onJump={jump} onStep={step} />
 
       {reducedNotice && (
         <div className={styles.notice} role="status">

@@ -96,7 +96,10 @@ test('journey: flight plan jumps straight to a chapter', async ({ page }) => {
   await page.getByRole('button', { name: /Stack/ }).click();
   await page.waitForTimeout(SETTLE_MS);
   await expect(panel(page, 'Technology stack')).toBeVisible();
-  await expect(page.getByText('SC09 · Stack Rings')).toBeVisible();
+  // visitor-facing section label (internal SC codes are no longer shown)
+  await expect(
+    page.locator('p[aria-live="polite"]').filter({ hasText: /05 \/ 07\s+Tech Stack/ }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 

@@ -1,4 +1,6 @@
 import { lazy, Suspense, useRef } from 'react';
+import { headerTarget, sectionIndexFor, sections } from '../chapters/sections.ts';
+import type { HeaderItem } from '../chapters/sections.ts';
 import { content } from '../content/index.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
@@ -15,6 +17,14 @@ const Journey = lazy(() =>
 
 const { identity, contact } = content;
 
+/** Section links (Contact opens the sheet instead). `brief` is the no-journey fallback. */
+const NAV: ReadonlyArray<{ item: HeaderItem; label: string; brief: string }> = [
+  { item: 'about', label: 'About', brief: '/brief/' },
+  { item: 'experience', label: 'Experience', brief: '/brief/#experience' },
+  { item: 'projects', label: 'Projects', brief: '/brief/#projects' },
+  { item: 'skills', label: 'Skills', brief: '/brief/#strengths' },
+];
+
 /**
  * Journey page: persistent UI (always reachable, from the first frame) + the cinematic journey
  * + the contact sheet. Name, role, Projects, Resume, Contact and Mission Brief never require
@@ -23,6 +33,8 @@ const { identity, contact } = content;
 export function App() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const navigate = useJourneyStore((s) => s.navigate);
+  // discrete: changes once per chapter, never per frame
+  const active = useJourneyStore((s) => sections[sectionIndexFor(s.activeIndex)]?.header ?? null);
 
   return (
     <>
@@ -40,22 +52,39 @@ export function App() {
           </span>
         </h1>
         <nav aria-label="Primary" className={styles.actions}>
-          {navigate ? (
-            <button type="button" onClick={() => navigate('sc08-jupiter')}>
-              Projects
-            </button>
-          ) : (
-            <a href="/brief/#projects">Projects</a>
-          )}
+          {NAV.map(({ item, label, brief }) => {
+            const target = headerTarget(item);
+            const current = active === item ? ('location' as const) : undefined;
+            return navigate && target ? (
+              <button
+                key={item}
+                type="button"
+                aria-current={current}
+                onClick={() => navigate(target)}
+              >
+                {label}
+              </button>
+            ) : (
+              <a key={item} href={brief} aria-current={current}>
+                {label}
+              </a>
+            );
+          })}
+          <button
+            type="button"
+            aria-current={active === 'contact' ? 'location' : undefined}
+            onClick={() => dialogRef.current?.showModal()}
+          >
+            Contact
+          </button>
           {shouldShow(contact.resumeUrl) && (
             <a href={contact.resumeUrl.value} download>
               <FactText fact={contact.resumeUrl}>Resume</FactText>
             </a>
           )}
-          <button type="button" onClick={() => dialogRef.current?.showModal()}>
-            Contact
-          </button>
-          <a href="/brief/">Mission Brief</a>
+          <a className={styles.secondary} href="/brief/">
+            Mission Brief
+          </a>
         </nav>
       </header>
 

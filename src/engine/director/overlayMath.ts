@@ -11,7 +11,13 @@ const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 export function restOpacity(
   localT: number,
   rest: number,
-  { half = 0.12, ramp = 0.05, holdToEnd = false } = {},
+  {
+    half = 0.12,
+    // the ramp is where the staged reveal plays (kicker → heading → body → actions), so it scales
+    // with the band: wide enough to read as a sequence, never eating the fully readable middle
+    ramp = Math.min(0.08, half * 0.4),
+    holdToEnd = false,
+  } = {},
 ): number {
   if (holdToEnd && localT >= rest) return 1;
   const d = Math.abs(localT - rest);
