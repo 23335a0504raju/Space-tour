@@ -261,6 +261,29 @@ Checks: `npm run verify` passes (105 tests, including 4 new camera tests: flows 
 
 - **J1: a long jump can show a black frame for more than 1.5 s.** Jumping straight to SC08 (as the header's Projects link does) rendered black on the first capture with *both* the old and new cameras; the chapter was not mounted yet when the jump fade lifted. To fix in step 4 (navigation): hold the jump fade until the target chapter has rendered a frame.
 
+---
+
+## Step 3 result: opening and typography (desktop), 2026-11-19
+
+Decisions by Raju (closes Q1): role "Full-Stack Software Engineer & AI Builder", name "Raju Chowdavada", hook line "Building beyond the ordinary", typefaces Space Grotesk + Inter.
+
+### Changes
+
+| Area | Change |
+|---|---|
+| Content | `identity.name` and `identity.role` are now `confirmed`. New `identity.tagline` (confirmed copy). Q1 marked resolved in `CREATIVE_DECISIONS.md`. Content audit: conflicts 4 → 2. |
+| Fonts | `@fontsource-variable/space-grotesk` and `@fontsource-variable/inter` (5.3.0, OFL, self-hosted, registered as A034/A035). Labels use Inter in spaced capitals, so there are two families. The browser loads only the latin subsets (22 KB + 48 KB). |
+| Tokens | New type scale: body 17 px; lead up to 24 px; section heading 36–64 px (`--text-h2`); hero 48–96 px (`--text-display`); `--measure`. |
+| Header | Name 20 px in the display face, role 13 px, nav 13 px Inter caps (was 12 px monospace). Its structure (sections, active state) is step 4. |
+| Start gate | Kicker "Mission 001 · Origin" (was "SC01 · Signal"). The hook line is the headline (decode effect), then name, role and the resume summary. The dock has "Scroll to begin ↓", **Explore projects** (jumps to SC08) and **Begin mission**. |
+| SC02 introduction | First use of the **editorial** panel type: name as a large heading, role, summary, then **Explore projects** and Mission Brief. Set straight over the scene on a soft vignette with no box. Readable band widened to ±0.25 of the chapter (`band` option on overlays). The summary is no longer repeated alone in SC03. |
+
+**Resume button: not added.** `contact.resumeUrl` is still `missing` (two different resume PDFs exist, Q5). It will appear in the header and the opening as soon as the current PDF is supplied.
+
+Checks: `npm run verify` passes (105 tests). `npm run build` passes. `npx playwright test` passes 24/24, including axe with zero violations on `/`, `/?gate=off` and `/brief/`. Both fonts are confirmed loaded in the built page.
+
+Known, for later steps: the gate headline sits over the ship in the window and the SC02 summary partly over the helmet (camera framing, step 5). Phone layout is deferred.
+
 ### Decisions I need from you
 
 1. **Name and role (Q1):** "Raju Chowdavada" and which role: "Software Engineer", or the site's "Full-Stack Software Engineer & AI Builder"?

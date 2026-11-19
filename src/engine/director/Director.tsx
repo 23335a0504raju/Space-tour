@@ -16,6 +16,8 @@ export interface OverlayEntry {
   readonly el: HTMLElement;
   readonly chapterId: string;
   readonly rest: number;
+  /** Half-width of the readable band around the rest point (local t). */
+  readonly half: number;
   readonly holdToEnd: boolean;
   last: number;
   visible: boolean;
@@ -103,7 +105,7 @@ export function Director({ master, frame, links }: Props) {
     for (const entry of links.overlays.values()) {
       const o =
         entry.chapterId === r.id
-          ? restOpacity(r.localT, entry.rest, { holdToEnd: entry.holdToEnd })
+          ? restOpacity(r.localT, entry.rest, { half: entry.half, holdToEnd: entry.holdToEnd })
           : 0;
       if (Math.abs(o - entry.last) < 0.002) continue;
       entry.last = o;

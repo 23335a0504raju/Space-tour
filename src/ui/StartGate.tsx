@@ -77,8 +77,10 @@ export function StartGate() {
   const scrim = useRef<HTMLDivElement>(null);
   const title = useRef<HTMLDivElement>(null);
   const kicker = useRef<HTMLParagraphElement>(null);
+  const tagline = useRef<HTMLParagraphElement>(null);
   const name = useRef<HTMLParagraphElement>(null);
   const role = useRef<HTMLParagraphElement>(null);
+  const summary = useRef<HTMLParagraphElement>(null);
   const dock = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const warp = useRef({ v: 0 });
@@ -106,7 +108,7 @@ export function StartGate() {
   }, [ready]);
 
   const stage = gone ? 'gone' : entered ? 'leaving' : revealed ? 'title' : 'loading';
-  const nameText = shouldShow(identity.name) ? String(identity.name.value) : '';
+  const taglineText = shouldShow(identity.tagline) ? String(identity.tagline.value) : '';
 
   // Scroll is locked only while there is nothing to show yet (assets loading). Header jumps still
   // work: they enter and unlock.
@@ -148,43 +150,37 @@ export function StartGate() {
   // Beat 2: warp, letterbox reveal, push-in, decode.
   useLayoutEffect(() => {
     if (stage !== 'title' || skipped) return;
-    const els = { kicker: kicker.current, name: name.current, role: role.current };
+    const els = {
+      kicker: kicker.current,
+      tagline: tagline.current,
+      name: name.current,
+      role: role.current,
+      summary: summary.current,
+    };
     const bars = [barTop.current, barBottom.current];
     const cam = canvasEl();
     const barPx = barHeight();
     if (prefersReducedMotion()) {
       gsap.set([loader.current, stars.current], { autoAlpha: 0 });
       gsap.set(bars, { height: barPx });
-      gsap.set([scrim.current, els.kicker, els.name, els.role, dock.current], { opacity: 1 });
+      gsap.set([scrim.current, ...Object.values(els), dock.current], { opacity: 1 });
       button.current?.focus({ preventScroll: true });
       return;
     }
+    const rise = { opacity: 1, y: 0, ease: 'power3.out' };
     const tl = gsap.timeline();
     tl.to(warp.current, { v: 1, duration: 0.7, ease: 'power2.in' }, 0)
       .to(loader.current, { scale: 1.5, autoAlpha: 0, duration: 0.55, ease: 'power2.in' }, 0.05)
       .to(stars.current, { autoAlpha: 0, duration: 0.35 }, 0.6)
       .to(bars, { height: barPx, duration: 1.15, ease: 'expo.inOut' }, 0.5)
       .fromTo(scrim.current, { opacity: 0 }, { opacity: 1, duration: 1 }, 0.9)
-      .fromTo(
-        els.kicker,
-        { opacity: 0, y: 14 },
-        { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' },
-        1.1,
-      )
-      .fromTo(
-        els.role,
-        { opacity: 0, y: 14 },
-        { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out' },
-        1.7,
-      )
-      .fromTo(
-        dock.current,
-        { opacity: 0, y: 10 },
-        { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' },
-        1.5,
-      )
-      .call(() => button.current?.focus({ preventScroll: true }), undefined, 1.6);
-    if (els.name) tl.add(scramble(els.name, nameText, 1.1), 1.2);
+      .fromTo(els.kicker, { opacity: 0, y: 14 }, { ...rise, duration: 0.6 }, 1.1)
+      .fromTo(els.name, { opacity: 0, y: 14 }, { ...rise, duration: 0.7 }, 1.75)
+      .fromTo(els.role, { opacity: 0, y: 14 }, { ...rise, duration: 0.7 }, 1.9)
+      .fromTo(els.summary, { opacity: 0, y: 14 }, { ...rise, duration: 0.8 }, 2.05)
+      .fromTo(dock.current, { opacity: 0, y: 10 }, { ...rise, duration: 0.6 }, 2.2)
+      .call(() => button.current?.focus({ preventScroll: true }), undefined, 2.3);
+    if (els.tagline) tl.add(scramble(els.tagline, taglineText, 1.1), 1.2);
     if (cam) {
       tl.fromTo(cam, { scale: 1.14 }, { scale: 1.03, duration: 5, ease: 'power2.out' }, 0.5);
     }
@@ -204,7 +200,7 @@ export function StartGate() {
       tl.kill();
       if (onMove) window.removeEventListener('pointermove', onMove);
     };
-  }, [stage, skipped, nameText]);
+  }, [stage, skipped, taglineText]);
 
   // Beat 3: hand-off. The Journey eases the camera to SC02's title card at the same moment.
   useLayoutEffect(() => {
@@ -292,31 +288,48 @@ export function StartGate() {
         aria-label="Loading the journey"
       />
 
+      {/* aria-hidden: the header's h1 and the SC02 introduction carry the same facts for AT */}
       <div ref={title} className={styles.title} aria-hidden="true">
         <p ref={kicker} className={styles.kicker}>
-          SC01 · Signal
+          Mission 001 · Origin
+        </p>
+        <p ref={tagline} className={styles.tagline}>
+          {taglineText}
         </p>
         <p ref={name} className={styles.name}>
-          {nameText}
+          <FactText fact={identity.name} />
         </p>
         <p ref={role} className={styles.role}>
           <FactText fact={identity.role} />
+        </p>
+        <p ref={summary} className={styles.summary}>
+          <FactText fact={identity.summary} />
         </p>
       </div>
 
       <div ref={dock} className={styles.dock}>
         <p className={styles.status} aria-hidden="true">
-          <span className={styles.dot} /> All systems ready
+          <span className={styles.dot} /> Scroll to begin <span className={styles.arrow}>↓</span>
         </p>
-        <button
-          ref={button}
-          type="button"
-          className={styles.begin}
-          disabled={stage !== 'title'}
-          onClick={() => enter('begin')}
-        >
-          Begin mission <span aria-hidden="true">→</span>
-        </button>
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.secondary}
+            disabled={stage !== 'title'}
+            onClick={() => useJourneyStore.getState().navigate?.('sc08-jupiter')}
+          >
+            Explore projects
+          </button>
+          <button
+            ref={button}
+            type="button"
+            className={styles.begin}
+            disabled={stage !== 'title'}
+            onClick={() => enter('begin')}
+          >
+            Begin mission <span aria-hidden="true">→</span>
+          </button>
+        </div>
       </div>
     </section>
   );

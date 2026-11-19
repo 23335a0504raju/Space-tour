@@ -156,8 +156,10 @@
 }
 
 .kicker,
+.tagline,
 .name,
-.role {
+.role,
+.summary {
   margin: 0;
   opacity: 0;
 }
@@ -180,22 +182,42 @@
   background: var(--color-accent);
 }
 
-.name {
+/* The hook line is the headline; the name and role introduce the person under it. */
+.tagline {
+  max-width: 14ch;
+  margin-bottom: var(--space-2);
   font-family: var(--font-display);
-  font-size: clamp(2.75rem, 1rem + 7.5vw, 8.5rem);
+  font-size: var(--text-display);
   font-weight: 700;
-  line-height: 0.95;
+  line-height: 0.98;
   letter-spacing: -0.035em;
-  text-transform: uppercase;
   color: var(--color-text);
   text-shadow: 0 2px 30px rgb(5 6 10 / 60%);
 }
 
+.name {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--color-text);
+}
+
 .role {
   font-family: var(--font-mono);
-  font-size: clamp(0.8rem, 0.7rem + 0.4vw, 1rem);
-  letter-spacing: 0.24em;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.summary {
+  max-width: 46ch;
+  margin-top: var(--space-2);
+  font-size: var(--text-lg);
+  line-height: 1.5;
   color: var(--color-text);
 }
 
@@ -225,6 +247,59 @@
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   color: var(--color-muted);
+}
+
+.arrow {
+  display: inline-block;
+  animation: nudge 1.8s ease-in-out infinite;
+}
+
+@keyframes nudge {
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrow {
+    animation: none;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  padding: 0 var(--space-6);
+  border: 1px solid rgb(233 231 225 / 45%);
+  background: rgb(5 6 10 / 35%);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+.secondary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.secondary:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
 }
 
 .dot {

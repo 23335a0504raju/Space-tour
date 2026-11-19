@@ -190,7 +190,7 @@
 ## B3-4. Unresolved: requires your decision ❓
 | # | Question |
 |---|---|
-| Q1 | Role title: "Software Engineer" or "Full-Stack Software Engineer & AI Builder" (or another)? Name order "Raju Chowdavada"? |
+| ~~Q1~~ | **Resolved 2026-11-19:** role "Full-Stack Software Engineer & AI Builder", name "Raju Chowdavada", opening hook line "Building beyond the ordinary", typefaces Space Grotesk (display) + Inter (body and labels). |
 | Q2 | CGPA: 8.31 or 8.36? Is "AI & ML" a formal B.Tech specialisation? |
 | Q3 | MeraSports / Sports Paramount and Arcslot: what are they, what was your role, and may they be shown (employer confidentiality)? |
 | Q4 | Is CodeAlpha an internship to list under Experience? |

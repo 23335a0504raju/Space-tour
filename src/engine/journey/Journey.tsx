@@ -123,7 +123,7 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
         <section
           key={def.key}
           aria-label={def.label}
-          className={`${overlayStyles.panel} ${overlayStyles[def.placement]}`}
+          className={`${overlayStyles.panel} ${overlayStyles[def.placement]} ${def.variant ? overlayStyles[def.variant] : ''}`}
           ref={(el) => {
             if (el) {
               // React re-runs this inline ref on every re-render (e.g. when the active chapter
@@ -139,6 +139,7 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
                 el,
                 chapterId: def.chapterId,
                 rest: def.rest,
+                half: def.band ?? 0.12,
                 holdToEnd: def.holdToEnd ?? false,
                 last: 0,
                 visible: false,

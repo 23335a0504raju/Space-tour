@@ -49,6 +49,83 @@
   max-width: none;
 }
 
+/* Editorial: large type straight over the scene. No box: a soft dark vignette behind the text keeps
+   AA contrast over the pale room walls without framing the copy as a card. */
+.editorial {
+  isolation: isolate;
+  gap: var(--space-4);
+  max-width: min(40rem, calc(100vw - 2 * var(--gutter)));
+  max-height: none;
+  overflow: visible;
+  padding: var(--space-6) 0;
+  background: none;
+  border-left: 0;
+  text-shadow: 0 1px 18px rgb(5 6 10 / 55%);
+}
+
+.editorial::before {
+  content: '';
+  position: absolute;
+  inset: -35% -45% -35% -60%;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse 55% 50% at 45% 50%,
+    rgb(5 6 10 / 82%) 0%,
+    rgb(5 6 10 / 62%) 45%,
+    rgb(5 6 10 / 0%) 100%
+  );
+  pointer-events: none;
+}
+
+.editorial .display {
+  font-size: var(--text-h2);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.editorial .lead {
+  max-width: 44ch;
+  line-height: 1.5;
+}
+
+.role {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+  margin-top: var(--space-2);
+  text-shadow: none;
+}
+
+.ctas .bay {
+  margin-top: 0;
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.ghost:hover {
+  border-bottom-color: var(--color-accent);
+}
+
 @media (max-width: 720px) {
   .left,
   .right,
@@ -84,6 +161,8 @@
 
 .title {
   font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .lead {
@@ -179,6 +258,7 @@
   font: inherit;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   color: var(--color-bg);

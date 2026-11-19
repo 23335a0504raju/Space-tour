@@ -15,6 +15,10 @@ export interface OverlayDef {
   readonly chapterId: string;
   readonly rest: number;
   readonly placement: 'center' | 'left' | 'right' | 'bottom';
+  /** 'editorial': large type straight over the scene on a soft vignette, no panel box. */
+  readonly variant?: 'editorial';
+  /** Half-width of the readable band around the rest point, in local t (default 0.12). */
+  readonly band?: number;
   readonly label: string;
   readonly holdToEnd?: boolean;
   /** When false the panel is left out entirely (e.g. its facts are not confirmed yet). */
@@ -61,33 +65,40 @@ const supporting = projects.filter((p) => p.tier === 'dossier');
 
 const allOverlayDefs: readonly OverlayDef[] = [
   {
+    // The introduction: who, what, and the two ways on (UI_SCROLL_AUDIT.md §5). The summary used
+    // to follow alone in SC03; it lives here now so the opening says everything at once.
     key: 'title',
     chapterId: 'sc02-room',
     rest: 0.6,
+    band: 0.25,
     placement: 'left',
+    variant: 'editorial',
     label: 'Introduction',
     render: () => (
       <>
-        <Kicker>Mission · Origin</Kicker>
+        <Kicker>Mission 001 · Origin</Kicker>
         <h2 className={styles.display}>
           <FactText fact={identity.name} />
         </h2>
-        <p className={styles.lead}>
+        <p className={styles.role}>
           <FactText fact={identity.role} />
         </p>
+        <p className={styles.lead}>
+          <FactText fact={identity.summary} />
+        </p>
+        <p className={styles.ctas}>
+          <button
+            type="button"
+            className={styles.bay}
+            onClick={() => useJourneyStore.getState().navigate?.('sc08-jupiter')}
+          >
+            Explore projects
+          </button>
+          <a className={styles.ghost} href="/brief/">
+            Mission Brief
+          </a>
+        </p>
       </>
-    ),
-  },
-  {
-    key: 'summary',
-    chapterId: 'sc03-departure',
-    rest: 0.35,
-    placement: 'bottom',
-    label: 'Summary',
-    render: () => (
-      <p className={styles.lead}>
-        <FactText fact={identity.summary} />
-      </p>
     ),
   },
   {
