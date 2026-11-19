@@ -274,21 +274,16 @@ function JourneyCanvas() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Start gate: scroll stays locked until Begin (programmatic jumps still work).
-  useEffect(() => {
-    if (entered) return;
-    document.documentElement.style.overflow = 'hidden';
-    return () => {
-      document.documentElement.style.overflow = '';
-    };
-  }, [entered]);
+  // (The start gate locks scroll only while assets load; from its title on, scrolling enters.)
 
   // Hand-off: after Begin, the camera eases into SC02's first rest point (title card) in 1.5 s.
-  // A jump from the header/Flight plan before Begin supplies its own target and skips this.
-  const handoffSkipped = useRef(entered);
+  // Entering by scrolling or by a jump skips it: the visitor's own input stays in charge. Any
+  // input during the hand-off also cancels it, so it never fights the wheel.
+  const enteredBy = useJourneyStore((s) => s.enteredBy);
+  const handoffDone = useRef(false);
   useEffect(() => {
-    if (!entered || handoffSkipped.current) return;
-    handoffSkipped.current = true;
+    if (enteredBy !== 'begin' || handoffDone.current) return;
+    handoffDone.current = true;
     if (prefersReducedMotion()) return;
     const meta = chapters.find((c) => c.id === 'sc02-room');
     if (!meta) return;
@@ -299,15 +294,22 @@ function JourneyCanvas() {
       ease: 'power2.inOut',
       onUpdate: () => master.scrollToProgress(o.p, false),
     });
-    return () => void tween.kill();
-  }, [entered, master, links]);
+    const cancel = () => void tween.kill();
+    const opts = { once: true, passive: true } as const;
+    window.addEventListener('wheel', cancel, opts);
+    window.addEventListener('touchstart', cancel, opts);
+    window.addEventListener('keydown', cancel, { once: true });
+    return () => {
+      tween.kill();
+      window.removeEventListener('wheel', cancel);
+      window.removeEventListener('touchstart', cancel);
+      window.removeEventListener('keydown', cancel);
+    };
+  }, [enteredBy, master, links]);
 
   const jump = useCallback(
     (id: string) => {
-      if (!useJourneyStore.getState().entered) {
-        handoffSkipped.current = true;
-        enter();
-      }
+      if (!useJourneyStore.getState().entered) enter('jump');
       const meta = chapters.find((c) => c.id === id);
       const target = progressFor(links.track, id, meta?.restPoints[0] ?? 0.05);
       const fade = fadeRef.current;

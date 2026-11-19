@@ -58,6 +58,7 @@ function scramble(el: HTMLElement, text: string, duration: number): gsap.core.Tw
 export function StartGate() {
   const entered = useJourneyStore((s) => s.entered);
   const enter = useJourneyStore((s) => s.enter);
+  const enteredBy = useJourneyStore((s) => s.enteredBy);
   const assetsReady = useJourneyStore((s) => s.assetsReady);
   // scene loaders (from the in-memory copies): used only to know the first scene is built
   const { progress, active } = useProgress();
@@ -106,6 +107,39 @@ export function StartGate() {
 
   const stage = gone ? 'gone' : entered ? 'leaving' : revealed ? 'title' : 'loading';
   const nameText = shouldShow(identity.name) ? String(identity.name.value) : '';
+
+  // Scroll is locked only while there is nothing to show yet (assets loading). Header jumps still
+  // work: they enter and unlock.
+  useEffect(() => {
+    if (skipped || stage !== 'loading') return;
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = '';
+    };
+  }, [skipped, stage]);
+
+  // From the title on, the first scroll input enters the journey (Begin stays as the explicit
+  // action). The scroll itself moves the story on from the live SC02 shot behind the gate.
+  useEffect(() => {
+    if (skipped || stage !== 'title') return;
+    const go = () => enter('scroll');
+    const SCROLL_KEYS = new Set(['ArrowDown', 'PageDown', 'End', ' ', 'ArrowRight']);
+    const onKey = (e: KeyboardEvent) => {
+      if (!SCROLL_KEYS.has(e.key)) return;
+      // Space on the focused Begin button is a Begin press, not a scroll
+      if (e.key === ' ' && (e.target as HTMLElement | null)?.closest('button, a')) return;
+      go();
+    };
+    const opts = { passive: true } as const;
+    window.addEventListener('wheel', go, opts);
+    window.addEventListener('touchmove', go, opts);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('wheel', go);
+      window.removeEventListener('touchmove', go);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [skipped, stage, enter]);
 
   useLayoutEffect(() => {
     root.current?.style.setProperty('--bar', `${barHeight()}px`);
@@ -215,7 +249,8 @@ export function StartGate() {
   );
 
   if (skipped) return null;
-  if (stage === 'gone') return <ScrollHint />;
+  // a visitor who entered by scrolling already knows how to move on
+  if (stage === 'gone') return enteredBy === 'scroll' ? null : <ScrollHint />;
   const shown = ready ? 100 : pct;
   return (
     <section ref={root} className={styles.gate} aria-label="Start" inert={entered}>
@@ -278,7 +313,7 @@ export function StartGate() {
           type="button"
           className={styles.begin}
           disabled={stage !== 'title'}
-          onClick={enter}
+          onClick={() => enter('begin')}
         >
           Begin mission <span aria-hidden="true">→</span>
         </button>

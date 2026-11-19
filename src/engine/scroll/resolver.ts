@@ -100,7 +100,9 @@ export interface DwellOptions {
 export function dwell(
   s: number,
   restPoints: readonly number[],
-  { width, flatness }: DwellOptions = { width: 0.2, flatness: 0.15 },
+  // narrower and less frozen than v1 (0.2 / 0.15), which held the picture still while the visitor
+  // kept scrolling (UI_SCROLL_AUDIT.md S5)
+  { width, flatness }: DwellOptions = { width: 0.16, flatness: 0.25 },
 ): number {
   const x = clamp01(s);
   const knots: Array<[number, number]> = [[0, 0]];

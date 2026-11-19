@@ -1,12 +1,17 @@
-import { useRef } from 'react';
+import { lazy, Suspense, useRef } from 'react';
 import { content } from '../content/index.ts';
-import { Journey } from '../engine/journey/Journey.tsx';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
 import { ProjectBay } from '../ui/ProjectBay.tsx';
 import { StartGate } from '../ui/StartGate.tsx';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
 import styles from './App.module.css';
+
+// The WebGL journey (three, drei, every chapter) loads after first paint, so the header,
+// start gate and Mission Brief link never wait on it.
+const Journey = lazy(() =>
+  import('../engine/journey/Journey.tsx').then((m) => ({ default: m.Journey })),
+);
 
 const { identity, contact } = content;
 
@@ -54,7 +59,9 @@ export function App() {
         </nav>
       </header>
 
-      <Journey />
+      <Suspense fallback={<main aria-busy="true" aria-label="Loading the journey" />}>
+        <Journey />
+      </Suspense>
       <StartGate />
       <ProjectBay />
 

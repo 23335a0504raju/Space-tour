@@ -15,8 +15,13 @@ interface JourneyStore {
   readonly navigate: ((chapterId: string) => void) | null;
   /** Project Bay: the open project's id, or null when closed. */
   readonly bayProject: string | null;
-  /** Start gate passed (Begin pressed, or skipped with ?gate=off). Before it, scroll is locked. */
+  /** Start gate passed (Begin, the first scroll, a jump, or skipped with ?gate=off). */
   readonly entered: boolean;
+  /**
+   * How the gate was passed. Only 'begin' plays the camera hand-off to the title card; a scroll
+   * entry keeps the visitor's own scroll in charge, and a jump supplies its own target.
+   */
+  readonly enteredBy: 'begin' | 'scroll' | 'jump' | null;
   /** Every journey asset downloaded (or the preload gave up); chapters mount only after this. */
   readonly assetsReady: boolean;
   setActiveIndex(index: number): void;
@@ -25,7 +30,7 @@ interface JourneyStore {
   setNavigate(fn: ((chapterId: string) => void) | null): void;
   openBay(projectId: string): void;
   closeBay(): void;
-  enter(): void;
+  enter(by?: 'begin' | 'scroll' | 'jump'): void;
   setAssetsReady(): void;
 }
 
@@ -42,7 +47,8 @@ export const useJourneyStore = create<JourneyStore>((set) => ({
   setNavigate: (navigate) => set({ navigate }),
   openBay: (bayProject) => set({ bayProject }),
   closeBay: () => set({ bayProject: null }),
-  enter: () => set({ entered: true }),
+  enteredBy: null,
+  enter: (by = 'begin') => set((s) => (s.entered ? s : { entered: true, enteredBy: by })),
   assetsReady: false,
   setAssetsReady: () => set({ assetsReady: true }),
 }));

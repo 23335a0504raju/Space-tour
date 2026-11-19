@@ -28,8 +28,9 @@ describe('buildTrack', () => {
     expect(progressFor(track, 'sc08-jupiter')).toBeGreaterThan(0.33);
     expect(progressFor(track, 'sc08-jupiter')).toBeLessThan(0.4);
     expect(progressFor(track, 'sc13-transmission')).toBeGreaterThan(0.84);
-    expect(track.totalScreens).toBeGreaterThan(30);
-    expect(track.totalScreens).toBeLessThan(36);
+    // shortened from 33.5 for pace (UI_SCROLL_AUDIT.md step 1)
+    expect(track.totalScreens).toBeGreaterThan(20);
+    expect(track.totalScreens).toBeLessThan(25);
   });
 
   it('portrait tracks are shorter but keep the same proportions', () => {

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import gsap from 'gsap';
-import { PACING, clampLead, follow, wheelStep } from './pacing.ts';
+import { admitWheel, chargeBurst, clampLead, createBurst, follow, wheelStep } from './pacing.ts';
 
 /**
  * Desktop wheel/trackpad governor. Touch, keyboard, scrollbar drags and programmatic jumps stay
@@ -12,7 +12,7 @@ export function usePacedWheel(enabled: boolean): void {
     if (!enabled) return;
     let target = window.scrollY;
     let last = window.scrollY;
-    let lastWheel = 0;
+    const burst = createBurst();
     const max = () => document.documentElement.scrollHeight - window.innerHeight;
 
     const onWheel = (e: WheelEvent) => {
@@ -20,25 +20,24 @@ export function usePacedWheel(enabled: boolean): void {
       // a modal (Project Bay) scrolls itself; the page must stay where it is
       if (document.querySelector('dialog[open]')) return;
       e.preventDefault();
+      const vh = window.innerHeight;
+      // a fling that has already carried about one chapter: ignore the rest of its momentum
+      if (!admitWheel(burst, performance.now(), vh)) return;
       // someone else moved the page (keyboard, jump): start from where it really is
       if (Math.abs(window.scrollY - last) > 2) target = window.scrollY;
-      target = Math.min(max(), Math.max(0, target + wheelStep(e.deltaY, e.deltaMode, innerHeight)));
-      target = clampLead(window.scrollY, target);
-      lastWheel = performance.now();
+      target = Math.min(max(), Math.max(0, target + wheelStep(e.deltaY, e.deltaMode, vh)));
+      target = clampLead(window.scrollY, target, vh);
     };
     const tick = () => {
-      // wheel went quiet: drop whatever lead is left, so nothing drains after input ends
-      if (target !== window.scrollY && performance.now() - lastWheel > PACING.idleMs) {
-        target = window.scrollY;
-        return;
-      }
       if (Math.abs(window.scrollY - last) > 2) {
         target = window.scrollY;
         last = window.scrollY;
         return;
       }
       if (target === window.scrollY) return;
-      const next = follow(window.scrollY, target, gsap.ticker.deltaRatio());
+      const vh = window.innerHeight;
+      const next = follow(window.scrollY, target, gsap.ticker.deltaRatio(), vh);
+      chargeBurst(burst, next - window.scrollY, target - window.scrollY, vh);
       window.scrollTo({ top: next, behavior: 'instant' });
       last = window.scrollY;
     };

@@ -3,7 +3,7 @@ import type { ChapterMeta } from './types.ts';
 /**
  * Ordered journey (FINAL_STORYLINE.md + SCROLL_EXPERIENCE_MAP.md).
  * SC01 "Signal" is the pre-scroll HTML shell, so it is not a scroll chapter.
- * Lengths are planning estimates and will be tuned in testing.
+ * Lengths are tuned for pace: 22.6 screens in all (was 33.5; UI_SCROLL_AUDIT.md step 1).
  */
 export const chapters: readonly ChapterMeta[] = [
   {
@@ -12,7 +12,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'The Room',
     act: 'origin',
     artStyle: 'realistic',
-    screens: 1.5,
+    screens: 1.2,
     restPoints: [0.6],
     navLabel: 'Origin',
   },
@@ -23,7 +23,7 @@ export const chapters: readonly ChapterMeta[] = [
     seamlessFromPrevious: true, // same room, same camera: the astronaut simply stands up
     act: 'origin',
     artStyle: 'realistic',
-    screens: 2,
+    screens: 1.6,
     restPoints: [0.35],
   },
   {
@@ -32,7 +32,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Crew Record',
     act: 'launch',
     artStyle: 'realistic',
-    screens: 2.5,
+    screens: 2,
     restPoints: [0.35, 0.7],
     navLabel: 'Crew Record',
     briefAnchor: 'experience',
@@ -43,7 +43,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Ignition & Ascent',
     act: 'launch',
     artStyle: 'realistic',
-    screens: 1.5,
+    screens: 1,
     restPoints: [],
   },
   {
@@ -52,7 +52,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Orbital Sunrise',
     act: 'launch',
     artStyle: 'realistic',
-    screens: 2.5,
+    screens: 1.6,
     restPoints: [0.7],
     navLabel: 'Strengths',
     briefAnchor: 'strengths',
@@ -63,7 +63,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Outbound',
     act: 'transit',
     artStyle: 'realistic',
-    screens: 2.5,
+    screens: 1.6,
     restPoints: [0.8],
     briefAnchor: 'projects',
   },
@@ -73,7 +73,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Project Installations',
     act: 'transit',
     artStyle: 'realistic',
-    screens: 4,
+    screens: 3,
     restPoints: [0.25, 0.5, 0.75],
     navLabel: 'Projects',
     briefAnchor: 'projects',
@@ -84,7 +84,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Stack Rings',
     act: 'transit',
     artStyle: 'realistic',
-    screens: 2,
+    screens: 1.4,
     restPoints: [0.75],
     navLabel: 'Stack',
     briefAnchor: 'stack',
@@ -95,7 +95,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'The Crossing',
     act: 'beyond',
     artStyle: 'realistic',
-    screens: 2,
+    screens: 1.3,
     restPoints: [],
   },
   {
@@ -105,7 +105,7 @@ export const chapters: readonly ChapterMeta[] = [
     seamlessFromPrevious: true, // SC10 emerges into this very sky
     act: 'beyond',
     artStyle: 'anime',
-    screens: 2.5,
+    screens: 1.5,
     restPoints: [0.55],
     navLabel: 'Beyond',
     briefAnchor: 'certifications',
@@ -116,7 +116,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Proof',
     act: 'beyond',
     artStyle: 'anime',
-    screens: 2.5,
+    screens: 1.5,
     restPoints: [0.55],
     briefAnchor: 'achievements',
     optional: true,
@@ -127,7 +127,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Horizon',
     act: 'beyond',
     artStyle: 'anime',
-    screens: 2.5,
+    screens: 1.5,
     restPoints: [0.55],
     briefAnchor: 'direction',
   },
@@ -137,7 +137,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'The Return',
     act: 'beyond',
     artStyle: 'realistic',
-    screens: 1.5,
+    screens: 1,
     restPoints: [],
   },
   {
@@ -146,7 +146,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Final Transmission',
     act: 'homecoming',
     artStyle: 'realistic',
-    screens: 4,
+    screens: 2.4,
     restPoints: [0.6],
     navLabel: 'Contact',
     briefAnchor: 'contact',
