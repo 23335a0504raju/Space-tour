@@ -280,6 +280,15 @@ export function Brief() {
 
       <footer className={styles.footer}>
         <a href="/">Experience the mission</a>
+        {/* CC BY credits (assets/ASSET_REGISTER.md); the full credits page is a P5 item */}
+        <p className={styles.credits}>
+          3D set: based on{' '}
+          <a href="https://sketchfab.com/3d-models/sf-bridge-console-3fca908d15254573b0a8bbec7f3a8c05">
+            “SF bridge console / 科幻風艦橋”
+          </a>{' '}
+          by <a href="https://sketchfab.com/hovce">林柏勳 (Lin)</a>, licensed under{' '}
+          <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; modified.
+        </p>
       </footer>
     </>
   );

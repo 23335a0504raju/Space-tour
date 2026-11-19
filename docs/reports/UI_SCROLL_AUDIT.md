@@ -332,6 +332,40 @@ Draw calls are unchanged (colours only): SC02 153–168, SC03 159. **Still above
 
 Checks: `npm run verify` passes (109 tests). `npm run build` passes. `npx playwright test` passes 24/24.
 
+---
+
+## Opening room rebuilt on a detailed 3D model, 2026-11-19
+
+Raju's direction after step 5: detailed 3D models, opening room first. He chose "SF bridge console / 科幻風艦橋" by 林柏勳 (Lin), Sketchfab, CC BY 4.0 (asset **A036**), from a licence-checked shortlist.
+
+### What changed
+
+| Area | Change |
+|---|---|
+| Asset | `scripts/optimize-bridge.ts`: opaque shell plus transparent hologram (was a single BLEND material), 2048 KTX2, Meshopt: 5.45 MB → 789 KB, GPU textures 44 MB → 8.4 MB. **The bridge's crew seats beside the desk and on the walk were removed** (Raju: "two chairs at the sitting position"; located by raycasting the frames). Registered as A036; CC BY credit in the Mission Brief footer. |
+| Set | [Bridge.tsx](../../src/chapters/room/Bridge.tsx) replaces the code-built cabin, side door and outside launch-pad view (all hidden by the bridge's walls and ceiling). The hologram globe and rings turn as ambient motion. A cool hologram light and a lift light (raised by SC03) were added. |
+| Layout | [layout.ts](../../src/chapters/room/layout.ts): bridge placement, pit, lift, platform. New dev tool `node scripts/plan-view.ts [cutY] [name] [minX minZ span]` renders the set from above, cut at a height, with the 1 m grid and the walk and camera paths drawn on top. |
+| SC02 | The opening looks from the back of the deck: the globe beyond the monitors, the astronaut on the right third, the title on the left. It drifts to the title-card view. |
+| SC03 | The walk: stand → past the desk → across the deck → **climbs the platform stairs** (the body rises with the steps; Raju: "he was moving through the stairs") → along the cleared platform → steps down at its north tip → stops in the **lit lift doorway**; the white exit dip continues it. The chair rolls back to the right. The camera follows: back of the deck, up onto the platform behind them, then over the north stairs to the deck east of the lift, looking into the doorway. |
+| Tests | Departure tests rewritten for the bridge: chair clearance, camera ≥ 1 m from the walker, clear of the desk and the pit, **climbs the stairs (height follows the platform, never floats)**, ends in the lift doorway, pure in t. |
+
+### Measured (production build, Radeon 780M, 1440×900)
+
+| | Old room | Bridge |
+|---|---|---|
+| SC02 draw calls, High | 153–168 (over budget) | **101–126** |
+| SC03 draw calls, High | 159–171 | **53–59** |
+| Triangles, High | 206–227k | 145–176k |
+| Low tier, draw calls | 102–114 | 27–76 |
+| Frame time p95 | 17.1 ms | 17.1–17.2 ms (display-capped 60 fps) |
+
+The step 5 draw-call overage is gone. Checks: `npm run verify` passes 110/110. `npm run build` passes. `npx playwright test` passes 24/24.
+
+### Known, next
+
+- The hologram globe's texture is the model author's (a reddish planet); it could become Earth from the NASA textures already in the project, if wanted.
+- The phone layout of the new opening has not been checked (mobile is deferred).
+
 ### Decisions I need from you
 
 1. **Name and role (Q1):** "Raju Chowdavada" and which role: "Software Engineer", or the site's "Full-Stack Software Engineer & AI Builder"?

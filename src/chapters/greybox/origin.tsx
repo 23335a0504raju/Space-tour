@@ -1,7 +1,5 @@
 import { Suspense, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { sampleKeys } from '../../engine/camera/shots.ts';
-import type { ShotKey } from '../../engine/camera/shots.ts';
 import { Astronaut } from '../astronaut/Astronaut.tsx';
 import type { AstronautApi, Drive } from '../astronaut/Astronaut.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
@@ -13,7 +11,8 @@ import {
   chairPose,
   clamp01,
   departureShot,
-  doorOpen,
+  liftLight,
+  roomShot,
   span,
   walkedDistance,
   walkerAt,
@@ -36,16 +35,6 @@ const typingTime = (api: AstronautApi, elapsed: number) =>
   (elapsed * TYPING_RATE) % api.duration('typing');
 
 // ── SC02 · The Room ────────────────────────────────────────────────────────────
-const roomKeys: ShotKey[] = [
-  // Opening frame (behind the start gate's title): from behind-left of the astronaut, so the
-  // figure at the desk sits on the right third and the ship on the pad shows right of the title
-  // block, which owns the left half (UI_SCROLL_AUDIT.md F7). Was a view over the helmet at the
-  // window frame, with the title covering the ship.
-  { t: 0, position: [-1.0, 1.6, 1.2], target: [-1.52, 1.25, -8.8], fov: 42 },
-  // pull back through the room to reveal the astronaut at the desk
-  { t: 0.6, position: [2.35, 1.85, 0.5], target: [0, 1.0, -2.2], fov: 42 },
-  { t: 1, position: [1.45, 1.5, -0.55], target: [0, 1.05, -2.3], fov: 40 },
-];
 
 /** Seated at the desk, typing (the typing loop is ambient: wall-clock time). */
 const typingDrive: Drive = (_t, api, body, elapsed) => {
@@ -66,12 +55,12 @@ function RoomScene({ id, frame }: ChapterSceneProps) {
 
 export const sc02Room: ChapterImpl = {
   Scene: RoomScene,
-  shot: (t, out) => void sampleKeys(roomKeys, t, out),
+  shot: roomShot,
   background: '#04060b',
   environment: ROOM_ENV,
 };
 
-// ── SC03 · Departure: stand up, push the chair back, walk to the door, into the light ──
+// ── SC03 · Departure: stand up, push the chair back, cross the deck onto the lit lift ──
 const departureDrive: Drive = (t, api, body, elapsed) => {
   body.rotation.set(0, walkerAt(t, body.position), 0);
 
@@ -91,7 +80,7 @@ function DepartureScene({ id, frame }: ChapterSceneProps) {
   const set = useRef<RoomSetHandle>(null);
   useFrame(() => {
     if (frame.id !== id || !set.current) return;
-    set.current.setDoor(doorOpen(frame.t));
+    set.current.setLift(liftLight(frame.t));
     const c = chairPose(frame.t);
     set.current.setChair(c.x, c.z, c.rotY);
   });

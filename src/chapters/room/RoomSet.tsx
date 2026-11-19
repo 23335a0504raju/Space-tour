@@ -8,27 +8,22 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { gltfExtender } from '../../engine/assets/loaders.ts';
 import { registerEnvironment } from '../../engine/environment.ts';
 import { useJourneyStore } from '../../engine/store.ts';
-import { Starfield } from '../greybox/parts.tsx';
-import { HelVela } from '../ship/HelVela.tsx';
 import { ROOM_HDRI, ROOM_MODELS } from './assets.ts';
 import { createCodeScreenTexture } from './codeScreen.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
-import { CHAIR_REST, DESK, KEYBOARD, MOUSE, ROOM, WINDOW_PAD } from './layout.ts';
-import { SlidingDoor } from './SlidingDoor.tsx';
-import type { DoorHandle } from './SlidingDoor.tsx';
-import { useCabinSurface } from './surfaces.ts';
+import { CHAIR_REST, DESK, HOLOGRAM, KEYBOARD, LIFT, MOUSE } from './layout.ts';
 import { CrewChair, CrewDesk } from './Furniture.tsx';
+import { Bridge } from './Bridge.tsx';
 
 /**
  * SC02/SC03 set: a compact futuristic developer room (FINAL_STORYLINE.md SC02).
  * Layout constants live in layout.ts (shared with the pure motion maths).
  */
-export { ROOM } from './layout.ts';
 
 /** Imperative handle for the animated parts of the set; called from a chapter's frame loop. */
 export interface RoomSetHandle {
-  /** 0 = closed, 1 = open. */
-  setDoor(open: number): void;
+  /** Lift platform light, 0 = off, 1 = full (SC03's walk ends on it). */
+  setLift(level: number): void;
   setChair(x: number, z: number, rotY: number): void;
 }
 
@@ -169,30 +164,6 @@ function Monitor({
   );
 }
 
-function LightStrip({
-  position,
-  size,
-  color,
-  intensity = 3,
-}: {
-  position: [number, number, number];
-  size: [number, number, number];
-  color: string;
-  intensity?: number;
-}) {
-  return (
-    <mesh position={position}>
-      <boxGeometry args={size} />
-      <meshStandardMaterial
-        color="#000000"
-        emissive={color}
-        emissiveIntensity={intensity}
-        toneMapped={false}
-      />
-    </mesh>
-  );
-}
-
 /** Spot light whose target is part of the scene graph (an un-added target always points at the origin). */
 function TargetedSpot({
   position,
@@ -233,128 +204,12 @@ function TargetedSpot({
   );
 }
 
-/** Steel lattice launch tower (one instanced mesh), matching the SC05 tower's footprint. */
-const TOWER_H = 26;
-const TOWER_HALF = 1.6;
-function WindowTower({ position }: { position: [number, number, number] }) {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  const count = 4 + Math.floor(TOWER_H / 2) * 2;
-  useEffect(() => {
-    const m = ref.current;
-    if (!m) return;
-    const mx = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    let i = 0;
-    const put = (x: number, y: number, z: number, sx: number, sy: number, sz: number) =>
-      m.setMatrixAt(i++, mx.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(sx, sy, sz)));
-    for (const sx of [-1, 1])
-      for (const sz of [-1, 1])
-        put(sx * TOWER_HALF, TOWER_H / 2, sz * TOWER_HALF, 0.3, TOWER_H, 0.3);
-    for (let y = 2; y <= TOWER_H; y += 2) {
-      put(0, y, TOWER_HALF, TOWER_HALF * 2, 0.16, 0.16);
-      put(0, y, -TOWER_HALF, TOWER_HALF * 2, 0.16, 0.16);
-    }
-    m.count = i;
-    m.instanceMatrix.needsUpdate = true;
-    m.computeBoundingSphere();
-  }, []);
-  return (
-    <group position={position}>
-      <instancedMesh ref={ref} args={[undefined, undefined, count]}>
-        <boxGeometry />
-        <meshLambertMaterial color="#6b7380" />
-      </instancedMesh>
-      <mesh position={[0, TOWER_H + 0.3, 0]}>
-        <sphereGeometry args={[0.25, 10, 8]} />
-        <meshBasicMaterial color={new THREE.Color(4, 0.35, 0.25)} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
-// ── The view through the window: spacecraft on a floodlit pad, at night ───────
-function OutsideView() {
-  return (
-    <group>
-      <Starfield count={3000} radius={300} seed={11} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, -90]}>
-        <planeGeometry args={[400, 220]} />
-        {/* Lambert ignores scene.environment: the exterior must not reflect the room IBL. (Standard
-            materials use scene.environmentIntensity and ignore their own envMapIntensity, so a grazing
-            Fresnel reflection turned this ground grey; found in P3 review.) */}
-        <meshLambertMaterial color="#07090d" />
-      </mesh>
-      {/* the pad SC05 launches from: the HelVela II (60 m) on its cradles, the tower on its -z side */}
-      <group position={WINDOW_PAD.position} rotation={[0, WINDOW_PAD.rotationY, 0]}>
-        <mesh position={[0, 0.25, 0]}>
-          <boxGeometry args={[80, 0.5, 34]} />
-          <meshLambertMaterial color="#2b2e35" />
-        </mesh>
-        {[-16, 16].map((x) => (
-          <mesh key={x} position={[x, 1.75, 0]}>
-            <boxGeometry args={[3.2, 3, 7]} />
-            <meshLambertMaterial color="#3a3d44" />
-          </mesh>
-        ))}
-        <Suspense fallback={null}>
-          <HelVela position={[0, 3, 0]} />
-        </Suspense>
-        <WindowTower position={[-6, 0, -17]} />
-        {/* pad markings */}
-        <mesh position={[0, 0.52, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[64, 9]} />
-          <meshLambertMaterial color="#14161a" />
-        </mesh>
-        {[-1, 1].map((s) => (
-          <LightStrip
-            key={s}
-            position={[s * 36, 0.8, 14]}
-            size={[0.5, 0.5, 0.5]}
-            color="#fff1d6"
-            intensity={2.5}
-          />
-        ))}
-      </group>
-      <TargetedSpot
-        position={[-30, 40, -40]}
-        target={[WINDOW_PAD.position[0], 5, WINDOW_PAD.position[2]]}
-        angle={0.4}
-        intensity={2600}
-        distance={140}
-        color="#e4ecff"
-      />
-    </group>
-  );
-}
-
-/** Wall handrail: a bar on three small brackets (x = bar centre, along z). */
-function Handrail({ x, y, z0, z1 }: { x: number; y: number; z0: number; z1: number }) {
-  const len = z1 - z0;
-  return (
-    <group position={[x, y, (z0 + z1) / 2]}>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.016, 0.016, len, 12]} />
-        <meshStandardMaterial color="#d9dde4" roughness={0.35} metalness={0.6} />
-      </mesh>
-      {[-0.45, 0, 0.45].map((k) => (
-        <mesh key={k} position={[0.03, 0, k * len]}>
-          <boxGeometry args={[0.06, 0.03, 0.03]} />
-          <meshStandardMaterial color="#8a919e" roughness={0.4} metalness={0.5} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-/** Multiplied into the shared (pale) cabin textures: seams and insets survive, the room goes dark. */
-const ROOM_TINT = { wall: '#4a515c', ceiling: '#2c3038', floor: '#9aa0aa' } as const;
-/** Small fittings that used to be off-white. */
-const TRIM = {
-  light: '#454b55',
-  dark: '#30353d',
-  hatch: '#3a4049',
-  hatchInset: '#4a515b',
-} as const;
+/**
+ * The opening room is the launch-control bridge model (Bridge.tsx, asset A036; Raju's choice,
+ * 2026-11-19). It replaced the code-built cabin (see git history before that date).
+ */
+/** Lift light at full (candela-ish, decay 2): bright enough to read as a lit platform. */
+const LIFT_LIGHT = 14;
 
 // ── The set ─────────────────────────────────────────────────────────────────
 interface RoomSetProps {
@@ -368,19 +223,14 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
 ) {
   const tier = useJourneyStore((s) => s.tier);
   const shadows = tier === 'balanced';
-  // Charcoal cabin (UI_SCROLL_AUDIT.md W1/F2): the shared panel textures are tinted dark here, so
-  // the white suit, the monitors and the warm/cool accents carry the frame. SC04 keeps its own look.
-  const wall = useCabinSurface('wall', [2, 3], ROOM_TINT.wall);
-  const sideWall = useCabinSurface('wall', [6, 3], ROOM_TINT.wall);
-  const ceiling = useCabinSurface('ceiling', [7, 6], ROOM_TINT.ceiling);
-  const floor = useCabinSurface('floor', [7, 6], ROOM_TINT.floor);
-  const { halfW, back, front, height, doorZ, doorW, doorH } = ROOM;
-  const door = useRef<DoorHandle>(null);
+  const lift = useRef<THREE.PointLight>(null);
   const chair = useRef<THREE.Group>(null);
   useImperativeHandle(
     handle,
     () => ({
-      setDoor: (open) => door.current?.set(open),
+      setLift: (k) => {
+        if (lift.current) lift.current.intensity = LIFT_LIGHT * k;
+      },
       setChair: (x, z, rotY) => {
         if (!chair.current) return;
         chair.current.position.set(x, 0, z);
@@ -389,177 +239,29 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
     }),
     [],
   );
-  const depth = front - back;
-  const midZ = (front + back) / 2;
 
   return (
     <group>
       <RoomLighting />
-
-      {/* floor + ceiling */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, midZ]} receiveShadow material={floor}>
-        <planeGeometry args={[halfW * 2, depth]} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, height, midZ]} material={ceiling}>
-        <planeGeometry args={[halfW * 2, depth]} />
-      </mesh>
-
-      {/* back wall with the window opening: x ∈ [-1.6, 1.6], y ∈ [0.85, 2.45] */}
-      <mesh position={[-2.55, height / 2, back]} material={wall} receiveShadow>
-        <boxGeometry args={[1.9, height, 0.12]} />
-      </mesh>
-      <mesh position={[2.55, height / 2, back]} material={wall} receiveShadow>
-        <boxGeometry args={[1.9, height, 0.12]} />
-      </mesh>
-      <mesh position={[0, 0.425, back]} material={wall} receiveShadow>
-        <boxGeometry args={[3.2, 0.85, 0.12]} />
-      </mesh>
-      <mesh position={[0, 2.625, back]} material={wall}>
-        <boxGeometry args={[3.2, 0.35, 0.12]} />
-      </mesh>
-      {/* window frame + glass */}
-      {[
-        [0, 2.45, 3.3, 0.06],
-        [0, 0.85, 3.3, 0.06],
-        [-1.62, 1.65, 0.06, 1.66],
-        [1.62, 1.65, 0.06, 1.66],
-        [0, 1.65, 0.04, 1.6],
-      ].map(([x, y, w, h], i) => (
-        <mesh key={i} position={[x ?? 0, y ?? 0, back + 0.04]}>
-          <boxGeometry args={[w ?? 0.05, h ?? 0.05, 0.08]} />
-          <meshStandardMaterial color="#1b1e24" metalness={0.8} roughness={0.35} />
-        </mesh>
-      ))}
-      <mesh position={[0, 1.65, back]}>
-        <planeGeometry args={[3.2, 1.6]} />
-        <meshBasicMaterial
-          // unlit faint tint: a PBR pane would mirror the room IBL across the night view
-          color="#9fb6d6"
-          transparent
-          opacity={0.02}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* left wall with shelf */}
-      <mesh
-        position={[-halfW, height / 2, midZ]}
-        rotation={[0, Math.PI / 2, 0]}
-        material={sideWall}
-        receiveShadow
-      >
-        <planeGeometry args={[depth, height]} />
-      </mesh>
-      {/* right wall around the door opening (z ∈ doorZ ± doorW/2, y ∈ [0, doorH]) */}
-      <mesh
-        position={[halfW, height / 2, (back + doorZ - doorW / 2) / 2]}
-        rotation={[0, -Math.PI / 2, 0]}
-        material={sideWall}
-        receiveShadow
-      >
-        <planeGeometry args={[doorZ - doorW / 2 - back, height]} />
-      </mesh>
-      <mesh
-        position={[halfW, height / 2, (front + doorZ + doorW / 2) / 2]}
-        rotation={[0, -Math.PI / 2, 0]}
-        material={sideWall}
-      >
-        <planeGeometry args={[front - doorZ - doorW / 2, height]} />
-      </mesh>
-      <mesh
-        position={[halfW, (height + doorH) / 2, doorZ]}
-        rotation={[0, -Math.PI / 2, 0]}
-        material={sideWall}
-      >
-        <planeGeometry args={[doorW, height - doorH]} />
-      </mesh>
-      <SlidingDoor ref={door} shadows={shadows} />
-      {/* front wall (behind the camera; contains light and reflections) */}
-      <mesh position={[0, height / 2, front]} rotation={[0, Math.PI, 0]} material={wall}>
-        <planeGeometry args={[halfW * 2, height]} />
-      </mesh>
-
-      {/* light strips: cool ceiling coves, warm uplights beside the window */}
-      <LightStrip
-        position={[-halfW + 0.06, height - 0.05, midZ]}
-        size={[0.03, 0.03, depth - 0.2]}
-        color="#cfe0ff"
-        intensity={2}
+      <Suspense fallback={null}>
+        <Bridge />
+      </Suspense>
+      {/* the hologram's cool glow over the deck, and the lift light SC03 raises (setLift) */}
+      <pointLight
+        position={[HOLOGRAM.centre[0], HOLOGRAM.centre[1], HOLOGRAM.centre[2]]}
+        color="#7fb4ff"
+        intensity={7}
+        distance={9}
+        decay={2}
       />
-      <LightStrip
-        position={[halfW - 0.06, height - 0.05, midZ]}
-        size={[0.03, 0.03, depth - 0.2]}
-        color="#cfe0ff"
-        intensity={2}
+      <pointLight
+        ref={lift}
+        position={[LIFT.light[0], LIFT.light[1], LIFT.light[2]]}
+        color="#f4f7ff"
+        intensity={0}
+        distance={5}
+        decay={2}
       />
-      <LightStrip
-        position={[-1.75, 1.65, back + 0.08]}
-        size={[0.025, 1.6, 0.025]}
-        color="#ffb870"
-        intensity={2.5}
-      />
-      <LightStrip
-        position={[1.75, 1.65, back + 0.08]}
-        size={[0.025, 1.6, 0.025]}
-        color="#ffb870"
-        intensity={2.5}
-      />
-
-      {/* right wall: handrail on brackets, cable run under the ceiling */}
-      <Handrail x={halfW - 0.07} y={1.1} z0={back + 0.3} z1={doorZ - doorW / 2 - 0.2} />
-      <mesh position={[halfW - 0.05, height - 0.28, midZ]}>
-        <boxGeometry args={[0.06, 0.05, depth - 0.3]} />
-        <meshStandardMaterial color={TRIM.light} roughness={0.45} metalness={0.4} />
-      </mesh>
-      <mesh position={[halfW - 0.05, height - 0.37, midZ]}>
-        <boxGeometry args={[0.06, 0.035, depth - 0.3]} />
-        <meshStandardMaterial color={TRIM.dark} roughness={0.45} metalness={0.4} />
-      </mesh>
-      {/* left wall: pressure hatch */}
-      <group position={[-halfW + 0.03, 1.2, 1.5]} rotation={[0, Math.PI / 2, 0]}>
-        <mesh>
-          <boxGeometry args={[0.9, 1.3, 0.05]} />
-          <meshStandardMaterial color={TRIM.hatch} roughness={0.45} metalness={0.4} />
-        </mesh>
-        <mesh position={[0, 0, 0.03]}>
-          <boxGeometry args={[0.7, 1.1, 0.03]} />
-          <meshStandardMaterial color={TRIM.hatchInset} roughness={0.45} metalness={0.3} />
-        </mesh>
-        <mesh position={[0, 0, 0.06]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.1, 0.1, 0.03, 20]} />
-          <meshStandardMaterial color="#8a919e" roughness={0.4} metalness={0.7} />
-        </mesh>
-        <mesh position={[0.28, 0.3, 0.06]}>
-          <boxGeometry args={[0.1, 0.03, 0.02]} />
-          <meshStandardMaterial color="#d86a3a" roughness={0.5} />
-        </mesh>
-      </group>
-      {/* flush ceiling light panels and a dark skirting around the walls */}
-      {[-0.4, -2.1].map((zz) => (
-        <LightStrip
-          key={'c' + zz}
-          position={[0, height - 0.02, zz]}
-          size={[1.6, 0.03, 0.5]}
-          color="#e4ecff"
-          intensity={1.5}
-        />
-      ))}
-      {[-halfW + 0.02, halfW - 0.02].map((xx) => (
-        <mesh key={'s' + xx} position={[xx, 0.1, midZ]}>
-          <boxGeometry args={[0.04, 0.2, depth - 0.1]} />
-          <meshStandardMaterial color="#2b303a" roughness={0.6} metalness={0.3} />
-        </mesh>
-      ))}
-      {/* deck edge lights */}
-      {[-1, 1].map((k) => (
-        <LightStrip
-          key={'d' + k}
-          position={[k * (halfW - 0.12), 0.012, midZ]}
-          size={[0.025, 0.01, depth - 0.5]}
-          color="#4fd8ff"
-          intensity={1.6}
-        />
-      ))}
 
       {/* furniture (Poly Haven CC0) */}
       <CrewDesk z={DESK.z} />
@@ -640,7 +342,6 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
       />
       <pointLight position={[0, 2.1, -0.6]} color="#ffd9b0" intensity={4} distance={6} decay={2} />
 
-      <OutsideView />
       {children}
     </group>
   );

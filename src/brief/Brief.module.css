@@ -205,6 +205,12 @@
   font-size: var(--text-sm);
 }
 
+.credits {
+  margin-top: var(--space-6);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
 @media print {
   .toc,
   .footer {

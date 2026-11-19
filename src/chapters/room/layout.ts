@@ -1,18 +1,8 @@
 /**
- * SC02/SC03 room layout in metres (no React, so motion maths can be unit-tested in node).
- * Origin = room centre on the floor; the window wall faces -z.
- *   x ∈ [-3.5, 3.5], z ∈ [-3.2, 3.0], height 2.8. Door on the +x wall centred at z = doorZ.
+ * SC02/SC03 layout in metres (no React, so motion maths can be unit-tested in node). Room origin =
+ * the floor under the centre of the old cabin; the desk faces -z. The set itself is the bridge
+ * model (BRIDGE below); its deck is at y = 0.
  */
-export const ROOM = {
-  halfW: 3.5,
-  back: -3.2,
-  front: 3,
-  height: 2.8,
-  doorZ: 1.4,
-  /** Clear door opening (m). */
-  doorW: 1.2,
-  doorH: 2.25,
-} as const;
 
 /** Where the astronaut sits (body root on the floor) and where the chair stands at rest. */
 export const SEAT: [number, number, number] = [0, 0, -1.6];
@@ -35,8 +25,39 @@ export const DESK = { scaleY: 0.85, top: 0.787 * 0.85, z: -2.4 } as const;
 export const KEYBOARD = { x: -0.01, z: -2.22, size: [0.38, 0.014, 0.18] } as const;
 export const MOUSE = { x: 0.31, z: -2.2, pad: [0.22, 0.003, 0.24] } as const;
 
-/** The launch pad seen through the window (SC02 opening shot looks at it). */
-export const WINDOW_PAD = {
-  position: [0, 0, -85] as [number, number, number],
-  rotationY: 0.18,
+/**
+ * The launch-control bridge (Bridge.tsx, asset A036) placed around the desk. Its main deck lies at
+ * y = 2.55 m in the model (measured by scripts/optimize-bridge.ts), so it is lowered by that much.
+ * Unrotated: the desk sits in the south part of the deck facing north, so the hologram globe turns
+ * 3.7 m ahead of the astronaut, beyond the monitors, and the camera has 1.8 m behind the chair
+ * (between a low rail at z ≈ -0.4 and the south wall at z ≈ 0.7; the deck has a ceiling).
+ * Room = model + (-0.2, -2.55, -5.3). Check any layout change with `node scripts/plan-view.ts`.
+ */
+export const BRIDGE = {
+  position: [-0.2, -2.55, -5.3] as [number, number, number],
+  rotationY: 0,
+  scale: 1,
 } as const;
+
+/** Hologram globe (centre and radius, room metres) and the pit ring around it. */
+export const HOLOGRAM = { centre: [0.04, 2.35, -5.35] as const, radius: 1.75 } as const;
+export const PIT = { x: 0.04, z: -5.35, radius: 2.1 } as const;
+
+/**
+ * The lift in the north-west corner: SC03's walk ends in its doorway (east side), facing in, after
+ * stepping down from the raised platform's north tip. `light` is inside the box (room metres).
+ */
+export const LIFT = {
+  /** the doorway, on the box's east side (its other sides are walls) */
+  x: -4.75,
+  z: -8.8,
+  y: 0,
+  radius: 0.5,
+  light: [-5.7, 2.0, -8.75] as const,
+} as const;
+
+/**
+ * The raised platform on the west side (0.5 m above the deck, measured from the model): the only
+ * way north to the lift. Stairs climb onto it westward at its south-east corner.
+ */
+export const PLATFORM = { height: 0.5 } as const;
