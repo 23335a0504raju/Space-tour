@@ -38,5 +38,8 @@ export function boundaryDip(
 ): number {
   const intoChapter = skipStart ? 0 : clamp01(1 - localT / width);
   const outOfChapter = skipEnd ? 0 : clamp01(1 - (1 - localT) / width);
-  return Math.max(intoChapter, outOfChapter);
+  // eased, so the cut breathes in and out instead of switching on a linear ramp
+  return smooth(Math.max(intoChapter, outOfChapter));
 }
+
+const smooth = (x: number) => x * x * (3 - 2 * x);

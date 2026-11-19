@@ -309,6 +309,29 @@ Checks: `npm run verify` passes (109 tests, 4 new for sections). `npm run build`
 
 Not done, needs your copy: short captions for SC05, SC10 and SC12 (the three chapters with no text). Anything there would be new copy, so I won't write it unasked.
 
+---
+
+## Step 5 result: room atmosphere, opening framing, softer seams (desktop), 2026-11-19
+
+### Changes
+
+| Area | Change |
+|---|---|
+| Room materials | [RoomSet.tsx](../../src/chapters/room/RoomSet.tsx): the shared cabin textures are **tinted** charcoal in the room only (walls `#4a515c`, ceiling `#2c3038`, darker deck), so SC04's cockpit keeps its look. Cable runs and the pressure hatch go from off-white to gunmetal. [Furniture.tsx](../../src/chapters/room/Furniture.tsx): desk and chair shell graphite, slightly metallic (was `#d9dde4`). No new meshes, lights or textures. |
+| Opening framing (F7) | SC02's first camera key now looks from behind-left of the astronaut. The figure at the desk sits on the right third, and the ship on the pad shows right of the title block (only its tip meets the headline). The sweep to the title-card key passes nowhere near the astronaut (frames at t 0.15/0.3/0.45 checked). |
+| Seams | Boundary dips use an eased curve (smoothstep) instead of a linear ramp. **Real match cuts were not done:** each needs scene work on both sides of a boundary (to plan per pair). |
+
+### Result
+
+- F2 fixed: the white suit now reads against a dark desk, chair and walls. The monitors, the warm window strips and the cyan deck lines carry the frame, as in the reference images.
+- F7 fixed: the opening no longer looks at the window frame over the helmet.
+
+### Measured
+
+Draw calls are unchanged (colours only): SC02 153–168, SC03 159. **Still above the ≤ 150 Balanced budget.** The cause is many small separate meshes (about 45 room parts, 12 monitor parts, door, props, furniture) plus about 22 post passes, not shadows (only a handful of casters). The fix is merging static room meshes by material: a performance task for P5 alongside the Android test. Frame time has about 150 fps headroom on the 780M.
+
+Checks: `npm run verify` passes (109 tests). `npm run build` passes. `npx playwright test` passes 24/24.
+
 ### Decisions I need from you
 
 1. **Name and role (Q1):** "Raju Chowdavada" and which role: "Software Engineer", or the site's "Full-Stack Software Engineer & AI Builder"?

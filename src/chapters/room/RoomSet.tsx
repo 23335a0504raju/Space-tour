@@ -346,6 +346,16 @@ function Handrail({ x, y, z0, z1 }: { x: number; y: number; z0: number; z1: numb
   );
 }
 
+/** Multiplied into the shared (pale) cabin textures: seams and insets survive, the room goes dark. */
+const ROOM_TINT = { wall: '#4a515c', ceiling: '#2c3038', floor: '#9aa0aa' } as const;
+/** Small fittings that used to be off-white. */
+const TRIM = {
+  light: '#454b55',
+  dark: '#30353d',
+  hatch: '#3a4049',
+  hatchInset: '#4a515b',
+} as const;
+
 // ── The set ─────────────────────────────────────────────────────────────────
 interface RoomSetProps {
   /** Astronaut (and anything else animated) is placed by the chapter. */
@@ -358,10 +368,12 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
 ) {
   const tier = useJourneyStore((s) => s.tier);
   const shadows = tier === 'balanced';
-  const wall = useCabinSurface('wall', [2, 3]);
-  const sideWall = useCabinSurface('wall', [6, 3]);
-  const ceiling = useCabinSurface('ceiling', [7, 6]);
-  const floor = useCabinSurface('floor', [7, 6]);
+  // Charcoal cabin (UI_SCROLL_AUDIT.md W1/F2): the shared panel textures are tinted dark here, so
+  // the white suit, the monitors and the warm/cool accents carry the frame. SC04 keeps its own look.
+  const wall = useCabinSurface('wall', [2, 3], ROOM_TINT.wall);
+  const sideWall = useCabinSurface('wall', [6, 3], ROOM_TINT.wall);
+  const ceiling = useCabinSurface('ceiling', [7, 6], ROOM_TINT.ceiling);
+  const floor = useCabinSurface('floor', [7, 6], ROOM_TINT.floor);
   const { halfW, back, front, height, doorZ, doorW, doorH } = ROOM;
   const door = useRef<DoorHandle>(null);
   const chair = useRef<THREE.Group>(null);
@@ -497,21 +509,21 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
       <Handrail x={halfW - 0.07} y={1.1} z0={back + 0.3} z1={doorZ - doorW / 2 - 0.2} />
       <mesh position={[halfW - 0.05, height - 0.28, midZ]}>
         <boxGeometry args={[0.06, 0.05, depth - 0.3]} />
-        <meshStandardMaterial color="#cfd4dc" roughness={0.5} metalness={0.2} />
+        <meshStandardMaterial color={TRIM.light} roughness={0.45} metalness={0.4} />
       </mesh>
       <mesh position={[halfW - 0.05, height - 0.37, midZ]}>
         <boxGeometry args={[0.06, 0.035, depth - 0.3]} />
-        <meshStandardMaterial color="#aab1bc" roughness={0.5} metalness={0.2} />
+        <meshStandardMaterial color={TRIM.dark} roughness={0.45} metalness={0.4} />
       </mesh>
       {/* left wall: pressure hatch */}
       <group position={[-halfW + 0.03, 1.2, 1.5]} rotation={[0, Math.PI / 2, 0]}>
         <mesh>
           <boxGeometry args={[0.9, 1.3, 0.05]} />
-          <meshStandardMaterial color="#c3c9d2" roughness={0.5} metalness={0.2} />
+          <meshStandardMaterial color={TRIM.hatch} roughness={0.45} metalness={0.4} />
         </mesh>
         <mesh position={[0, 0, 0.03]}>
           <boxGeometry args={[0.7, 1.1, 0.03]} />
-          <meshStandardMaterial color="#e2e5ea" roughness={0.5} metalness={0.1} />
+          <meshStandardMaterial color={TRIM.hatchInset} roughness={0.45} metalness={0.3} />
         </mesh>
         <mesh position={[0, 0, 0.06]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.1, 0.1, 0.03, 20]} />

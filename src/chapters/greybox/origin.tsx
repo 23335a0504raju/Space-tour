@@ -37,8 +37,11 @@ const typingTime = (api: AstronautApi, elapsed: number) =>
 
 // ── SC02 · The Room ────────────────────────────────────────────────────────────
 const roomKeys: ShotKey[] = [
-  // between the monitors and the window, looking out at the ship on the pad
-  { t: 0, position: [0.55, 1.45, -0.15], target: [0.3, 3.2, -85], fov: 46 },
+  // Opening frame (behind the start gate's title): from behind-left of the astronaut, so the
+  // figure at the desk sits on the right third and the ship on the pad shows right of the title
+  // block, which owns the left half (UI_SCROLL_AUDIT.md F7). Was a view over the helmet at the
+  // window frame, with the title covering the ship.
+  { t: 0, position: [-1.0, 1.6, 1.2], target: [-1.52, 1.25, -8.8], fov: 42 },
   // pull back through the room to reveal the astronaut at the desk
   { t: 0.6, position: [2.35, 1.85, 0.5], target: [0, 1.0, -2.2], fov: 42 },
   { t: 1, position: [1.45, 1.5, -0.55], target: [0, 1.05, -2.3], fov: 40 },

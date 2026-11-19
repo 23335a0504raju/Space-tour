@@ -14,7 +14,8 @@ const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeome
 function useFurnitureKit() {
   const kit = useMemo(
     () => ({
-      shell: new THREE.MeshStandardMaterial({ color: '#d9dde4', roughness: 0.42, metalness: 0.1 }),
+      // graphite shell (was off-white): the white suit now separates from the desk and chair
+      shell: new THREE.MeshStandardMaterial({ color: '#3a3f48', roughness: 0.36, metalness: 0.5 }),
       graphite: new THREE.MeshStandardMaterial({
         color: '#23272e',
         roughness: 0.6,
