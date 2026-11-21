@@ -122,7 +122,7 @@ function ProjectShowcase({
         </button>
         {linkEntries.map(([k, href]) => (
           <a key={k} className={styles.ghost} href={href} target="_blank" rel="noopener noreferrer">
-            {LINK_LABELS[k]} <span aria-hidden="true">↗</span>
+            {LINK_LABELS[k]}
           </a>
         ))}
       </p>
@@ -169,7 +169,7 @@ const allOverlayDefs: readonly OverlayDef[] = [
             Explore projects
           </button>
           <a className={styles.ghost} href="/brief/">
-            Mission Brief
+            Read the Mission Brief
           </a>
         </p>
       </>
@@ -192,10 +192,13 @@ const allOverlayDefs: readonly OverlayDef[] = [
                 <FactText fact={job.role} />
               </h3>
               <p className={styles.meta}>
-                <FactText fact={job.organisation} /> ·{' '}
-                <FactText fact={job.period}>
-                  {job.period.value.start} – {job.period.value.end}
-                </FactText>
+                <FactText fact={job.organisation} />{' '}
+                <span className={styles.date}>
+                  ·{' '}
+                  <FactText fact={job.period}>
+                    {job.period.value.start} – {job.period.value.end}
+                  </FactText>
+                </span>
               </p>
               <p>
                 <FactText fact={job.summary} />
@@ -225,11 +228,14 @@ const allOverlayDefs: readonly OverlayDef[] = [
                   <FactText fact={e.qualification} />
                 </h3>
                 <p className={styles.meta}>
-                  <FactText fact={e.institution} /> ·{' '}
-                  <FactText fact={e.period}>
-                    {e.period.value.start} – {e.period.value.end}
-                  </FactText>{' '}
-                  · <FactText fact={e.grade} />
+                  <FactText fact={e.institution} />{' '}
+                  <span className={styles.date}>
+                    ·{' '}
+                    <FactText fact={e.period}>
+                      {e.period.value.start} – {e.period.value.end}
+                    </FactText>{' '}
+                    · <FactText fact={e.grade} />
+                  </span>
                 </p>
               </li>
             ))}
@@ -241,20 +247,20 @@ const allOverlayDefs: readonly OverlayDef[] = [
     key: 'strengths',
     chapterId: 'sc06-sunrise',
     rest: 0.7,
-    placement: 'bottom',
+    placement: 'left', // bottom-centre covered the ship and the sunrise
     label: 'Core strengths',
     render: () => (
       <>
-        <Kicker>You can tell what a star is made of by its light</Kicker>
+        <Kicker>Spectral analysis</Kicker>
         <h2 className={styles.heading}>Core strengths</h2>
-        <div className={styles.spectrum} aria-hidden="true" />
-        <ul className={styles.lines}>
+        <p className={styles.lead}>You can tell what a star is made of by its light.</p>
+        <ol className={styles.strengths}>
           {strengths.value.map((s) => (
             <li key={s}>
               <FactText fact={strengths}>{s}</FactText>
             </li>
           ))}
-        </ul>
+        </ol>
       </>
     ),
   },

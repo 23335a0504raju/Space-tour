@@ -1,7 +1,9 @@
-/* Self-hosted variable fonts (OFL; assets/ASSET_REGISTER.md A034, A035). Only the unicode subsets
-   a page uses are downloaded. */
+/* Self-hosted fonts (OFL; assets/ASSET_REGISTER.md A034, A035, A038). Only the unicode subsets a
+   page uses are downloaded. */
 @import '@fontsource-variable/space-grotesk/wght.css';
 @import '@fontsource-variable/inter/wght.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
 @import './tokens.css';
 
 *,

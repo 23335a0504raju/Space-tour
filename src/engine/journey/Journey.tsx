@@ -10,6 +10,7 @@ import { ToneMappingMode } from 'postprocessing';
 import { chapters } from '../../chapters/registry.ts';
 import { implementations } from '../../chapters/implementations.ts';
 import { overlayDefs } from '../../chapters/overlays.tsx';
+import { buildReveal } from '../../ui/cardReveal.ts';
 import overlayStyles from '../../chapters/overlays.module.css';
 import { createJourneyFrame } from '../../chapters/contract.ts';
 import type { JourneyFrame } from '../../chapters/contract.ts';
@@ -176,6 +177,10 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
                 rest: def.rest,
                 half: def.band ?? DEFAULT_BAND,
                 holdToEnd: def.holdToEnd ?? false,
+                reveal: buildReveal(el, {
+                  editorial: def.variant === 'editorial',
+                  reduced: prefersReducedMotion(),
+                }),
                 last: 0,
                 visible: false,
               });

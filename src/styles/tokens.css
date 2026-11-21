@@ -2,9 +2,9 @@
  * Design tokens: one dark palette, one accent (visor gold). PROJECT_VISION.md §3.
  * Contrast (estimated against --color-bg; verified by axe in later phases):
  *   text ≈ 17:1, muted ≈ 7:1, accent ≈ 9:1.
- * Typefaces (Raju, 2026-11-19): Space Grotesk for display, Inter for body AND labels (spaced
- * capitals), so the site uses two families. `--font-mono` is kept as the label token name for the
- * existing styles; it no longer points at a monospace face.
+ * Typefaces (Raju, 2026-11-21, superseding the two-family choice of 2026-11-19): Space Grotesk for
+ * display (name, chapter and card titles), Inter for body copy, IBM Plex Mono for labels, mission
+ * identifiers and metadata. All self-hosted (A034, A035, A038).
  */
 :root {
   --color-bg: #05060a;
@@ -19,9 +19,15 @@
   --font-display:
     'Space Grotesk Variable', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-body: 'Inter Variable', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: var(--font-body); /* labels: body face in spaced capitals */
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
-  /* Type scale (UI_SCROLL_AUDIT.md §4) */
+  /* Type scale (UI_SCROLL_AUDIT.md §4; editorial scale 2026-11-21: hero 64–88 px, section 44–64,
+     card 32–44, body 16–18, metadata 11–13 on desktop, smaller on phones) */
+  --text-meta: clamp(0.6875rem, 0.64rem + 0.18vw, 0.8125rem);
+  --text-body: clamp(1rem, 0.95rem + 0.2vw, 1.125rem);
+  --text-card: clamp(1.75rem, 1.25rem + 1.3vw, 2.75rem);
+  --text-section: clamp(2.25rem, 1.4rem + 2.4vw, 4rem);
+  --text-hero: clamp(2.75rem, 1.5rem + 3.9vw, 5.5rem);
   --text-xs: 0.78rem; /* labels, kickers */
   --text-sm: 0.9375rem;
   --text-md: 1.0625rem; /* body */
