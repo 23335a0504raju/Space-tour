@@ -27,6 +27,8 @@ export interface OverlayEntry {
   /** Half-width of the readable band around the rest point (local t). */
   readonly half: number;
   readonly holdToEnd: boolean;
+  /** The card's entrance timeline (src/ui/cardReveal.ts), seeked to the visibility each change. */
+  readonly reveal?: { progress(p: number): unknown };
   last: number;
   visible: boolean;
 }
@@ -102,7 +104,7 @@ export function Director({ master, frame, links }: Props) {
       else scene.background = bg.clone();
     }
 
-    impl.shot(frame.t, shot);
+    impl.shot(frame.t, shot, frame.aspect);
     camera.position.copy(shot.position);
     camera.lookAt(shot.target);
     const persp = camera as THREE.PerspectiveCamera;
@@ -112,7 +114,7 @@ export function Director({ master, frame, links }: Props) {
       persp.updateProjectionMatrix();
     }
     if (persp.isPerspectiveCamera) {
-      const shift = frame.aspect === 'portrait' ? PORTRAIT_SHIFT : 0;
+      const shift = frame.aspect === 'portrait' ? (impl.portraitShift ?? PORTRAIT_SHIFT) : 0;
       if (lens.w !== size.width || lens.h !== size.height || lens.shift !== shift) {
         lens.w = size.width;
         lens.h = size.height;
@@ -142,6 +144,7 @@ export function Director({ master, frame, links }: Props) {
       // one value per panel; CSS derives the panel fade and the staged reveal of its parts from
       // it (overlays.module.css), so the stagger is still a pure function of progress
       entry.el.style.setProperty('--o', o.toFixed(3));
+      entry.reveal?.progress(o);
       const visible = o > 0.01;
       if (visible !== entry.visible) {
         entry.visible = visible;

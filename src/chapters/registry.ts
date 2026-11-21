@@ -3,7 +3,7 @@ import type { ChapterMeta } from './types.ts';
 /**
  * Ordered journey (FINAL_STORYLINE.md + SCROLL_EXPERIENCE_MAP.md).
  * SC01 "Signal" is the pre-scroll HTML shell, so it is not a scroll chapter.
- * Lengths are tuned for pace: 22.6 screens in all (was 33.5; UI_SCROLL_AUDIT.md step 1).
+ * Lengths are tuned for pace: 23.6 screens in all (was 33.5; UI_SCROLL_AUDIT.md step 1; SC06 +1 on review).
  */
 export const chapters: readonly ChapterMeta[] = [
   {
@@ -52,7 +52,7 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Orbital Sunrise',
     act: 'launch',
     artStyle: 'realistic',
-    screens: 1.6,
+    screens: 2.6, // the sunrise needs room to breathe (review: it passed in about a second)
     restPoints: [0.7],
     navLabel: 'Strengths',
     briefAnchor: 'strengths',

@@ -26,7 +26,9 @@ describe('buildTrack', () => {
     // SCROLL_EXPERIENCE_MAP.md: experience by ~10%, projects ~36%, contact ~87%.
     expect(progressFor(track, 'sc04-crew-record')).toBeCloseTo(0.1, 1);
     expect(progressFor(track, 'sc08-jupiter')).toBeGreaterThan(0.33);
-    expect(progressFor(track, 'sc08-jupiter')).toBeLessThan(0.4);
+    // 0.42 since SC06 grew to 2.6 screens (review 2026-11-21: the sunrise passed too fast); the
+    // header's Projects link still jumps there directly
+    expect(progressFor(track, 'sc08-jupiter')).toBeLessThan(0.43);
     expect(progressFor(track, 'sc13-transmission')).toBeGreaterThan(0.84);
     // shortened from 33.5 for pace (UI_SCROLL_AUDIT.md step 1)
     expect(track.totalScreens).toBeGreaterThan(20);
