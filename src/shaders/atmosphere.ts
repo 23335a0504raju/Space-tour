@@ -5,7 +5,7 @@ import * as THREE from 'three';
  * the same horizon colour so the far edge of every flat layer dissolves into the sky (the camera's
  * far plane is 2 km; no hard edges may show).
  */
-export const HORIZON = new THREE.Color('#1a2742');
+export const HORIZON = new THREE.Color('#1c1f3d');
 export const ZENITH = new THREE.Color('#050912');
 
 const noiseGlsl = /* glsl */ `
@@ -17,13 +17,30 @@ const noiseGlsl = /* glsl */ `
 `;
 
 // ── Sky dome ───────────────────────────────────────────────────────────────────
-/** Camera-centred dome: horizon glow → zenith; `uThin` (altitude) darkens it to space black. */
-export function createSkyMaterial(): THREE.ShaderMaterial {
+/**
+ * Camera-centred dome: horizon glow → zenith; `uThin` (altitude) darkens it to space black.
+ * Optional Milky Way: the shared baked deep sky (DeepSky `bakeSky`), looked up through `uGalaxyRot`
+ * (SC05 world → galaxy frame) so the band rises out of the horizon in the launch views. It is
+ * extinguished near the horizon, where the magenta/violet airglow sits (review 2026-11-21: the Milky
+ * Way photo). At h = 0 the colour is still exactly the horizon colour the ground and clouds fade to.
+ */
+export function createSkyMaterial(
+  galaxy: THREE.Texture | null = null,
+  galaxyRot: THREE.Matrix3 = new THREE.Matrix3(),
+  bandNormal: THREE.Vector3 = new THREE.Vector3(0, 1, 0),
+  octaves = 4,
+): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: {
       uHorizon: { value: HORIZON.clone() },
       uZenith: { value: ZENITH.clone() },
       uThin: { value: 0 },
+      uGalaxy: { value: galaxy },
+      uGalaxyRot: { value: galaxyRot },
+      uGalaxyGain: { value: galaxy ? 1 : 0 },
+      uBandN: { value: bandNormal },
+      /** sine of how far the horizon has dropped (SC05's curved planet at the top of the climb) */
+      uDip: { value: 0 },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -34,17 +51,64 @@ export function createSkyMaterial(): THREE.ShaderMaterial {
     `,
     fragmentShader: /* glsl */ `
       uniform vec3 uHorizon; uniform vec3 uZenith; uniform float uThin;
+      uniform sampler2D uGalaxy; uniform mat3 uGalaxyRot; uniform float uGalaxyGain; uniform vec3 uBandN; uniform float uDip;
       varying vec3 vDir;
+      float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+      float n3(vec3 x) {
+        vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y),
+                   mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z);
+      }
+      float fbm3(vec3 p) {
+        float v = 0.0, a = 0.5;
+        for (int i = 0; i < ${octaves}; i++) { v += a * n3(p); p = p * 2.13 + vec3(5.1, 1.3, 8.7); a *= 0.5; }
+        return v;
+      }
       void main() {
-        float h = vDir.y;
+        vec3 d = normalize(vDir);
+        float h = d.y + uDip;
         vec3 col = mix(uHorizon, uZenith, smoothstep(-0.02, 0.45, h));
         // the horizon band sinks and dims with altitude
         float band = exp(-abs(h + 0.04 * uThin) * (14.0 + 30.0 * uThin));
         col += uHorizon * band * 0.6 * (1.0 - 0.5 * uThin);
+        // airglow: a magenta layer a few degrees up, violet above it, fading toward the zenith
+        float hs = max(h, 0.0);
+        vec3 glow = vec3(0.13, 0.008, 0.07) * exp(-pow((hs - 0.018) / 0.045, 2.0))
+                  + vec3(0.02, 0.004, 0.04) * exp(-hs * 9.0);
+        col += glow * smoothstep(-0.01, 0.01, h) * (1.0 - 0.6 * uThin);
         // high up the sky goes black above a thin glowing horizon line
         col *= 1.0 - 0.9 * uThin * smoothstep(-0.03, 0.25, h);
+        if (uGalaxyGain > 0.0) {
+          vec3 g = uGalaxyRot * d;
+          vec2 uv = vec2(atan(g.z, -g.x) / 6.2831853, 1.0 - acos(clamp(g.y, -1.0, 1.0)) / 3.1415927);
+          vec3 mw = pow(texture2D(uGalaxy, uv).rgb, vec3(2.2));
+          // photo contrast: drop the faint floor, deepen the dust lanes, keep the colour
+          float lum = dot(mw, vec3(0.3, 0.55, 0.15));
+          // steeper than linear so the lanes and the band edge separate; slightly cooled (AgX warms it)
+          mw = mw * smoothstep(0.003, 0.05, lum) * (lum / (lum + 0.02)) * 2.4;
+          mw *= vec3(0.86, 0.92, 1.12);
+          // the dark rift and dust lanes (as in long-exposure photos): broad dark patches down the middle
+          // of the band plus thin filaments that cross the bright core
+          float b = dot(g, uBandN);
+          vec3 wp = g * 6.0 + vec3(fbm3(g * 2.5)) * 1.8;
+          float dust = fbm3(wp);
+          float onBand = exp(-b * b / 0.04);
+          float patches = smoothstep(0.44, 0.6, dust);
+          float fil = smoothstep(0.8, 0.97, 1.0 - abs(2.0 * fbm3(wp * 2.3 + 7.0) - 1.0));
+          mw *= 1.0 - onBand * max(0.95 * patches, 0.8 * fil);
+          // mottled star clouds between the lanes
+          mw *= 0.55 + 0.9 * smoothstep(0.3, 0.72, fbm3(g * 22.0 + 3.0));
+          // roll off the highlights so the core stays a glow, not a flat cloud
+          mw = mw / (1.0 + mw * 2.5);
+          // atmospheric extinction: gone at the horizon, full a quarter of the way up
+          float ext = smoothstep(0.0, 0.22, h);
+          col += mw * uGalaxyGain * ext;
+        }
         // below the horizon: the dark night Earth beyond the far edge of the ground and deck
         col = mix(col, vec3(0.006, 0.008, 0.012), smoothstep(-0.005, -0.06, h));
+        // half-step dither: the dark gradients band on 8-bit displays
+        float r = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+        col += (r - 0.5) / 255.0;
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }

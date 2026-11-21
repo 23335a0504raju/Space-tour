@@ -20,7 +20,7 @@ export function seeded(seed: number) {
 }
 
 // ── Starfield ─────────────────────────────────────────────────────────────────
-const starVertex = /* glsl */ `
+export const starVertex = /* glsl */ `
   attribute float aSize;
   attribute vec3 aColor;
   uniform float uScale;
@@ -33,7 +33,8 @@ const starVertex = /* glsl */ `
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
-const starFragment = /* glsl */ `
+export const starFragment = /* glsl */ `
+  uniform float uFade;
   varying vec3 vColor;
   varying float vSize;
   void main() {
@@ -51,7 +52,7 @@ const starFragment = /* glsl */ `
     }
     float a = core + halo + spikes;
     if (a < 0.01) discard;
-    gl_FragColor = vec4(vColor * a, 1.0);
+    gl_FragColor = vec4(vColor * a * uFade, 1.0);
     #include <colorspace_fragment>
   }
 `;
@@ -115,7 +116,7 @@ export function Starfield({
       new THREE.ShaderMaterial({
         vertexShader: starVertex,
         fragmentShader: starFragment,
-        uniforms: { uScale: { value: Math.min(dpr, 2) } },
+        uniforms: { uScale: { value: Math.min(dpr, 2) }, uFade: { value: 1 } },
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { RefObject } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { getKTX2Loader } from '../../engine/assets/loaders.ts';
 import { registerEnvironment } from '../../engine/environment.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { useJourneyStore } from '../../engine/store.ts';
@@ -11,9 +12,11 @@ import {
   createSkyMaterial,
   createSmokeMaterial,
 } from '../../shaders/atmosphere.ts';
+import { createEarthMaterial, createLimbAtmosphereMaterial } from '../../shaders/earth.ts';
 import { createPlumeGeometry, createPlumeMaterial } from '../../shaders/plume.ts';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
-import { seeded } from '../greybox/parts.tsx';
+import { seeded, starFragment, starVertex } from '../greybox/parts.tsx';
+import { GALAXY, bakeSky } from '../space/DeepSky.tsx';
 import { HELVELA, HelVela } from '../ship/HelVela.tsx';
 import { LaunchPad, PIT } from './LaunchPad.tsx';
 import type { EngineLevel } from '../ship/Spacecraft.tsx';
@@ -28,6 +31,9 @@ import {
   engine as engineAt,
   groundGlow,
   liftJets,
+  ORBIT_DIP,
+  ORBIT_EARTH,
+  orbitEarth,
   shipPose,
   thinAir,
 } from './ascent.ts';
@@ -430,6 +436,7 @@ function CloudDeck({
       Array.from({ length: layers }, (_, i) => {
         const m = createCloudMaterial(i * 1.7 + 0.3, octaves);
         m.uniforms.uOpacity!.value = 0.55 + 0.35 * ((i * 7) % 3) * 0.5;
+        m.userData.base = m.uniforms.uOpacity!.value;
         return m;
       }),
     [layers, octaves],
@@ -460,17 +467,60 @@ function CloudDeck({
   );
 }
 
-function makeStars(n: number) {
-  const rand = seeded(77);
+/**
+ * The Milky Way as seen from the pad (review 2026-11-21: the reference is a Milky Way night photo).
+ * The band is a great circle through a low core ahead-left of the opening shot, rising steeply to the
+ * upper right. `GALAXY_ROT` turns an SC05 direction into the baked deep sky's galaxy frame.
+ */
+const SC05_CORE = new THREE.Vector3(-0.5, 0.1, -0.86).normalize();
+const SC05_BAND = new THREE.Vector3()
+  .crossVectors(SC05_CORE, new THREE.Vector3(0.35, 0.93, -0.1))
+  .normalize();
+const GALAXY_ROT = (() => {
+  const frame = (n: THREE.Vector3, c: THREE.Vector3) => {
+    const cc = c
+      .clone()
+      .sub(n.clone().multiplyScalar(c.dot(n)))
+      .normalize();
+    return new THREE.Matrix4().makeBasis(n, cc, new THREE.Vector3().crossVectors(n, cc));
+  };
+  const from = frame(SC05_BAND, SC05_CORE);
+  const to = frame(GALAXY.normal.clone(), GALAXY.core.clone());
+  return new THREE.Matrix3().setFromMatrix4(to.multiply(from.transpose()));
+})();
+
+/** Camera-centred star sprites: power-law brightness, tinted, denser on the band, dimmed low down. */
+function makeStars(n: number, seed: number, yMin: number, yMax: number, horizon: number) {
+  const rand = seeded(seed);
   const pos = new Float32Array(n * 3);
+  const sizes = new Float32Array(n);
+  const colors = new Float32Array(n * 3);
+  const tints = ['#9fb8ff', '#d6e0ff', '#fff4e8', '#ffd9a0', '#ffb48a'].map(
+    (c) => new THREE.Color(c),
+  );
+  const v = new THREE.Vector3();
   for (let i = 0; i < n; i += 1) {
-    const u = rand() * 0.98 + 0.02; // upper hemisphere (plus a sliver below the horizon at altitude)
-    const th = rand() * Math.PI * 2;
-    const r = Math.sqrt(1 - u * u) * 1400;
-    pos.set([r * Math.cos(th), u * 1400 - 60, r * Math.sin(th)], i * 3);
+    for (let tries = 0; tries < 6; tries += 1) {
+      const u = yMin + rand() * (yMax - yMin);
+      const th = rand() * Math.PI * 2;
+      const r = Math.sqrt(1 - u * u);
+      v.set(r * Math.cos(th), u, r * Math.sin(th));
+      const band = Math.exp(-(v.dot(SC05_BAND) ** 2) / 0.025);
+      if (rand() < 0.3 + 0.7 * band) break;
+    }
+    pos.set([v.x * 1400, v.y * 1400, v.z * 1400], i * 3);
+    const m = Math.pow(rand(), 9);
+    sizes[i] = 1.3 + m * 11;
+    const c = tints[Math.floor(rand() * tints.length)] ?? tints[1]!;
+    // extinction toward the horizon (thick air and the pad glow)
+    const ext = 0.25 + 0.75 * Math.min(1, Math.max(0, (v.y - horizon) / 0.3));
+    const k = (0.4 + 0.6 * Math.min(1, m * 3 + rand() * 0.5)) * ext;
+    colors.set([c.r * k, c.g * k, c.b * k], i * 3);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+  g.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
   return g;
 }
 
@@ -503,6 +553,85 @@ function makeGroundLights(n: number) {
   return g;
 }
 
+// ── The curved Earth at the top of the climb ────────────────────────────────────
+const EARTH_TEX = ['/assets/textures/earth_day_2k.ktx2', '/assets/textures/earth_night_2k.ktx2'];
+/** Bearing the end shot looks along (the climb heads -x, the camera sits on the +z side). */
+const AHEAD = new THREE.Vector3(-0.95, 0, -0.3).normalize();
+/** Sun just under the limb ahead: the night side below, a gold twilight line on the far limb. */
+const ORBIT_SUN = (() => {
+  const e = -(ORBIT_DIP + 0.1);
+  return AHEAD.clone()
+    .multiplyScalar(Math.cos(e))
+    .add(new THREE.Vector3(0, Math.sin(e), 0));
+})();
+/** India (22°N 79°E) under the camera with east ahead, as in SC06. */
+const ORBIT_ROT = (() => {
+  const th = Math.PI / 2 - THREE.MathUtils.degToRad(22);
+  const ph = THREE.MathUtils.degToRad(79) + Math.PI;
+  const up = new THREE.Vector3(
+    -Math.cos(ph) * Math.sin(th),
+    Math.cos(th),
+    Math.sin(ph) * Math.sin(th),
+  );
+  const east = new THREE.Vector3(Math.sin(ph), 0, Math.cos(ph)).normalize();
+  const local = new THREE.Matrix4().makeBasis(east, new THREE.Vector3().crossVectors(up, east), up);
+  const U = new THREE.Vector3(0, 1, 0);
+  const world = new THREE.Matrix4().makeBasis(AHEAD, new THREE.Vector3().crossVectors(U, AHEAD), U);
+  return new THREE.Euler().setFromRotationMatrix(world.multiply(local.transpose()));
+})();
+
+function OrbitEarth({ fade }: { fade: { current: number } }) {
+  const gl = useThree((s) => s.gl);
+  const low = useJourneyStore((s) => s.tier !== 'balanced');
+  // shared with SC06 through the loader cache (same URLs): never disposed here
+  const [day, night] = useLoader(getKTX2Loader(gl), EARTH_TEX);
+  const { earth, limb } = useMemo(() => {
+    for (const t of [day, night]) {
+      if (t) {
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 4;
+      }
+    }
+    if (!day || !night) throw new Error('SC05: Earth textures missing');
+    const earth = createEarthMaterial(day, night, low);
+    earth.transparent = true;
+    // still writes depth while fading: the limb shell behind the disc must stay hidden
+    earth.depthWrite = true;
+    (earth.uniforms.uSun!.value as THREE.Vector3).copy(ORBIT_SUN);
+    const limb = createLimbAtmosphereMaterial(ORBIT_EARTH.radius, new THREE.Vector3());
+    (limb.uniforms.uSun!.value as THREE.Vector3).copy(ORBIT_SUN);
+    return { earth, limb };
+  }, [day, night, low]);
+  useDisposeOnUnmount(earth, limb);
+  const group = useRef<THREE.Group>(null);
+  useFrame(({ camera }) => {
+    const g = group.current;
+    if (!g) return;
+    const f = fade.current;
+    g.visible = f > 0.001;
+    if (!g.visible) return;
+    // camera-centred: at this scale the ground below hardly parallaxes
+    g.position.set(
+      camera.position.x,
+      camera.position.y - ORBIT_EARTH.radius - ORBIT_EARTH.height,
+      camera.position.z,
+    );
+    (limb.uniforms.uCentre!.value as THREE.Vector3).copy(g.position);
+    earth.uniforms.uOpacity!.value = f;
+    limb.uniforms.uFade!.value = f;
+  });
+  return (
+    <group ref={group} visible={false}>
+      <mesh rotation={ORBIT_ROT} material={earth} renderOrder={5} frustumCulled={false}>
+        <sphereGeometry args={[ORBIT_EARTH.radius, low ? 96 : 192, low ? 64 : 128]} />
+      </mesh>
+      <mesh material={limb} renderOrder={6} frustumCulled={false}>
+        <sphereGeometry args={[ORBIT_EARTH.radius * 1.04, 128, 96]} />
+      </mesh>
+    </group>
+  );
+}
+
 // ── The scene ────────────────────────────────────────────────────────────────────
 function AscentScene({ id, frame }: ChapterSceneProps) {
   const low = useJourneyStore((s) => s.tier === 'low');
@@ -521,23 +650,44 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
   const story = useRef({ current: 0 }).current;
   const clouds = useRef<THREE.ShaderMaterial[]>([]);
 
-  const skyMat = useMemo(() => createSkyMaterial(), []);
+  const gl = useThree((s) => s.gl);
+  const balanced = useJourneyStore((s) => s.tier === 'balanced');
+  // the shared Milky Way bake (session-lifetime, owned by DeepSky: never disposed here)
+  const skyMat = useMemo(
+    () =>
+      createSkyMaterial(
+        bakeSky(gl, balanced ? 4096 : 2048),
+        GALAXY_ROT,
+        GALAXY.normal,
+        low ? 2 : 4,
+      ),
+    [gl, balanced, low],
+  );
+  const dpr = useThree((s) => s.viewport.dpr);
   const plumeMat = useMemo(() => createPlumeMaterial(low), [low]);
   const glowMat = useMemo(() => createPlumeMaterial(low, true), [low]);
   const liftMat = useMemo(() => createPlumeMaterial(low), [low]);
   const plumeGeo = useMemo(() => createPlumeGeometry(low ? 16 : 28), [low]);
-  const stars = useMemo(() => makeStars(low ? 1200 : 2600), [low]);
+  const stars = useMemo(() => makeStars(low ? 2500 : 6000, 77, -0.04, 1, -0.02), [low]);
+  // the sky between the old horizon and the planet's limb: only once the planet is in
+  const lowStars = useMemo(
+    () => makeStars(low ? 500 : 1200, 91, -Math.sin(ORBIT_DIP) - 0.02, -0.04, -Math.sin(ORBIT_DIP)),
+    [low],
+  );
+  const orbit = useRef({ current: 0 }).current;
   const starMat = useMemo(
     () =>
-      new THREE.PointsMaterial({
-        size: 1.4,
-        sizeAttenuation: false,
-        color: '#e6ebff',
+      new THREE.ShaderMaterial({
+        vertexShader: starVertex,
+        fragmentShader: starFragment,
+        uniforms: { uScale: { value: Math.min(dpr, 2) }, uFade: { value: 1 } },
         transparent: true,
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
       }),
-    [],
+    [dpr],
   );
+  const lowStarMat = useMemo(() => starMat.clone(), [starMat]);
   const lights = useMemo(() => makeGroundLights(low ? 1400 : 3200), [low]);
   const lightsMat = useMemo(
     () =>
@@ -559,6 +709,8 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
     plumeGeo,
     stars,
     starMat,
+    lowStars,
+    lowStarMat,
     lights,
     lightsMat,
   );
@@ -621,8 +773,13 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
       plumeLight.current.intensity = 1500 * Math.max(e * 0.3, lift);
     }
 
+    // the curved planet replaces the flat ground and deck at the top of the climb
+    const orb = orbitEarth(t);
+    orbit.current = orb;
+
     // clouds lit by the exhaust as the ship approaches and passes
     for (const m of clouds.current) {
+      m.uniforms.uOpacity!.value = (m.userData.base as number) * (1 - orb);
       m.uniforms.uGlow!.value = e;
       (m.uniforms.uGlowPos!.value as THREE.Vector3).set(shipPos.x + 30, shipPos.y, 0);
       m.uniforms.uTime!.value = clock.elapsedTime;
@@ -634,11 +791,15 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
       (gm.uniforms.uGlowPos!.value as THREE.Vector3).set(0, 0, 0);
       gm.uniforms.uThin!.value = thin;
     }
+    if (ground.current) ground.current.visible = orb < 0.999;
 
     // sky follows the camera (presentation only); darkens and reveals stars with altitude
     if (sky.current) sky.current.position.copy(camera.position);
     skyMat.uniforms.uThin!.value = thin;
-    starMat.opacity = 0.35 + 0.65 * thin;
+    skyMat.uniforms.uDip!.value = Math.sin(ORBIT_DIP) * orb;
+    lowStarMat.uniforms.uFade!.value = orb;
+    starMat.uniforms.uFade!.value = 0.7 + 0.3 * thin;
+    skyMat.uniforms.uGalaxyGain!.value = 1.6 + 0.6 * thin;
     // settlements vanish under the deck once the camera is above it (they glittered through it)
     lightsMat.opacity =
       1 - 0.9 * Math.min(1, Math.max(0, (camera.position.y - CLOUDS.bottom) / 160));
@@ -651,6 +812,7 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
           <sphereGeometry args={[1500, 48, 24]} />
         </mesh>
         <points geometry={stars} material={starMat} frustumCulled={false} renderOrder={0} />
+        <points geometry={lowStars} material={lowStarMat} frustumCulled={false} renderOrder={0} />
       </group>
 
       {/* low fill so the shadow side stays dark; the moon sits behind the pad as a cool rim light,
@@ -712,6 +874,7 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
 
       <Smoke count={low ? 90 : 220} t={story} />
       <CloudDeck layers={low ? 3 : 6} octaves={low ? 3 : 5} glow={clouds} />
+      <OrbitEarth fade={orbit} />
     </group>
   );
 }

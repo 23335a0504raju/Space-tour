@@ -21,29 +21,52 @@ export function createEarthMaterial(day: THREE.Texture, night: THREE.Texture, lo
       uNight: { value: night },
       uSun: { value: new THREE.Vector3(0, 0, -1) },
       uLow: { value: lowCost ? 1 : 0 },
+      /** < 1 only while SC05 fades the planet in over its flat ground (set `transparent` too) */
+      uOpacity: { value: 1 },
     },
     vertexShader: vert,
     fragmentShader: /* glsl */ `
       uniform sampler2D uDay; uniform sampler2D uNight; uniform vec3 uSun; uniform float uLow;
+      uniform float uOpacity;
       varying vec3 vN; varying vec2 vUv; varying vec3 vV;
+      float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vnoise(vec2 p) {
+        vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y);
+      }
+      // one round light per cell at a jittered spot, normalised so its mean is 1; cellsPerPx blends
+      // toward that mean once a cell is smaller than ~1 px (no aliasing, no squares)
+      float cityDots(vec2 p, float cellsPerPx) {
+        vec2 c = floor(p);
+        vec2 j = vec2(h21(c), h21(c + 31.7)) * 0.6 + 0.2;
+        float on = step(0.3, h21(c + 71.3));
+        float r = 0.16 + 0.1 * h21(c + 5.1);
+        vec2 q = fract(p) - j;
+        float spot = exp(-dot(q, q) / (r * r)) * on * (0.6 + 0.8 * h21(c + 9.9));
+        // mean of the dot field: on 0.7, area pi r^2 (r avg 0.21), brightness avg 1.0
+        float mean = 0.7 * 3.1416 * 0.21 * 0.21;
+        return mix(spot / mean, 1.0, smoothstep(0.35, 1.0, cellsPerPx));
+      }
       void main(){
         vec3 n = normalize(vN);
         float d = dot(n, uSun);
         vec2 uvf = vec2(vUv.x, 1.0 - vUv.y); // KTX2 is not Y-flipped
         vec3 day = texture2D(uDay, uvf).rgb;
-        vec3 nightRaw = texture2D(uNight, uvf).rgb;
+        // close up, the 2k night map's bilinear texels showed as blocky squares (review 2026-11-21).
+        // 1) warp the lookup by a fraction of a texel so the lit areas get organic, not stair-step, edges
+        vec2 mapPx = uvf * vec2(2048.0, 1024.0);
+        vec2 warp = vec2(vnoise(mapPx * 1.3), vnoise(mapPx * 1.3 + 17.0)) - 0.5;
+        vec3 nightRaw = texture2D(uNight, uvf + warp * vec2(1.6 / 2048.0, 1.6 / 1024.0)).rgb;
         // the map's dark land is blue; city lights are warm: key on red-over-blue
         float warm = max(nightRaw.r - nightRaw.b * 0.9, 0.0);
-        // the 2k map magnifies into blobs up close: break each lit area into fine clustered points
-        // (a hashed grid ~4x the map's resolution), fading back to the smooth map once a cell is
-        // smaller than a pixel (distant globes)
-        vec2 cell = floor(uvf * vec2(8192.0, 4096.0));
-        float grain = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
-        float sparkle = smoothstep(0.55, 0.95, grain) * 3.2 + 0.12;
-        // band-pass: sparkle only while a cell spans ~1-6 px (larger cells would show as squares)
-        float fw = fwidth(uvf.x * 8192.0);
-        float near = smoothstep(0.1, 0.25, fw) * (1.0 - smoothstep(0.35, 1.0, fw));
-        vec3 night = vec3(1.0, 0.68, 0.32) * smoothstep(0.05, 0.45, warm) * mix(0.6, sparkle, near);
+        float dens = smoothstep(0.03, 0.5, warm);
+        // 2) break each lit area into fine round lights on two jittered grids (4x and 12x the map);
+        //    each grid fades to its mean once a dot is under a pixel, so distant globes stay smooth
+        float texPerPx = fwidth(mapPx.x);
+        float dots = cityDots(uvf * vec2(8192.0, 4096.0), texPerPx * 4.0);
+        if (uLow < 0.5) dots = dots * 0.55 + cityDots(uvf * vec2(24576.0, 12288.0) + 3.7, texPerPx * 12.0) * 0.45;
+        // sodium orange, whiter in the dense cores
+        vec3 night = mix(vec3(1.0, 0.56, 0.22), vec3(1.0, 0.82, 0.55), dens * dens) * dens * dots * 0.75;
         float lit = smoothstep(-0.06, 0.22, d);
         // ocean glint: a soft specular on dark blue water
         vec3 h = normalize(uSun + vV);
@@ -63,7 +86,7 @@ export function createEarthMaterial(day: THREE.Texture, night: THREE.Texture, lo
         float fres = pow(1.0 - max(dot(n, normalize(vV)), 0.0), 4.0);
         vec3 haze = vec3(0.3, 0.55, 1.0) * lit + vec3(1.0, 0.5, 0.2) * term * 0.3;
         col += haze * fres * fres * 0.6;
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(col, uOpacity);
       }`,
   });
 }
@@ -138,6 +161,7 @@ export function createLimbAtmosphereMaterial(radius: number, centre: THREE.Vecto
       uCentre: { value: centre.clone() },
       uRadius: { value: radius },
       uH: { value: radius * 0.0075 },
+      uFade: { value: 1 },
     },
     vertexShader: /* glsl */ `
       varying vec3 vW;
@@ -147,7 +171,7 @@ export function createLimbAtmosphereMaterial(radius: number, centre: THREE.Vecto
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
     fragmentShader: /* glsl */ `
-      uniform vec3 uSun; uniform vec3 uCentre; uniform float uRadius; uniform float uH;
+      uniform vec3 uSun; uniform vec3 uCentre; uniform float uRadius; uniform float uH; uniform float uFade;
       varying vec3 vW;
       void main(){
         vec3 rd = normalize(vW - cameraPosition);
@@ -165,7 +189,7 @@ export function createLimbAtmosphereMaterial(radius: number, centre: THREE.Vecto
                  + vec3(1.0, 0.48, 0.18) * twilight * 1.1
                  + vec3(1.0, 0.78, 0.5) * forward
                  + vec3(0.04, 0.07, 0.14) * 0.35;
-        float a = clamp(dens, 0.0, 1.0);
+        float a = clamp(dens, 0.0, 1.0) * uFade;
         gl_FragColor = vec4(col * a, a);
       }`,
     side: THREE.BackSide,

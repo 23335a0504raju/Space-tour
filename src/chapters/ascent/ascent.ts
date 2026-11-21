@@ -83,6 +83,18 @@ export const thinAir = (t: number) => clamp01(altitude(t) / MAX_ALT);
 export const armSwing = (t: number) => span(t, BEATS.arm[0], BEATS.arm[1]);
 export const clampsOpen = (t: number) => span(t, BEATS.clamps[0], BEATS.clamps[1]);
 
+/**
+ * The curved Earth at the top of the climb (review 2026-11-21: the flat ground read as a plane). A
+ * camera-centred planet, radius 1500 m with its surface 100 m under the camera (inside the 2 km far
+ * plane; the limb dips ~20°), fades in over the flat ground and cloud deck, which fade out. It hands
+ * over to SC06's low-orbit Earth: night side, city lights, a thin limb glowing ahead.
+ */
+export const ORBIT_EARTH = { radius: 1500, height: 100 } as const;
+/** Limb dip below level (rad) seen from the camera once the planet is in. */
+export const ORBIT_DIP = Math.acos(ORBIT_EARTH.radius / (ORBIT_EARTH.radius + ORBIT_EARTH.height));
+/** 0 → 1 as the planet replaces the flat ground and deck. */
+export const orbitEarth = (t: number) => span(t, 0.8, 0.9);
+
 /** How strongly the jets light the ground and the smoke (falls off as the ship climbs). */
 export const groundGlow = (t: number) =>
   Math.max(engine(t) * 0.5, liftJets(t)) * Math.exp(-altitude(t) / 90);

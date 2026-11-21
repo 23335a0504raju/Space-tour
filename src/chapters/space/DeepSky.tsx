@@ -137,7 +137,11 @@ const skyVertex = /* glsl */ `
 
 const baked = new Map<number, THREE.Texture>();
 
-function bakeSky(gl: THREE.WebGLRenderer, width: number): THREE.Texture {
+/**
+ * The shared baked Milky Way (equirectangular, sRGB-encoded in 8 bits: decode with pow 2.2). SC05
+ * samples it in its own sky dome. Lives for the session; never dispose it.
+ */
+export function bakeSky(gl: THREE.WebGLRenderer, width: number): THREE.Texture {
   const hit = baked.get(width);
   if (hit) return hit;
   const rt = new THREE.WebGLRenderTarget(width, width / 2, {
