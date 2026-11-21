@@ -16,8 +16,9 @@ interface Rock {
   readonly size: number;
 }
 
-// real asteroids are dark (albedo 0.04–0.15): charcoal and umber, not light grey
-const BASE = ['#4d4841', '#3f3b36', '#5a544b', '#35322e', '#4a443a'] as const;
+// stony grey with a little warmth (review 2026-11-21: the reference rocks are grey regolith, the
+// brown read as mud); the hard key light and the crater shading carry the form
+const BASE = ['#8a8782', '#76736e', '#9a9690', '#6b6864', '#827d75'] as const;
 const HERO_COUNT = 9;
 const MID_COUNT = 36;
 
@@ -70,6 +71,73 @@ export function makeRocks(
   return rocks;
 }
 
+/**
+ * Regolith shading: a procedural pitted surface (Worley craters with raised rims, plus fine grit)
+ * evaluated in each rock's own unit space, applied as a bump to the shading normal from screen-space
+ * derivatives. No textures; the low tier drops the second crater octave.
+ */
+function createRockMaterial(low: boolean): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95, metalness: 0 });
+  m.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRock;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRock = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        varying vec3 vRock;
+        vec3 rh3(vec3 p) {
+          p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6)));
+          return fract(sin(p) * 43758.5453);
+        }
+        // crater field: bowl inside, raised rim, flat between (Worley distance, varied radii)
+        float craters(vec3 p) {
+          vec3 i = floor(p); vec3 f = fract(p);
+          float h = 0.0;
+          for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+            vec3 g = vec3(x, y, z);
+            vec3 o = rh3(i + g);
+            float r = 0.25 + 0.3 * o.x;
+            float d = length(g + o - f) / r;
+            float bowl = (d * d - 1.0) * 0.6;
+            float rim = exp(-pow((d - 1.0) * 4.0, 2.0)) * 0.35;
+            h += d < 1.0 ? bowl : rim;
+          }
+          return h;
+        }
+        
+        float rockHeight(vec3 p) {
+          float h = craters(p * 3.0) * 0.6;
+          ${low ? '' : 'h += craters(p * 8.0 + 3.7) * 0.22;'}
+          
+          return h;
+        }`,
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+        {
+          float hgt = rockHeight(vRock);
+          vec3 sp = -vViewPosition;
+          vec3 dpx = dFdx(sp); vec3 dpy = dFdy(sp);
+          vec3 r1 = cross(dpy, normal); vec3 r2 = cross(normal, dpx);
+          float det = dot(dpx, r1);
+          float dhx = dFdx(hgt); float dhy = dFdy(hgt);
+          // fade the bump where a crater spans only a few pixels (it would alias into sparkle)
+          float fp = length(fwidth(vRock * 3.0));
+          float keep = 1.0 - smoothstep(0.08, 0.3, fp);
+          vec3 grad = sign(det) * (dhx * r1 + dhy * r2) * 0.45 * keep;
+          normal = normalize(abs(det) * normal - grad);
+          // crater floors are a touch darker (shadowed regolith)
+          diffuseColor.rgb *= 0.82 + 0.25 * clamp(hgt + 0.5, 0.0, 1.0);
+        }`,
+      );
+  };
+  m.customProgramCacheKey = () => `belt-rock-${low ? 'lo' : 'hi'}`;
+  return m;
+}
+
 function Field({
   geometry,
   rocks,
@@ -119,10 +187,7 @@ export function Belt({
   const heroA = useUnitGeometry('bennu', { roughen: 0.1, craters: 46, seed: 11 });
   const heroB = useUnitGeometry('bennu', { roughen: 0.14, craters: 38, seed: 23 });
   const heroC = useUnitGeometry('bennu', { roughen: 0.08, craters: 54, seed: 37 });
-  const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, metalness: 0 }),
-    [],
-  );
+  const material = useMemo(() => createRockMaterial(low), [low]);
   useDisposeOnUnmount(material);
   const { field, mids, groups } = useMemo(() => {
     const all = makeRocks(count, spread, seed, 7);

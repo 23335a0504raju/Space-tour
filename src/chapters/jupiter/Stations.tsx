@@ -1,9 +1,8 @@
-import { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
-import type * as THREE from 'three';
+import { useMemo } from 'react';
 import { NasaCraft } from '../nasa/NasaModel.tsx';
 import type { NasaModelKey } from '../nasa/NasaModel.tsx';
 import type { StationKind } from './jupiter.ts';
+import { OrbitTrail, alongOrbit, orbitThrough } from './Orbits.tsx';
 
 /**
  * Three real NASA spacecraft, one per flagship project (public-domain models, assets A031–A033).
@@ -14,7 +13,8 @@ import type { StationKind } from './jupiter.ts';
  *    (the project stores documents and retrieves them by meaning),
  *  - Stash: Juno, whose electronics sit inside a titanium radiation vault
  *    (the project is a place where saved things are kept).
- * Spin is ambient (clock time); it carries no story meaning.
+ * Each flies along its own orbit with a light trail behind it (Orbits.tsx); `tilt` is now the
+ * craft's attitude within that flight frame, so every craft is held in a deliberate, ordered pose.
  */
 const CRAFT: Record<
   StationKind,
@@ -32,17 +32,19 @@ export function Station({
   readonly kind: StationKind;
   readonly position: readonly [number, number, number];
 }) {
-  const spin = useRef<THREE.Group>(null);
   const craft = CRAFT[kind];
-  useFrame((_, delta) => {
-    if (spin.current) spin.current.rotation.y += delta * 0.1;
-  });
+  const heading = useMemo(() => alongOrbit(orbitThrough(position)), [position]);
   return (
-    <group position={[...position]}>
-      <pointLight position={[0, 4, 9]} intensity={60} distance={30} color="#dbe6ff" />
-      <group ref={spin} rotation={craft.tilt}>
-        <NasaCraft model={craft.model} size={craft.size} />
+    <>
+      <OrbitTrail station={position} />
+      <group position={[...position]}>
+        <pointLight position={[0, 4, 9]} intensity={60} distance={30} color="#dbe6ff" />
+        <group rotation={heading}>
+          <group rotation={craft.tilt}>
+            <NasaCraft model={craft.model} size={craft.size} />
+          </group>
+        </group>
       </group>
-    </group>
+    </>
   );
 }

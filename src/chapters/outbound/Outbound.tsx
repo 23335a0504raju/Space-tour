@@ -79,9 +79,9 @@ function OutboundScene({ id, frame }: ChapterSceneProps) {
   return (
     <group>
       <Starfield count={7000} radius={1500} seed={41} />
-      <directionalLight ref={light} target={sunTarget} color="#fff2e0" intensity={2.8} />
+      <directionalLight ref={light} target={sunTarget} color="#fff2e0" intensity={3.4} />
       <primitive object={sunTarget} />
-      <hemisphereLight args={['#33415f', '#08090d', 0.3]} />
+      <hemisphereLight args={['#33415f', '#08090d', 0.12]} />
       <mesh position={[...EARTH.position]} rotation={[0.08, 1.15, 0]} material={earth}>
         <sphereGeometry args={[EARTH.radius, low ? 64 : 128, low ? 48 : 96]} />
       </mesh>

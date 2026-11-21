@@ -1,7 +1,9 @@
 import { forwardRef, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
+import { DeepSky, GALAXY } from '../space/DeepSky.tsx';
 
 /**
  * Grey-box building blocks (P2). Stand-ins for real assets: correct placement, scale and
@@ -18,35 +20,114 @@ export function seeded(seed: number) {
 }
 
 // ── Starfield ─────────────────────────────────────────────────────────────────
+const starVertex = /* glsl */ `
+  attribute float aSize;
+  attribute vec3 aColor;
+  uniform float uScale;
+  varying vec3 vColor;
+  varying float vSize;
+  void main() {
+    vColor = aColor;
+    vSize = aSize * uScale;
+    gl_PointSize = vSize;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const starFragment = /* glsl */ `
+  varying vec3 vColor;
+  varying float vSize;
+  void main() {
+    vec2 c = gl_PointCoord - 0.5;
+    float r = length(c) * 2.0;
+    // soft round core with a faint halo
+    float core = exp(-r * r * 9.0);
+    float halo = exp(-r * 3.5) * 0.25;
+    // the brightest stars get thin diffraction spikes (lens look of the references)
+    float spikes = 0.0;
+    if (vSize > 9.0) {
+      float sx = exp(-abs(c.y) * vSize * 1.6) * (1.0 - abs(c.x) * 2.0);
+      float sy = exp(-abs(c.x) * vSize * 1.6) * (1.0 - abs(c.y) * 2.0);
+      spikes = max(sx, sy) * 0.9;
+    }
+    float a = core + halo + spikes;
+    if (a < 0.01) discard;
+    gl_FragColor = vec4(vColor * a, 1.0);
+    #include <colorspace_fragment>
+  }
+`;
+
+/**
+ * Sharp stars over the baked deep sky (DeepSky): magnitudes follow a steep power law (mostly faint,
+ * a few bright with spikes), colours run from blue-white to warm, and density rises toward the
+ * galactic band. Additive point sprites: one draw call.
+ */
 export function Starfield({
   count = 8000,
   radius = 400,
   seed = 1,
+  sky = true,
 }: {
   count?: number;
   radius?: number;
   seed?: number;
+  /** Draw the deep-sky backdrop behind the stars (off where a chapter has its own sky). */
+  sky?: boolean;
 }) {
   const geometry = useMemo(() => {
     const rand = seeded(seed);
     const positions = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    const colors = new Float32Array(count * 3);
+    const tints = [
+      new THREE.Color('#9fb8ff'),
+      new THREE.Color('#d6e0ff'),
+      new THREE.Color('#fff4e8'),
+      new THREE.Color('#ffd9a0'),
+      new THREE.Color('#ffb48a'),
+    ];
+    const v = new THREE.Vector3();
     for (let i = 0; i < count; i += 1) {
-      const u = rand() * 2 - 1;
-      const th = rand() * Math.PI * 2;
-      const r = Math.sqrt(1 - u * u) * radius;
-      positions[i * 3] = r * Math.cos(th);
-      positions[i * 3 + 1] = u * radius;
-      positions[i * 3 + 2] = r * Math.sin(th);
+      // rejection-sample toward the galactic band: about 2.5x denser on it
+      for (let tries = 0; tries < 6; tries += 1) {
+        const u = rand() * 2 - 1;
+        const th = rand() * Math.PI * 2;
+        const r = Math.sqrt(1 - u * u);
+        v.set(r * Math.cos(th), u, r * Math.sin(th));
+        const bnd = Math.exp(-(v.dot(GALAXY.normal) ** 2) / 0.03);
+        if (rand() < 0.4 + 0.6 * bnd) break;
+      }
+      positions.set([v.x * radius, v.y * radius, v.z * radius], i * 3);
+      const m = Math.pow(rand(), 9); // steep: most faint, a handful very bright
+      sizes[i] = 1.4 + m * 14;
+      const c = tints[Math.floor(rand() * tints.length)] ?? tints[1]!;
+      const k = 0.45 + 0.55 * Math.min(1, m * 3 + rand() * 0.5);
+      colors.set([c.r * k, c.g * k, c.b * k], i * 3);
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    g.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+    g.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
     return g;
   }, [count, radius, seed]);
-  useDisposeOnUnmount(geometry);
+  const dpr = useThree((s) => s.viewport.dpr);
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: starVertex,
+        fragmentShader: starFragment,
+        uniforms: { uScale: { value: Math.min(dpr, 2) } },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    [dpr],
+  );
+  useDisposeOnUnmount(geometry, material);
   return (
-    <points geometry={geometry} frustumCulled={false}>
-      <pointsMaterial size={1.3} sizeAttenuation={false} color="#e6ebff" />
-    </points>
+    <>
+      {sky && <DeepSky rotation={((seed % 5) - 2) * 0.14} />}
+      <points geometry={geometry} material={material} frustumCulled={false} />
+    </>
   );
 }
 
