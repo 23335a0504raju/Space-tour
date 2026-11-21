@@ -91,13 +91,25 @@ export function Bridge() {
       if (!mat) {
         const copy = src.clone();
         if (src.name === 'Bridge_Shell') copy.color.set(SHELL_TINT);
-        else copy.depthWrite = false; // hologram: transparent glass over the deck
+        else {
+          // hologram shells: the author's pale cream glass swept across the globe as the clip turned
+          // it, washing half the planet out (seen as a flicker at the desk). A faint, cool, additive
+          // glow keeps the rings and the scan effect without ever covering the Earth.
+          copy.depthWrite = false;
+          copy.color.set(GLOBE_TINT);
+          copy.blending = THREE.AdditiveBlending;
+          copy.opacity = Math.min(copy.opacity, 1) * 0.28;
+        }
         swap.set(src, copy);
         owned.push(copy);
         mat = copy;
       }
       m.material = mat;
       m.receiveShadow = true;
+      // the two large spinning hemispheres (Object010/011, 960 tris each) were opaque cream panels
+      // that swept across the globe as the clip turned them: half the planet washed out every few
+      // seconds, read as a flicker at the desk. The ring shell (Object009) keeps the hologram look.
+      if (/^Object01[01]_/.test(m.name)) m.visible = false;
       if (m.name.startsWith(GLOBE_MESH)) {
         // the planet: Earth on its own geometry and material (the cached glTF is shared)
         const map = earth.clone();
@@ -110,6 +122,17 @@ export function Bridge() {
           opacity: 0.94,
           depthWrite: false,
         });
+        // polar caps fade into the hologram blue: the camera looks up at the globe as it moves round
+        // the desk, and the white Antarctic cap, stretched over this low-poly sphere's pole fan,
+        // washed out most of the visible face (seen as a flicker at the desk)
+        globe.onBeforeCompile = (shader) => {
+          shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <map_fragment>',
+            `#include <map_fragment>
+            float polar = smoothstep(0.55, 0.85, abs(vMapUv.y - 0.5) * 2.0);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.16, 0.34), polar * 0.85);`,
+          );
+        };
         m.geometry = sphericalUvs(m.geometry);
         m.material = globe;
         owned.push(map, globe, m.geometry);

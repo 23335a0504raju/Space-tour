@@ -21,13 +21,16 @@ export const WALK = { start: 0.26, end: 0.96 } as const;
  * space with it (P3 review: the chair cut through the legs on the way to the door).
  */
 export function chairPose(t: number) {
-  const k = span(t, 0.05, 0.2);
+  // back first (it has to leave the legs as they straighten), then aside to the right, clear of
+  // both the body and the camera line behind it (review: the chair back stood in front of the legs)
+  const back = span(t, 0.04, 0.12);
+  const aside = span(t, 0.07, 0.2);
   return {
-    // rolls back and away to the right: the walk now leaves to the left (bridge layout)
-    x: CHAIR_REST.x + 0.75 * k,
-    // only 0.45 back: a low rail runs behind it on the bridge
-    z: CHAIR_REST.z + 0.45 * k,
-    rotY: CHAIR_REST.rotY + 0.4 * k,
+    // the walk leaves to the left (bridge layout)
+    x: CHAIR_REST.x + 1.05 * aside,
+    // only 0.4 back: a low rail runs behind it on the bridge
+    z: CHAIR_REST.z + 0.4 * back,
+    rotY: CHAIR_REST.rotY + 0.7 * aside,
   };
 }
 
@@ -47,12 +50,13 @@ export const PATH_POINTS: ReadonlyArray<readonly [number, number, number]> = [
   // stairs: foot at the east, top at the west (0.9 m run, 0.5 m rise)
   [-3.6, -3.35, 0],
   [-4.5, -3.6, UP],
-  [-5.35, -4.3, UP],
-  [-5.4, -6.3, UP],
-  [-4.85, -7.4, UP],
+  [-5.2, -4.3, UP],
+  [-5.2, -6.2, UP],
+  [-4.6, -7.25, UP],
   // the platform's north tip, the step down to the deck, then turn into the lift doorway
-  [-4.75, -7.8, UP],
-  [-4.35, -8.2, 0],
+  // (kept ~0.5 m off the diagonal wall: the body and the arm swing clipped into it)
+  [-4.45, -7.7, UP],
+  [-4.25, -8.15, 0],
   [-4.3, -8.65, 0],
   [LIFT.x, LIFT.z, LIFT.y],
 ];
