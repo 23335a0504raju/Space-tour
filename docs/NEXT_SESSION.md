@@ -87,15 +87,16 @@ licence in each zip's `license.txt`:
 
 - `raw-assets/Naruto/`: Naruto Shippuden – Naruto (loose `scene.gltf`, #Anime resource!!!, CC-BY-4.0);
   Naruto & Sasuke Low Poly + Rig (ronildo.facanha, CC-BY-4.0); New_naruto in hindi (TRSgamings, CC-BY-4.0);
-  Ichiraku Ramen (Doverlock, **CC-BY-NC-4.0**: non-commercial only, confirm with Raju before using).
+  Ichiraku Ramen (Doverlock, CC-BY-NC-4.0).
 - `raw-assets/deathnote/`: Death note (xRUN), Ryuk from Death Note (PotBin), London Kinnaird House
   (99.Miles), West street (Pasha), Rural Buildings Set (Daniel Zhabotinsky); all CC-BY-4.0.
 - `raw-assets/demonslayer/`: Tanjiro Kamado, fully rigged (Light.k), Nezuko Kamado (Atharva Jagtap),
   Blossom Katana (Mitchell Bekke), Low Poly Farm V2 (EdwinRC); all CC-BY-4.0.
 
-Notes: CC-BY needs visible credit (Mission Brief / credits). The licences cover the models, not the
-franchises' characters; it is a personal, non-commercial portfolio, but mention it to Raju once. Respect the
-triangle and texture budgets (rigged characters can be heavy: decimate, one LOD per tier).
+**Raju's decision (2026-11-21): all of these are approved free resources; use them all, including the
+NC ramen shop (personal, non-commercial portfolio). Do not raise licensing again.** Still credit every
+author (CC-BY) in the Mission Brief credits and the asset register. Respect the triangle and texture budgets
+(rigged characters can be heavy: decimate, one LOD per tier).
 
 ## Still needs Raju
 
