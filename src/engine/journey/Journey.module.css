@@ -280,3 +280,32 @@
   text-transform: uppercase;
   color: var(--color-accent);
 }
+
+/*
+ * Phone bottom bar: the progress line runs across the top of the bar, with the Flight Plan button
+ * and the current section on the row below. The previous/next buttons are dropped (a thumb scrolls;
+ * the section ticks and the Flight Plan jump anywhere); they used to run off the right edge.
+ */
+@media (max-width: 720px) {
+  .bottom {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    min-height: 0;
+    padding: var(--space-3) var(--gutter) var(--space-2);
+  }
+
+  .track {
+    order: -1;
+    flex: 1 0 100%;
+  }
+
+  .progressLabel {
+    min-width: 0;
+    margin-left: auto;
+    font-size: 0.6875rem;
+  }
+
+  .stepper {
+    display: none;
+  }
+}

@@ -12,6 +12,14 @@ import type { ScrollMasterState } from '../scroll/useScrollMaster.ts';
 import { useJourneyStore } from '../store.ts';
 import { boundaryDip, restOpacity } from './overlayMath.ts';
 
+/**
+ * Portrait screens put the text panel in the bottom half and the header at the top, leaving a
+ * narrow free band above the panel. A lens shift (the projection window slides down the image)
+ * moves the whole picture up by this fraction of the screen height, so the 3D subject lands in
+ * that band instead of behind the panel. Exact and free: no change to any chapter's camera keys.
+ */
+const PORTRAIT_SHIFT = 0.17;
+
 export interface OverlayEntry {
   readonly el: HTMLElement;
   readonly chapterId: string;
@@ -60,7 +68,10 @@ export function Director({ master, frame, links }: Props) {
   }, []);
   const lastDip = useMemo(() => ({ opacity: -1, color: '' }), []);
 
-  useFrame(({ camera, scene }) => {
+  // size the lens shift was last applied for (so it is only rewritten when something changes)
+  const lens = useMemo(() => ({ w: 0, h: 0, shift: 0 }), []);
+
+  useFrame(({ camera, scene, size }) => {
     const r = resolve(links.track, master.progress);
     const meta = chapters[r.index];
     const impl = implementations[r.id];
@@ -99,6 +110,25 @@ export function Director({ master, frame, links }: Props) {
     if (persp.isPerspectiveCamera && Math.abs(persp.fov - fov) > 1e-3) {
       persp.fov = fov;
       persp.updateProjectionMatrix();
+    }
+    if (persp.isPerspectiveCamera) {
+      const shift = frame.aspect === 'portrait' ? PORTRAIT_SHIFT : 0;
+      if (lens.w !== size.width || lens.h !== size.height || lens.shift !== shift) {
+        lens.w = size.width;
+        lens.h = size.height;
+        lens.shift = shift;
+        if (shift > 0)
+          persp.setViewOffset(
+            size.width,
+            size.height,
+            0,
+            size.height * shift,
+            size.width,
+            size.height,
+          );
+        else persp.clearViewOffset();
+        persp.updateProjectionMatrix();
+      }
     }
 
     // Overlays: direct style writes, only when values change.

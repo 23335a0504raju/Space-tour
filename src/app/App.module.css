@@ -115,3 +115,52 @@
   font: inherit;
   cursor: pointer;
 }
+
+/*
+ * Phone header (UI_SCROLL_AUDIT.md F4): the identity on one line over a single scrollable row of
+ * links, about 96 px instead of two wrapped rows at ~18 % of the screen. Links keep 44 px targets.
+ */
+@media (max-width: 720px) {
+  .bar {
+    gap: 0;
+    padding: var(--space-2) var(--gutter) 0;
+  }
+
+  .name {
+    font-size: 1.0625rem;
+  }
+
+  .role {
+    font-size: 0.75rem;
+  }
+
+  .actions {
+    flex: 1 0 100%;
+    flex-wrap: nowrap;
+    gap: 0 var(--space-4);
+    margin-inline: calc(-1 * var(--gutter));
+    padding-inline: var(--gutter);
+    overflow-x: auto;
+    scrollbar-width: none;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  .actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .actions a,
+  .actions button {
+    flex: none;
+  }
+
+  .actions [aria-current]::after {
+    bottom: 6px;
+  }
+
+  .actions .secondary {
+    padding-left: var(--space-4);
+  }
+}

@@ -391,6 +391,30 @@ The three flagship stops in SC08 (SmartWay Traffic, DocumentDB, Stash) are now *
 - The 4th feature of DocumentDB and Stash only appears in the Project Bay.
 - The supporting projects (SC07) keep their compact link list.
 
+## Fix 1: Earth on the hologram globe, 2026-11-21
+
+[Bridge.tsx](../../src/chapters/room/Bridge.tsx): the bridge's planet (mesh `Object012`, a 151-vertex sphere) now shows NASA's Blue Marble (A021, already in the project) with a cool hologram tint, instead of the model author's reddish planet. The model's own UVs address the author's atlas, so the sphere gets equirectangular UVs in code (seam-unwrapped, pole vertices averaged). The pole axis is the model's spin axis (local Z, 22.5°/s, measured from the clip), so it turns like a globe with north up. The glow shells and posts are untouched.
+
+- **Bug found and fixed on the way:** the spin never ran in dev because the animation was started when the model was built but stopped in an effect cleanup, which React's dev-mode double run triggers. Start and stop now share one effect (the lesson already in the r3f-scenes notes).
+- Draw calls and triangles unchanged (101–126 High, 52–76 Low); +1 live texture. A021 now lists SC02.
+
+## Fix 2: phone layout, 2026-11-21
+
+| Problem (UI_SCROLL_AUDIT.md) | Fix |
+|---|---|
+| F4: header two wrapped rows, ~18 % of the screen | Identity over one scrollable row of links, **90 px** (about 10 %); 44 px targets kept |
+| Bottom bar: previous/next ran off the right edge, label collided | Progress line across the top, Flight Plan and the section label below; previous/next dropped on phones |
+| F1: 3D subject hidden behind the panel at project stops | **Lens shift** in the Director (`PORTRAIT_SHIFT` 0.17): on portrait screens the picture moves up into the free band above the panel. No chapter's camera changed. The astronaut at the desk, the cockpit and the Voyager/Juno models are now visible above their panels |
+| Showcase panels cut off at the bottom | No preview image on phones; tighter type; the panel may use all the height between header and bar; features and links all reachable. Smaller phones (≤ 800 px tall) show two features |
+| Stack chips took four rows | One line of chips that scrolls sideways (all technologies kept); the grid column shrinks so nothing clips |
+| A scrolling panel could trap the swipe | `overscroll-behavior: auto` on phone showcases: a swipe that reaches the panel's end carries on to the page |
+
+Measured (production build): no panel scrolls inside itself at **412×915** and **390×844**; at **360×740** only DocumentDB's panel overflows, by 51 px (the long role line and summary). No page-level sideways overflow at any of the three sizes.
+
+Not done: the first project stop's station sits at the left edge on phones (in landscape the camera aims left of it so the panel can sit on the right); centring it needs a per-stop camera variant. A real-device Android test is still outstanding (Q12).
+
+Checks: `npm run verify` 110/110; `npm run build`; `npx playwright test` 24/24 (desktop and phone-portrait projects, axe included).
+
 ### Decisions I need from you
 
 1. **Name and role (Q1):** "Raju Chowdavada" and which role: "Software Engineer", or the site's "Full-Stack Software Engineer & AI Builder"?
