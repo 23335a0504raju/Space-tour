@@ -415,6 +415,19 @@ Not done: the first project stop's station sits at the left edge on phones (in l
 
 Checks: `npm run verify` 110/110; `npm run build`; `npx playwright test` 24/24 (desktop and phone-portrait projects, axe included).
 
+## Cockpit upgrade (SC04), 2026-11-21
+
+Raju's decisions: upgrade the current cockpit (no new model: a licence-checked search found no free cockpit interior close to the references; the one good-looking candidate, "Spaceship Cockpit + Seat" by sparshgupta, CC BY, is a 594k-triangle seat and console, not a cabin); **keep the Stash preview image** as it is.
+
+| Area | Change |
+|---|---|
+| Materials | Shell, dash, seats and hull go from pale grey and white to charcoal and gunmetal (hull and deck textures tinted like the bridge), dark pads, gold harness straps instead of orange. The astronaut's white suit now separates from the cabin. |
+| Window | The windscreen showed a black void. It now has a warm horizon haze (a canvas gradient, additive) and a distant launch complex: 90 floodlights and beacons in one instanced draw, bright enough for the post chain's bloom. The tower and starfield stay. |
+| Flight Plan screen (U4) | The in-world screen listed internal chapter codes (SC02, SC04…). It now lists the seven visitor sections (01 Introduction … 07 Contact), the same list as the header, progress bar and Flight Plan menu. |
+| Cost | Draw calls 175 / 107 / 86 / 83 (was 173 / 105 / 84 / 81): +2 for the haze and the lights. The opening frame is still over the ≤ 150 target while the bridge chapter beside it is mounted, and under it everywhere else. Frame time p95 16.8–17.2 ms. |
+
+Checks: `npm run verify` 110/110; build; `npx playwright test` as run below.
+
 ### Decisions I need from you
 
 1. **Name and role (Q1):** "Raju Chowdavada" and which role: "Software Engineer", or the site's "Full-Stack Software Engineer & AI Builder"?

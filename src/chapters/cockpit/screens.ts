@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { chapters } from '../registry.ts';
+import { sections } from '../sections.ts';
 import { content, isPublishable } from '../../content/index.ts';
 
 /**
@@ -106,15 +106,16 @@ export function educationScreen(): THREE.CanvasTexture {
 
 export function flightPlanScreen(): THREE.CanvasTexture {
   const { canvas, ctx } = frame('FLIGHT PLAN');
-  const stops = chapters.filter((c) => c.navLabel);
-  stops.forEach((c, i) => {
+  // the visitor's sections (same list as the header, progress bar and Flight Plan menu), not the
+  // internal chapter codes
+  sections.forEach((sec, i) => {
     const y = 150 + i * 62;
     ctx.fillStyle = i === 1 ? GOLD : MUTED;
     ctx.font = `26px ${FONT}`;
-    ctx.fillText(c.scene.padEnd(7, ' '), 40, y);
+    ctx.fillText(String(i + 1).padStart(2, '0'), 40, y);
     ctx.fillStyle = i === 1 ? GOLD : TEXT;
     ctx.font = `600 32px ${FONT}`;
-    ctx.fillText(c.navLabel ?? c.title, 190, y);
+    ctx.fillText(sec.label, 130, y);
     ctx.fillStyle = 'rgba(127,138,160,0.35)';
     ctx.fillRect(40, y + 18, W - 80, 1);
   });
