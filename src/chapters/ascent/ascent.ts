@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { ShotState } from '../../engine/camera/shots.ts';
+import type { AspectClass } from '../types.ts';
 import { HELVELA } from '../ship/helvelaDimensions.ts';
 
 /**
@@ -131,7 +132,17 @@ const jitter = new THREE.Vector3();
  *  D  above and behind, looking down the ship as it climbs out of the deck; at the end the view
  *     lifts to the horizon ahead: black sky over a thin glowing line (handover to SC06's limb).
  */
-export function ascentShot(t: number, out: ShotState, reduced = REDUCED_MOTION): void {
+/** Portrait pulls the exterior shots back along their view line so the 60 m hull fits the narrow frame. */
+const PORTRAIT_PULL = 2.2;
+
+export { REDUCED_MOTION };
+
+export function ascentShot(
+  t: number,
+  out: ShotState,
+  reduced = REDUCED_MOTION,
+  aspect: AspectClass = 'landscape',
+): void {
   shipPose(t, ship);
   if (t < BEATS.onboard[0]) {
     const push = span(t, 0, 0.3);
@@ -159,6 +170,11 @@ export function ascentShot(t: number, out: ShotState, reduced = REDUCED_MOTION):
     tgtB.set(out.position.x - 460, ship.y - 30, out.position.z - 140);
     out.target.copy(tgtA).lerp(tgtB, lift);
     out.fov = 46 + 6 * lift;
+  }
+  if (aspect === 'portrait') {
+    // exterior shots only; the onboard deck camera keeps its place on the hull (hard cuts either side)
+    const pull = t >= BEATS.onboard[0] && t < BEATS.onboard[1] ? 1 : PORTRAIT_PULL;
+    out.position.sub(out.target).multiplyScalar(pull).add(out.target);
   }
   out.position.add(shake(t, jitter, reduced));
 }

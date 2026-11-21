@@ -39,8 +39,12 @@ export interface ChapterSceneProps {
 export interface ChapterImpl {
   /** 3D content in the chapter's own local coordinate space. */
   readonly Scene: ComponentType<ChapterSceneProps>;
-  /** Camera for story time t; must be a pure function of t (writes into `out`). */
-  shot(t: number, out: ShotState): void;
+  /** Camera for story time t; must be a pure function of t and the aspect class (writes into `out`).
+   *  Chapters that frame the same for every aspect can ignore `aspect`. */
+  shot(t: number, out: ShotState, aspect: AspectClass): void;
+  /** Portrait only: fraction of the screen height the picture is lifted to clear the text panel
+   *  (default 0.17). Chapters without text set 0 so the subject stays centred. */
+  readonly portraitShift?: number;
   /** Art-style blend at story time t (0 realistic, 1 line art, 2 cel). Default: the chapter art style. */
   style?(t: number): number;
   readonly background: string;

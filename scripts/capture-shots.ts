@@ -16,13 +16,18 @@ const low = args.includes('--low');
 const perf = args.includes('--perf');
 const base = args.find((a) => a.startsWith('--url='))?.slice(6) ?? 'http://localhost:4173';
 const specs = args.filter((a) => !a.startsWith('--'));
-const viewport = portrait ? { width: 412, height: 915 } : { width: 1440, height: 900 };
+const wide = args.includes('--wide');
+const viewport = portrait
+  ? { width: 412, height: 915 }
+  : wide
+    ? { width: 1919, height: 1067 }
+    : { width: 1440, height: 900 };
 const outDir = join(
   import.meta.dirname,
   '..',
   'spike-results',
   'shots',
-  portrait ? 'portrait' : 'desktop',
+  portrait ? 'portrait' : wide ? 'wide' : 'desktop',
 );
 mkdirSync(outDir, { recursive: true });
 
@@ -68,6 +73,9 @@ await page.goto(base + '/?gate=off');
 await page.waitForSelector('canvas', { timeout: 30_000 });
 await page.waitForTimeout(2500); // assets + shader compile
 
+// A chapter reached by a cold jump needs time to mount, load and compile before it draws; the
+// first shot of each chapter used to come out black (a capture artefact, not an app bug).
+const warmed = new Set<string>();
 for (const spec of specs) {
   const [id, times = '0.5'] = spec.split(':');
   if (!id || !chapters.some((c) => c.id === id)) throw new Error(`Unknown chapter: ${id}`);
@@ -77,7 +85,8 @@ for (const spec of specs) {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       window.scrollTo({ top: max * progress, behavior: 'instant' });
     }, p);
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(warmed.has(id) ? 1500 : 6000);
+    warmed.add(id);
     const file = join(outDir, `${id}-${t}${low ? '-low' : ''}.png`);
     await page.screenshot({ path: file });
     console.log(`✓ ${file}`);

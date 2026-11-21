@@ -161,30 +161,47 @@ export function createSmokeMaterial(): THREE.ShaderMaterial {
     vertexShader: /* glsl */ `
       attribute vec3 iCenter;
       attribute vec4 iParams; // size, alpha, rotation, lit
-      varying vec2 vUv; varying float vAlpha; varying float vLit; varying float vSeed;
+      varying vec2 vUv; varying float vAlpha; varying float vLit; varying float vSeed; varying vec2 vUp;
       void main() {
         vUv = uv;
-        vAlpha = iParams.y; vLit = iParams.w; vSeed = iCenter.x * 0.13 + iCenter.z * 0.07;
+        vLit = iParams.w; vSeed = iCenter.x * 0.13 + iCenter.z * 0.07;
         float c = cos(iParams.z), s = sin(iParams.z);
-        vec2 q = mat2(c, -s, s, c) * position.xy * iParams.x;
+        mat2 rot = mat2(c, -s, s, c);
+        vec2 q = rot * position.xy * iParams.x;
+        // screen up expressed in the sprite's own (rotated) frame, so the underside stays at the bottom
+        vUp = vec2(-s, c);
         vec4 mv = viewMatrix * vec4(iCenter, 1.0);
+        // puffs close to the lens dissolve instead of filling the frame
+        vAlpha = iParams.y * smoothstep(12.0, 38.0, -mv.z);
         mv.xy += q;
         gl_Position = projectionMatrix * mv;
       }
     `,
     fragmentShader: /* glsl */ `
       uniform float uGlow;
-      varying vec2 vUv; varying float vAlpha; varying float vLit; varying float vSeed;
+      varying vec2 vUv; varying float vAlpha; varying float vLit; varying float vSeed; varying vec2 vUp;
       ${noiseGlsl}
+      float fbm(vec2 p) {
+        float v = 0.0, a = 0.5;
+        for (int i = 0; i < 3; i++) { v += a * noise(p); p = p * 2.03 + 7.1; a *= 0.5; }
+        return v;
+      }
       void main() {
         vec2 c = vUv - 0.5;
         float r = length(c) * 2.0;
-        float puff = smoothstep(1.0, 0.2, r) * (0.6 + 0.6 * noise(vUv * 4.0 + vSeed));
-        float a = puff * vAlpha;
+        // billowed silhouette: the edge is eroded by noise, the core stays dense
+        float n = fbm(vUv * 3.2 + vSeed);
+        float body = smoothstep(1.0, 0.35, r + (n - 0.5) * 0.7);
+        float a = body * vAlpha * (0.75 + 0.5 * n);
         if (a < 0.004) discard;
-        vec3 base = vec3(0.085, 0.095, 0.12); // night smoke: dark unless lit
-        vec3 lit = vec3(1.0, 0.42, 0.12) * uGlow * vLit * 1.1;
-        gl_FragColor = vec4(base * (0.35 + 0.65 * (1.0 - r)) + lit, a);
+        // height within the puff in world terms (unrotated), -1 bottom .. 1 top
+        float h = dot(c * 2.0, vUp);
+        // night smoke: cool grey, brighter toward the top (floodlit), darker inside
+        vec3 base = mix(vec3(0.05, 0.055, 0.065), vec3(0.17, 0.185, 0.21), smoothstep(-0.8, 0.9, h) * (0.55 + 0.45 * n));
+        // engine light only on the underside, and only near the pit
+        float under = smoothstep(0.4, -0.9, h);
+        vec3 lit = vec3(1.0, 0.45, 0.16) * uGlow * vLit * under * 1.6;
+        gl_FragColor = vec4(base + lit, a);
         #include <colorspace_fragment>
       }
     `,

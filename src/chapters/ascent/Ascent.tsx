@@ -15,7 +15,7 @@ import { createPlumeGeometry, createPlumeMaterial } from '../../shaders/plume.ts
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { seeded } from '../greybox/parts.tsx';
 import { HELVELA, HelVela } from '../ship/HelVela.tsx';
-import { LaunchPad } from './LaunchPad.tsx';
+import { LaunchPad, PIT } from './LaunchPad.tsx';
 import type { EngineLevel } from '../ship/Spacecraft.tsx';
 import {
   CLOUDS,
@@ -23,6 +23,7 @@ import {
   altitude,
   armSwing,
   ascentShot,
+  REDUCED_MOTION as REDUCED_MOTION_FLAG,
   clampsOpen,
   engine as engineAt,
   groundGlow,
@@ -140,6 +141,11 @@ function Tower({ arm }: { arm: RefObject<THREE.Group | null> }) {
   const armLen = HULL_SIDE_Z - (TOWER.z + TOWER.half); // tower face → just short of the hull
   return (
     <group position={[TOWER.x, 0, TOWER.z]}>
+      {/* pedestal: the tower stands inside the pit, on its floor */}
+      <mesh position={[0, PIT.floorY / 2, 0]}>
+        <boxGeometry args={[2 * TOWER.half + 1.2, -PIT.floorY, 2 * TOWER.half + 1.2]} />
+        <meshStandardMaterial color="#22262d" roughness={0.7} metalness={0.4} />
+      </mesh>
       <instancedMesh ref={ref} args={[undefined, undefined, matrices.length]}>
         <boxGeometry />
         <meshStandardMaterial color="#2b3038" roughness={0.55} metalness={0.5} />
@@ -160,7 +166,7 @@ function Tower({ arm }: { arm: RefObject<THREE.Group | null> }) {
       <group ref={arm} position={[0, armY, TOWER.half]}>
         <mesh position={[0, 0, armLen / 2]} castShadow>
           <boxGeometry args={[1.5, 2.1, armLen]} />
-          <meshStandardMaterial color="#c9ccd2" roughness={0.6} metalness={0.3} />
+          <meshStandardMaterial color="#3b4049" roughness={0.5} metalness={0.55} />
         </mesh>
         <mesh position={[0, -1.12, armLen / 2]}>
           <boxGeometry args={[1.7, 0.14, armLen]} />
@@ -200,14 +206,25 @@ function Pad({ clamps }: { clamps: RefObject<(THREE.Group | null)[]> }) {
         material={ground}
         name="Ground"
       >
-        <circleGeometry args={[1900, 96]} />
+        {/* open over the launch pit */}
+        <ringGeometry args={[PIT.radius, 1900, 96, 1]} />
       </mesh>
-      {/* cradles under the keel */}
+      {/* pit wall: dark concrete between the ground cut and the bowl */}
+      <mesh position={[0, PIT.floorY / 2, 0]}>
+        <cylinderGeometry args={[PIT.radius, PIT.radius, -PIT.floorY, 96, 1, true]} />
+        <meshStandardMaterial
+          color="#15171b"
+          roughness={0.9}
+          metalness={0.1}
+          side={THREE.BackSide}
+        />
+      </mesh>
+      {/* cradles under the keel, standing on the pit floor */}
       {CRADLE_X.map((x) => (
         <group key={x} position={[x, 0, 0]}>
-          <mesh position={[0, PAD.mountY / 2, 0]}>
-            <boxGeometry args={[3.2, PAD.mountY, 7]} />
-            <meshStandardMaterial color="#4a4b4f" roughness={0.8} metalness={0.3} />
+          <mesh position={[0, (PAD.mountY + PIT.floorY) / 2, 0]}>
+            <boxGeometry args={[3.2, PAD.mountY - PIT.floorY, 7]} />
+            <meshStandardMaterial color="#2a2e35" roughness={0.8} metalness={0.3} />
           </mesh>
           <mesh position={[0, PAD.mountY - 0.1, 0]}>
             <boxGeometry args={[3.6, 0.2, 7.4]} />
@@ -283,8 +300,11 @@ function Flood({ position, intensity }: { position: [number, number, number]; in
 // ── Smoke (instanced billboards, pure in t) ──────────────────────────────────────
 interface Puff {
   born: number;
-  side: number;
-  lateral: number;
+  /** direction around the pit (rad) */
+  angle: number;
+  /** column puffs rise through the pit under the belly; the rest vent over the rim and roll out */
+  column: boolean;
+  start: number;
   reach: number;
   rise: number;
   life: number;
@@ -293,15 +313,19 @@ interface Puff {
 
 function makePuffs(n: number): Puff[] {
   const rand = seeded(505);
-  return Array.from({ length: n }, () => ({
-    born: 0.11 + rand() * 0.26,
-    side: rand() < 0.5 ? -1 : 1,
-    lateral: (rand() - 0.5) * 56,
-    reach: 8 + rand() * 20,
-    rise: 4 + rand() * 18,
-    life: 8 + rand() * 7,
-    spin: rand() * 6.28,
-  }));
+  return Array.from({ length: n }, () => {
+    const column = rand() < 0.22;
+    return {
+      born: 0.11 + rand() * 0.26,
+      angle: rand() * Math.PI * 2,
+      column,
+      start: column ? rand() * PIT.radius * 0.55 : PIT.radius * (0.9 + 0.12 * rand()),
+      reach: column ? 4 + rand() * 6 : 10 + rand() * 38,
+      rise: column ? 8 + rand() * 10 : 2 + rand() * 9,
+      life: 6 + rand() * 8,
+      spin: rand() * 6.28,
+    };
+  });
 }
 
 /** Story-time smoke age scale: one unit of t = 60 "seconds" of billow. */
@@ -339,19 +363,24 @@ function Smoke({ count, t }: { count: number; t: { current: number } }) {
         return;
       }
       const k = age / p.life;
-      const out = 1 - Math.exp(-age * 0.45);
-      const x = p.lateral * (0.6 + 0.6 * out);
-      const z = p.side * (7 + p.reach * out);
-      const y = 1.5 + p.rise * Math.pow(k, 0.8);
+      const out = 1 - Math.exp(-age * 0.4);
+      const r = p.start + p.reach * out;
+      const x = Math.cos(p.angle) * r;
+      const z = Math.sin(p.angle) * r;
+      const y = p.column
+        ? PIT.floorY * 0.4 + p.rise * Math.pow(k, 0.7)
+        : 0.8 + p.rise * Math.pow(k, 0.9);
       c[i * 3] = x;
       c[i * 3 + 1] = y;
       c[i * 3 + 2] = z;
-      const size = 4 + 12 * Math.pow(k, 0.6);
-      const alpha = Math.min(1, age / 0.6) * (1 - Math.max(0, (k - 0.55) / 0.45)) * 0.35;
-      const lit = Math.exp(-Math.hypot(x, z, y) / 22);
+      const size = p.column ? 7 + 9 * Math.pow(k, 0.6) : 6 + 15 * Math.pow(k, 0.6);
+      const alpha = Math.min(1, age / 0.6) * (1 - Math.max(0, (k - 0.5) / 0.5)) * 0.26;
+      // engine light reaches the column and the rim, not the far billows
+      const lit =
+        Math.exp(-Math.max(0, r - PIT.radius * 0.6) / 18) * Math.exp(-Math.max(0, y) / 14);
       pa[i * 4] = size;
       pa[i * 4 + 1] = alpha;
-      pa[i * 4 + 2] = p.spin + age * 0.04 * p.side;
+      pa[i * 4 + 2] = p.spin + age * 0.03 * (p.angle > Math.PI ? 1 : -1);
       pa[i * 4 + 3] = lit;
     });
     centers.needsUpdate = true;
@@ -599,8 +628,10 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
         <points geometry={stars} material={starMat} frustumCulled={false} renderOrder={0} />
       </group>
 
-      <hemisphereLight args={['#4a5c80', '#0b0b0d', 0.6]} />
-      <directionalLight position={[-60, 90, 40]} intensity={1.6} color="#9fb2d8" />
+      {/* low fill so the shadow side stays dark; the moon sits behind the pad as a cool rim light,
+          the floods and the engine glow are the warm keys (contrast, not even grey) */}
+      <hemisphereLight args={['#33415c', '#070708', 0.28]} />
+      <directionalLight position={[-30, 70, -110]} intensity={2.6} color="#a9c2ff" />
       <Flood position={[44, 16, 22]} intensity={3600} />
       <Flood position={[-46, 16, 24]} intensity={3200} />
       <pointLight ref={plumeLight} color="#ff9a52" intensity={0} distance={0} decay={2} />
@@ -681,7 +712,8 @@ function PadWithGround({
 
 export const sc05Ascent: ChapterImpl = {
   Scene: AscentScene,
-  shot: (t, out) => ascentShot(t, out),
+  shot: (t, out, aspect) => ascentShot(t, out, REDUCED_MOTION_FLAG, aspect),
+  portraitShift: 0, // no text in SC05: keep the ship centred
   background: '#050912',
   environment: { key: 'launch-night', intensity: 0.6 },
 };
