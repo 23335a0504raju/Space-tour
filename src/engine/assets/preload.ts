@@ -22,6 +22,7 @@ export const JOURNEY_ASSETS: readonly string[] = [
   '/assets/models/modern_ceiling_lamp_01.glb',
   // ship and space
   '/assets/models/helvela.glb',
+  '/assets/models/launch-pad.glb',
   '/assets/models/nasa_bennu.glb',
   '/assets/models/nasa_bennu_mid.glb',
   '/assets/models/nasa_bennu_lo.glb',

@@ -289,6 +289,14 @@ export function Brief() {
           by <a href="https://sketchfab.com/hovce">林柏勳 (Lin)</a>, licensed under{' '}
           <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; modified.
         </p>
+        <p className={styles.credits}>
+          Launch platform: based on{' '}
+          <a href="https://sketchfab.com/3d-models/sci-fi-hangar-4b263701219446f1ab13b37a5b98bac5">
+            “SCI FI HANGAR”
+          </a>{' '}
+          by <a href="https://sketchfab.com/Lezalit">Lezalit</a>, licensed under{' '}
+          <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; modified.
+        </p>
       </footer>
     </>
   );
