@@ -135,7 +135,7 @@ test('project bay: opens from an installation, traps scroll, Esc restores the ex
   await scrollToProgress(page, progressFor(track, 'sc08-jupiter', 0.25));
   await page.waitForTimeout(SETTLE_MS);
 
-  const opener = panel(page, 'SmartWay Traffic').getByRole('button', { name: 'Enter Project Bay' });
+  const opener = panel(page, 'SmartWay Traffic').getByRole('button', { name: 'Open full details' });
   await expect(opener).toBeVisible();
   const before = await page.evaluate(() => Math.round(window.scrollY));
   await opener.click();

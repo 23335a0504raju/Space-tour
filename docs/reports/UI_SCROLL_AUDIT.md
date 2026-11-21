@@ -366,6 +366,31 @@ The step 5 draw-call overage is gone. Checks: `npm run verify` passes 110/110. `
 - The hologram globe's texture is the model author's (a reddish planet); it could become Earth from the NASA textures already in the project, if wanted.
 - The phone layout of the new opening has not been checked (mobile is deferred).
 
+## Step 6 result: project showcase (desktop), 2026-11-21
+
+The three flagship stops in SC08 (SmartWay Traffic, DocumentDB, Stash) are now **showcase panels** ([overlays.tsx](../../src/chapters/overlays.tsx) `ProjectShowcase`, third panel type after side panel and editorial). Every field comes from `src/content/projects.ts`; no copy was written.
+
+| Part | Source |
+|---|---|
+| "Project 01 / 03" label, project name (display face, 28–38 px), role | `name`, `role` |
+| One-sentence summary | `summary` |
+| Interface preview (hidden on screens shorter than 800 px) | `image` fact, shared map in `src/ui/projectMedia.ts` (also used by the Project Bay) |
+| **Key features**: the first three | `features` (the Project Bay lists all) |
+| **Built with**: every technology as a chip | `stack` |
+| **Open full details** (Project Bay), **Live site**, **Source code**, **Demo** | `links` |
+
+### Measured
+
+- Panel height 576 / 689 / 607 px at 1440×900 and 578 / 691 / 609 px at 1920×1080; 412 / 523 / 443 px at 1280×720 (no preview). **None scrolls inside itself** at 1920×1080, 1440×900, 1366×768 or 1280×720.
+- Draw calls 26–28 (DOM-only change); frame time p95 17.1–17.4 ms.
+- `npm run verify` passes 110/110; `npm run build` passes; `npx playwright test` passes 24/24 including axe. The opener button is now "Open full details" (e2e updated). The sub-blocks are plain `div`s, not `section`s: nested labelled sections counted as extra landmarks and tripped the "no passed panel left on screen" regression test.
+
+### Open
+
+- **Stash preview (A029):** the image looks like a design mockup (placeholder URL `app.stash.com`), and it is now visible in the panel as well as in the Project Bay. Confirm it, supply a real screenshot, or tell me to hide it for Stash.
+- The 4th feature of DocumentDB and Stash only appears in the Project Bay.
+- The supporting projects (SC07) keep their compact link list.
+
 ### Decisions I need from you
 
 1. **Name and role (Q1):** "Raju Chowdavada" and which role: "Software Engineer", or the site's "Full-Stack Software Engineer & AI Builder"?

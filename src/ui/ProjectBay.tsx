@@ -2,17 +2,8 @@ import { useEffect, useRef } from 'react';
 import { projects } from '../content/projects.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { FactText, shouldShow } from './FactText.tsx';
+import { PROJECT_MEDIA } from './projectMedia.ts';
 import styles from './ProjectBay.module.css';
-
-/**
- * Re-encoded project images (npm run assets:projects). File names are not personal content; what
- * the image shows is the project's own `image` fact. Projects without a file simply show no media.
- */
-const MEDIA: Readonly<Record<string, string>> = {
-  'smartway-traffic': '/assets/projects/smartway-traffic.webp',
-  documentdb: '/assets/projects/documentdb.webp',
-  stash: '/assets/projects/stash.webp',
-};
 
 const LINKS = { live: 'Live', code: 'Code', demo: 'Demo' } as const;
 
@@ -45,7 +36,7 @@ export function ProjectBay() {
     window.scrollTo({ top: savedY.current, behavior: 'instant' });
   };
 
-  const media = project ? MEDIA[project.id] : undefined;
+  const media = project ? PROJECT_MEDIA[project.id] : undefined;
   const links = project && shouldShow(project.links) ? project.links.value : {};
   const linkEntries = Object.entries(links).filter(([k]) => k in LINKS) as Array<
     [keyof typeof LINKS, string]

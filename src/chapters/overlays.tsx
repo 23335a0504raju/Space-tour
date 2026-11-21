@@ -4,6 +4,7 @@ import type { Project } from '../content/index.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
+import { PROJECT_MEDIA } from '../ui/projectMedia.ts';
 import styles from './overlays.module.css';
 
 /**
@@ -16,7 +17,7 @@ export interface OverlayDef {
   readonly rest: number;
   readonly placement: 'center' | 'left' | 'right' | 'bottom';
   /** 'editorial': large type straight over the scene on a soft vignette, no panel box. */
-  readonly variant?: 'editorial';
+  readonly variant?: 'editorial' | 'showcase';
   /** Half-width of the readable band around the rest point, in local t (default 0.12). */
   readonly band?: number;
   readonly label: string;
@@ -37,22 +38,95 @@ const {
   achievements,
 } = content;
 
-const LINKS = { live: 'Live', code: 'Code', demo: 'Demo', docs: 'Docs' } as const;
+const LINK_LABELS = { live: 'Live site', code: 'Source code', demo: 'Demo' } as const;
+/** Features shown on a showcase panel; the Project Bay lists them all. */
+const SHOWCASE_FEATURES = 3;
 
-function ProjectLinks({ project }: { project: Project }) {
-  if (!shouldShow(project.links)) return null;
-  const entries = Object.entries(project.links.value) as Array<[keyof typeof LINKS, string]>;
+/**
+ * A flagship project at its SC08 stop (UI_SCROLL_AUDIT.md §7): name, role, one-line summary, a
+ * preview, key features, the stack, and the way on (full details, live site, source). Every field
+ * comes from src/content/projects.ts; nothing is written here.
+ */
+function ProjectShowcase({
+  project,
+  index,
+  total,
+}: {
+  project: Project;
+  index: number;
+  total: number;
+}) {
+  const media = PROJECT_MEDIA[project.id];
+  const links = shouldShow(project.links) ? project.links.value : {};
+  const linkEntries = (Object.keys(LINK_LABELS) as Array<keyof typeof LINK_LABELS>).flatMap((k) => {
+    const href = links[k];
+    return href ? [[k, href] as const] : [];
+  });
   return (
-    <p className={styles.links}>
-      {entries
-        .filter(([k]) => k !== 'docs')
-        .map(([k, href]) => (
-          <a key={k} href={href} target="_blank" rel="noopener noreferrer">
-            {LINKS[k]}
+    <>
+      <div className={styles.showHead}>
+        <Kicker>
+          Project {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+        </Kicker>
+        <h3 className={styles.showTitle}>
+          <FactText fact={project.name} />
+        </h3>
+        <p className={styles.role}>
+          <FactText fact={project.role} />
+        </p>
+      </div>
+      <p className={styles.showLead}>
+        <FactText fact={project.summary} />
+      </p>
+      {media && (
+        <figure className={styles.showMedia}>
+          <img
+            src={media}
+            alt={`Interface of ${project.name.value}`}
+            loading="lazy"
+            decoding="async"
+          />
+        </figure>
+      )}
+      <div className={styles.showCols}>
+        {shouldShow(project.features) && (
+          <div>
+            <p className={styles.label}>Key features</p>
+            <ul className={styles.showList}>
+              {project.features.value.slice(0, SHOWCASE_FEATURES).map((f) => (
+                <li key={f}>
+                  <FactText fact={project.features}>{f}</FactText>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div>
+          <p className={styles.label}>Built with</p>
+          <ul className={styles.chips}>
+            {project.stack.value.map((t) => (
+              <li key={t}>
+                <FactText fact={project.stack}>{t}</FactText>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <p className={styles.showActions}>
+        <button
+          type="button"
+          className={styles.bay}
+          onClick={() => useJourneyStore.getState().openBay(project.id)}
+        >
+          Open full details
+        </button>
+        {linkEntries.map(([k, href]) => (
+          <a key={k} className={styles.ghost} href={href} target="_blank" rel="noopener noreferrer">
+            {LINK_LABELS[k]} <span aria-hidden="true">↗</span>
           </a>
         ))}
-      <a href={`/brief/#projects`}>Details</a>
-    </p>
+      </p>
+    </>
   );
 }
 
@@ -217,33 +291,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     band: 0.12, // rest points 0.25 apart: neighbours must not overlap
     placement: i % 2 ? 'left' : 'right',
     label: p.name.value,
-    render: () => (
-      <>
-        <Kicker>
-          Installation {i + 1} of {flagships.length}
-        </Kicker>
-        <h3 className={styles.title}>
-          <FactText fact={p.name} />
-        </h3>
-        <p className={styles.meta}>
-          <FactText fact={p.role} />
-        </p>
-        <p>
-          <FactText fact={p.summary} />
-        </p>
-        <p className={styles.stack}>
-          <FactText fact={p.stack}>{p.stack.value.join(' · ')}</FactText>
-        </p>
-        <ProjectLinks project={p} />
-        <button
-          type="button"
-          className={styles.bay}
-          onClick={() => useJourneyStore.getState().openBay(p.id)}
-        >
-          Enter Project Bay
-        </button>
-      </>
-    ),
+    variant: 'showcase',
+    render: () => <ProjectShowcase project={p} index={i} total={flagships.length} />,
   })),
   {
     key: 'stack',
