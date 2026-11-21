@@ -98,6 +98,29 @@ NC ramen shop (personal, non-commercial portfolio). Do not raise licensing again
 author (CC-BY) in the Mission Brief credits and the asset register. Respect the triangle and texture budgets
 (rigged characters can be heavy: decimate, one LOD per tier).
 
+**8. Loading and opening animation, like Shopify Editions Winter '26.** Reference:
+https://www.shopify.com/editions/winter2026 (open it and study the loader and the opening first; record
+frames with Playwright to get the timing) and Raju's screenshot `raw-assets/reference/shopify-editions-loader.png`
+(git-ignored). The look: a dark page, thin architectural guide lines and circles, and a glowing ring/globe built
+from thousands of image shards and white sparkle particles that gather around a small centred title (a sans
+title with one italic script word). Replace our "0–100%" counter loader (`src/ui/StartGate.tsx`; progress
+comes from `src/engine/assets/preload.ts` `fraction`) with this: the load fraction drives how far the ring
+assembles, then the opening reveals SC01 (e.g. the ring opens and the camera passes through it). Put Raju's
+details in it (name, role, from `src/content/` facts only, never invented). Rules: no second WebGL
+`<Canvas>` (use a 2D canvas or the main canvas), reduced-motion fallback, phone performance.
+
+**9. Section transitions: a torn-paper scroll reveal instead of the black/white flash.** Reference: the same
+site's section change, and `raw-assets/reference/shopify-editions-torn-transition.png`: the next layer slides
+up over the current one with a ragged, fibrous torn-paper edge (white paper fibres, a soft shadow), moving
+with the scroll. Today the boundary "dip" is a full-screen colour fade: `boundaryDip` and `links.dip` in
+`src/engine/director/Director.tsx` (~l.159), the per-chapter dip colour in `src/chapters/contract.ts` (l.51),
+the `.dip` layer in `src/engine/journey/Journey.tsx`, and the jump fade (`jumpFade`, ~l.423). Replace them
+with the torn edge as a pure function of scroll progress (exactly reversible; one clock, GSAP). It still has
+to hide each cut. Likely approach: render the outgoing and incoming chapters to textures during the
+boundary window and composite them with a torn-edge mask shader (noise edge, fibres, shadow). Propose the
+approach and its cost (two scene renders during the transition) before building. Keep it within the
+performance budgets on the 780M and on Android.
+
 ## Still needs Raju
 
 - Resume URL (Q5), CGPA 8.31 or 8.36 (Q2), HelVela II (A024) page and author, launch pad credit
