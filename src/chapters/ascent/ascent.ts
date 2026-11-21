@@ -135,7 +135,7 @@ export function ascentShot(t: number, out: ShotState, reduced = REDUCED_MOTION):
   shipPose(t, ship);
   if (t < BEATS.onboard[0]) {
     const push = span(t, 0, 0.3);
-    p.set(22 - 6 * push, 8 - 1 * push, 80 - 16 * push);
+    p.set(22 - 6 * push, 22 - 4 * push, 84 - 16 * push);
     tgtA.set(-2, 6 + Math.min(altitude(t), 34) * 0.85, 0);
     // B: alongside and slightly behind, rising with the ship
     const rise = span(t, 0.42, 0.6);

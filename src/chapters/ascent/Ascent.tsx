@@ -15,6 +15,7 @@ import { createPlumeGeometry, createPlumeMaterial } from '../../shaders/plume.ts
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { seeded } from '../greybox/parts.tsx';
 import { HELVELA, HelVela } from '../ship/HelVela.tsx';
+import { LaunchPad } from './LaunchPad.tsx';
 import type { EngineLevel } from '../ship/Spacecraft.tsx';
 import {
   CLOUDS,
@@ -141,8 +142,13 @@ function Tower({ arm }: { arm: RefObject<THREE.Group | null> }) {
     <group position={[TOWER.x, 0, TOWER.z]}>
       <instancedMesh ref={ref} args={[undefined, undefined, matrices.length]}>
         <boxGeometry />
-        <meshStandardMaterial color="#59311f" roughness={0.6} metalness={0.5} />
+        <meshStandardMaterial color="#2b3038" roughness={0.55} metalness={0.5} />
       </instancedMesh>
+      {/* cool light strip up the ship-facing corner, matching the platform floods */}
+      <mesh position={[TOWER.half, TOWER.height / 2, TOWER.half + 0.2]}>
+        <boxGeometry args={[0.12, TOWER.height, 0.06]} />
+        <meshBasicMaterial color={new THREE.Color(0.7, 1.6, 2.2)} toneMapped={false} />
+      </mesh>
       {/* red aircraft-warning beacons */}
       {[TOWER.height, TOWER.height + 8].map((y) => (
         <mesh key={y} position={[0, y, 0]}>
@@ -195,15 +201,6 @@ function Pad({ clamps }: { clamps: RefObject<(THREE.Group | null)[]> }) {
         name="Ground"
       >
         <circleGeometry args={[1900, 96]} />
-      </mesh>
-      {/* concrete pad + blast deflector under the hull */}
-      <mesh position={[0, -0.4, 0]} receiveShadow>
-        <boxGeometry args={[90, 0.8, 52]} />
-        <meshStandardMaterial color="#3a3b3e" roughness={0.95} />
-      </mesh>
-      <mesh position={[0, 0.005, 0]}>
-        <boxGeometry args={[64, 0.02, 9]} />
-        <meshStandardMaterial color="#08090a" roughness={1} />
       </mesh>
       {/* cradles under the keel */}
       {CRADLE_X.map((x) => (
@@ -602,13 +599,14 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
         <points geometry={stars} material={starMat} frustumCulled={false} renderOrder={0} />
       </group>
 
-      <hemisphereLight args={['#33415e', '#0b0b0d', 0.35]} />
-      <directionalLight position={[-60, 90, 40]} intensity={1.0} color="#9fb2d8" />
+      <hemisphereLight args={['#4a5c80', '#0b0b0d', 0.6]} />
+      <directionalLight position={[-60, 90, 40]} intensity={1.6} color="#9fb2d8" />
       <Flood position={[44, 16, 22]} intensity={3600} />
       <Flood position={[-46, 16, 24]} intensity={3200} />
       <pointLight ref={plumeLight} color="#ff9a52" intensity={0} distance={0} decay={2} />
 
       <PadWithGround ground={ground} clamps={clamps} />
+      <LaunchPad />
       <Tower arm={arm} />
       <points geometry={lights} material={lightsMat} frustumCulled={false} />
 
