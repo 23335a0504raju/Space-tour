@@ -17,23 +17,29 @@ const perf = args.includes('--perf');
 const base = args.find((a) => a.startsWith('--url='))?.slice(6) ?? 'http://localhost:4173';
 const specs = args.filter((a) => !a.startsWith('--'));
 const wide = args.includes('--wide');
-const viewport = portrait
-  ? { width: 412, height: 915 }
-  : wide
-    ? { width: 1919, height: 1067 }
-    : { width: 1440, height: 900 };
+const small = args.includes('--small');
+const viewport = small
+  ? { width: 360, height: 740 }
+  : portrait
+    ? { width: 412, height: 915 }
+    : wide
+      ? { width: 1919, height: 1067 }
+      : { width: 1440, height: 900 };
 const outDir = join(
   import.meta.dirname,
   '..',
   'spike-results',
   'shots',
-  portrait ? 'portrait' : wide ? 'wide' : 'desktop',
+  small ? 'small' : portrait ? 'portrait' : wide ? 'wide' : 'desktop',
 );
 mkdirSync(outDir, { recursive: true });
 
 const track = buildTrack(chapters, classifyAspect(viewport.width, viewport.height));
 const browser = await chromium.launch({ channel: 'chrome' });
-const context = await browser.newContext({ viewport, deviceScaleFactor: portrait ? 2.625 : 1 });
+const context = await browser.newContext({
+  viewport,
+  deviceScaleFactor: portrait || small ? 2.625 : 1,
+});
 if (low) await context.addInitScript(() => localStorage.setItem('mission.quality', 'low'));
 if (perf)
   // Test-side GPU counters (no app changes): wrap WebGL2 draw/create/delete calls.

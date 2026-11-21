@@ -149,7 +149,7 @@ function HomecomingScene({ id, frame }: ChapterSceneProps) {
       </group>
 
       <Suspense fallback={null}>
-        <Astronaut chapterId={id} frame={frame} drive={drive} />
+        <Astronaut chapterId={id} frame={frame} drive={drive} variant="eva" />
       </Suspense>
     </group>
   );

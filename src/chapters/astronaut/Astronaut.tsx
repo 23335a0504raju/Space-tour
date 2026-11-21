@@ -10,11 +10,15 @@ import type { JourneyFrame } from '../contract.ts';
 import { dressAstronaut } from './suit.ts';
 
 /**
- * The astronaut: Mixamo "Y Bot" rig + clips (converted by scripts/convert-mixamo.ts), dressed in
- * code as a flight suit with a gold-visor helmet (faceless, decision C23); see suit.ts.
+ * The astronaut, in two looks on the same Mixamo "Y Bot" rig and clips (Raju, 2026-11-21):
+ *  - 'crew': the Y Bot dressed in code as a flight suit (suit.ts), at the desk and on the walk to
+ *    the lift (SC02, SC03): it sits and walks cleanly;
+ *  - 'eva': the "player" EVA suit (A039) skinned onto the rig by `npm run assets:astronaut`
+ *    (scripts/rig-transfer.ts), after the lift (SC13 homecoming).
  * Story motion is driven per chapter by a pure function of story time (see `Drive`).
  */
 export const ASTRONAUT_URL = '/assets/models/astronaut.glb';
+export const ASTRONAUT_EVA_URL = '/assets/models/astronaut-eva.glb';
 export type ClipName = 'typing' | 'sitIdle' | 'walk' | 'standUp' | 'sitDown';
 const CLIPS: readonly ClipName[] = ['typing', 'sitIdle', 'walk', 'standUp', 'sitDown'];
 
@@ -36,18 +40,43 @@ interface Props {
   readonly chapterId: string;
   readonly frame: JourneyFrame;
   readonly drive: Drive;
+  /** Which suit (default 'crew'). */
+  readonly variant?: 'crew' | 'eva';
 }
 
-export function Astronaut({ chapterId, frame, drive }: Props) {
+export function Astronaut({ chapterId, frame, drive, variant = 'crew' }: Props) {
   const gl = useThree((s) => s.gl);
   const shadows = useJourneyStore((s) => s.tier === 'balanced');
-  const gltf = useGLTF(ASTRONAUT_URL, false, true, gltfExtender(gl));
+  const gltf = useGLTF(
+    variant === 'eva' ? ASTRONAUT_EVA_URL : ASTRONAUT_URL,
+    false,
+    true,
+    gltfExtender(gl),
+  );
   const body = useRef<THREE.Group>(null);
 
   // Skinned meshes must be cloned with SkeletonUtils (neighbouring chapters mount simultaneously).
   const model = useMemo(() => {
     const c = cloneSkinned(gltf.scene);
-    dressAstronaut(c, shadows);
+    let suited = false;
+    c.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh || !m.name.startsWith('Suit_')) return;
+      suited = true;
+      // the palette merge carried a white emissive onto the whole suit (it glowed); only the
+      // small helmet-lamp mesh keeps its light. Idempotent, so shared materials are safe.
+      const mat = m.material as THREE.MeshStandardMaterial;
+      const lamps = m.geometry.getAttribute('position').count < 2000;
+      if (!lamps) {
+        mat.emissive.setRGB(0, 0, 0);
+        mat.roughness = 0.55;
+        mat.metalness = 0.05;
+      }
+      m.castShadow = shadows;
+      m.receiveShadow = true;
+      m.frustumCulled = false; // skinned bounds don't follow the animation
+    });
+    if (!suited) dressAstronaut(c, shadows);
     return c;
   }, [gltf.scene, shadows]);
   const mixer = useMemo(() => new THREE.AnimationMixer(model), [model]);

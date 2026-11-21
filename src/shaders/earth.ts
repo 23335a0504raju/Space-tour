@@ -43,17 +43,19 @@ export function createEarthMaterial(day: THREE.Texture, night: THREE.Texture, lo
         // band-pass: sparkle only while a cell spans ~1-6 px (larger cells would show as squares)
         float fw = fwidth(uvf.x * 8192.0);
         float near = smoothstep(0.1, 0.25, fw) * (1.0 - smoothstep(0.35, 1.0, fw));
-        vec3 night = vec3(1.0, 0.68, 0.32) * smoothstep(0.05, 0.45, warm) * mix(1.0, sparkle, near);
+        vec3 night = vec3(1.0, 0.68, 0.32) * smoothstep(0.05, 0.45, warm) * mix(0.6, sparkle, near);
         float lit = smoothstep(-0.06, 0.22, d);
         // ocean glint: a soft specular on dark blue water
         vec3 h = normalize(uSun + vV);
-        float spec = pow(max(dot(n,h),0.0), 260.0) * smoothstep(0.0,0.3,d);
+        // a tight sun glint: seen from far away a broad lobe read as a white blob on the ocean
+        float spec = pow(max(dot(n,h),0.0), 900.0) * smoothstep(0.0,0.3,d);
         float water = smoothstep(0.25, 0.0, day.r - day.b * 0.4);
         vec3 col = day * (0.03 + 1.25 * max(d,0.0)) * lit;
         // night side: a faint blue earthshine so the dark hemisphere has form, not flat black
         col += (day * 0.012 + vec3(0.006, 0.010, 0.022)) * (1.0 - lit);
         col += night * 1.3 * (1.0 - lit);   // city lights
-        col += vec3(0.8,0.9,1.0) * spec * water * 0.35 * (1.0 - uLow);
+        // kept below the bloom threshold: a strong glint bloomed into a white disc on the ocean
+        col += vec3(0.8,0.9,1.0) * spec * water * 0.09 * (1.0 - uLow);
         // warm band along the terminator
         float term = exp(-pow(d / 0.06, 2.0));
         col += vec3(0.9,0.38,0.12) * term * 0.035;

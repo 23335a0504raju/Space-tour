@@ -23,7 +23,12 @@ async function typingFrames() {
   const buf = readFileSync(
     join(import.meta.dirname, '../../../public/assets/models/astronaut.glb'),
   );
-  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  // Node has no image decoder: the suit's palette texture is replaced by an empty texture (only
+  // the skeleton and clips matter here)
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).register(() => ({
+    name: 'node-no-textures',
+    loadTexture: () => Promise.resolve(new THREE.Texture()),
+  }));
   const gltf = await loader.parseAsync(
     buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
     '',

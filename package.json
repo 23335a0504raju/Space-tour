@@ -28,6 +28,7 @@
     "assets:optimize": "node scripts/optimize-assets.ts",
     "shots": "node scripts/capture-shots.ts",
     "assets:mixamo": "node scripts/convert-mixamo.ts",
+    "assets:astronaut": "node scripts/rig-transfer.ts",
     "assets:nasa": "node scripts/fetch-nasa.ts",
     "assets:projects": "node scripts/prepare-project-images.ts",
     "assets:ship": "node scripts/convert-fbx.ts raw-assets/helveta-space-battle-ship/source/HV.fbx raw-assets/helveta-space-battle-ship/hv.raw.glb && node scripts/optimize-ship.ts raw-assets/helveta-space-battle-ship/hv.raw.glb public/assets/models/helvela.glb 60000"

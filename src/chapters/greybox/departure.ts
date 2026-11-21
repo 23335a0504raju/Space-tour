@@ -23,11 +23,12 @@ export const WALK = { start: 0.26, end: 0.96 } as const;
 export function chairPose(t: number) {
   // back first (it has to leave the legs as they straighten), then aside to the right, clear of
   // both the body and the camera line behind it (review: the chair back stood in front of the legs)
-  const back = span(t, 0.04, 0.12);
-  const aside = span(t, 0.07, 0.2);
+  // it leaves before the body rises out of it (review 2026-11-21: the back cut through the body)
+  const back = span(t, 0.02, 0.08);
+  const aside = span(t, 0.05, 0.16);
   return {
     // the walk leaves to the left (bridge layout)
-    x: CHAIR_REST.x + 1.05 * aside,
+    x: CHAIR_REST.x + 1.35 * aside,
     // only 0.4 back: a low rail runs behind it on the bridge
     z: CHAIR_REST.z + 0.4 * back,
     rotY: CHAIR_REST.rotY + 0.7 * aside,
@@ -112,10 +113,13 @@ export const roomShot = (t: number, out: ShotState): void => void sampleKeys(roo
 // block (departure.test.ts checks the walker distance; frames reviewed for the set).
 export const departureKeys: ShotKey[] = [
   { t: 0, position: [1.3, 1.55, -0.15], target: [0, 1.05, -2.3], fov: 42 },
-  // swing left along the back of the deck: they stand, the chair rolls back
-  { t: 0.3, position: [-1.5, 1.55, -0.05], target: [-0.6, 1.1, -1.8], fov: 46 },
-  // hold while they pass along the desk, then move in past the end of the low rail
-  { t: 0.46, position: [-1.6, 1.6, 0.0], target: [-2.0, 1.1, -1.8], fov: 46 },
+  // rise and pull back to the south wall as they stand (review 2026-11-21: the camera used to pass
+  // right behind the rising body, which filled the frame with the head cut off)
+  // (the sloped south wall stands at z ≈ 0.35 at eye height: stay in front of it, widen the lens)
+  { t: 0.14, position: [0.95, 1.85, 0.05], target: [0, 1.0, -1.7], fov: 60 },
+  // track left along the back of the deck, the whole figure in frame
+  { t: 0.3, position: [-0.5, 1.85, 0.05], target: [-0.8, 0.95, -1.6], fov: 60 },
+  { t: 0.46, position: [-1.6, 1.8, 0.05], target: [-2.2, 1.0, -1.9], fov: 56 },
   { t: 0.62, position: [-2.0, 1.6, -1.0], target: [-4.2, 1.4, -3.5], fov: 48 },
   // follow them up onto the platform and walk behind them along it to the lift (the console
   // block beside the platform hid them from the deck)

@@ -12,6 +12,7 @@ export const JOURNEY_ASSETS: readonly string[] = [
   // SC02 room
   '/assets/env/empty_warehouse_01_1k.hdr',
   '/assets/models/astronaut.glb',
+  '/assets/models/astronaut-eva.glb',
   '/assets/models/bridge.glb',
   '/assets/models/metal_office_desk.glb',
   '/assets/models/modern_arm_chair_01.glb',

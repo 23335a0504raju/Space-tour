@@ -16,6 +16,11 @@ export const identity: Identity = {
     [SRC.hero],
     `${DECISION_Q1}: the live site's hero wording (resume says "Software Engineer").`,
   ),
+  shortRole: confirmed(
+    'Software Engineer',
+    [SRC.resume],
+    "The resume's title; chosen by Raju for the header brand line (navbar brief, 2026-11-21).",
+  ),
   tagline: confirmed(
     'Building beyond the ordinary',
     [DECISION_Q1],

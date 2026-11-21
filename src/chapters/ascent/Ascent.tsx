@@ -66,7 +66,10 @@ function useLaunchEnvironment() {
       scene.add(m);
     }
     const pmrem = new THREE.PMREMGenerator(gl);
-    const tex = pmrem.fromScene(scene, 0.02).texture;
+    // keep the render target: in three r187 only renderTarget.dispose() frees a PMREM result
+    // (texture.dispose() skips render-target textures; it leaked one per visit)
+    const target = pmrem.fromScene(scene, 0.02);
+    const tex = target.texture;
     pmrem.dispose();
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -78,7 +81,7 @@ function useLaunchEnvironment() {
     const unregister = registerEnvironment('launch-night', tex);
     return () => {
       unregister();
-      tex.dispose();
+      target.dispose();
     };
   }, [gl]);
 }
@@ -219,20 +222,34 @@ function Pad({ clamps }: { clamps: RefObject<(THREE.Group | null)[]> }) {
           side={THREE.BackSide}
         />
       </mesh>
-      {/* cradles under the keel, standing on the pit floor */}
+      {/* cradles under the keel: tapered steel pylons on the pit floor, a saddle that takes the
+          keel, a cyan service strip on each face (they were plain grey boxes) */}
       {CRADLE_X.map((x) => (
         <group key={x} position={[x, 0, 0]}>
-          <mesh position={[0, (PAD.mountY + PIT.floorY) / 2, 0]}>
-            <boxGeometry args={[3.2, PAD.mountY - PIT.floorY, 7]} />
-            <meshStandardMaterial color="#2a2e35" roughness={0.8} metalness={0.3} />
+          {[-2.2, 2.2].map((z) => (
+            <mesh key={z} position={[0, (PAD.mountY + PIT.floorY) / 2 - 0.2, z]}>
+              <cylinderGeometry args={[0.55, 0.9, PAD.mountY - PIT.floorY - 0.4, 6]} />
+              <meshStandardMaterial color="#23272e" roughness={0.45} metalness={0.7} />
+            </mesh>
+          ))}
+          <mesh position={[0, PAD.mountY - 0.45, 0]}>
+            <boxGeometry args={[2.4, 0.5, 6.6]} />
+            <meshStandardMaterial color="#2b3038" roughness={0.4} metalness={0.75} />
           </mesh>
-          <mesh position={[0, PAD.mountY - 0.1, 0]}>
-            <boxGeometry args={[3.6, 0.2, 7.4]} />
-            <meshStandardMaterial color="#2c2e33" roughness={0.6} metalness={0.6} />
+          <mesh position={[0, PAD.mountY - 0.12, 0]}>
+            <boxGeometry args={[2.8, 0.16, 7.2]} />
+            <meshStandardMaterial color="#14161a" roughness={0.6} metalness={0.5} />
           </mesh>
+          {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * 1.21, PAD.mountY - 0.45, 0]}>
+              <boxGeometry args={[0.02, 0.08, 6.0]} />
+              <meshBasicMaterial color={new THREE.Color(0.5, 1.7, 2.2)} toneMapped={false} />
+            </mesh>
+          ))}
         </group>
       ))}
-      {/* hold-down clamps against the hull sides; swing out and down at release */}
+      {/* hold-down clamps against the hull sides: gunmetal arms with a hazard band and a red
+          status lamp; they swing out and down at release */}
       {CLAMPS.map(([x, side], i) => (
         <group key={`${x}${side}`} position={[x, PAD.mountY, side * (HELVELA.width / 2 + 0.4)]}>
           <group
@@ -240,9 +257,17 @@ function Pad({ clamps }: { clamps: RefObject<(THREE.Group | null)[]> }) {
               clamps.current[i] = g;
             }}
           >
-            <mesh position={[0, 0.7, 0]}>
-              <boxGeometry args={[1.2, 1.4, 0.6]} />
-              <meshStandardMaterial color="#d6a43a" roughness={0.6} metalness={0.4} />
+            <mesh position={[0, 0.7, side * 0.05]}>
+              <boxGeometry args={[1.0, 1.4, 0.5]} />
+              <meshStandardMaterial color="#2e333b" roughness={0.4} metalness={0.75} />
+            </mesh>
+            <mesh position={[0, 1.15, side * -0.12]}>
+              <boxGeometry args={[1.05, 0.22, 0.32]} />
+              <meshStandardMaterial color="#c8892a" roughness={0.55} metalness={0.3} />
+            </mesh>
+            <mesh position={[0, 0.35, side * 0.32]}>
+              <sphereGeometry args={[0.08, 10, 8]} />
+              <meshBasicMaterial color={new THREE.Color(3, 0.3, 0.2)} toneMapped={false} />
             </mesh>
           </group>
         </group>

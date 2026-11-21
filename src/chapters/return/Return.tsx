@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { getKTX2Loader } from '../../engine/assets/loaders.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { useJourneyStore } from '../../engine/store.ts';
-import { createAtmosphereMaterial, createEarthMaterial } from '../../shaders/earth.ts';
+import { createLimbAtmosphereMaterial, createEarthMaterial } from '../../shaders/earth.ts';
 import { AREAS } from '../anime/anime.ts';
 import { PAINTED_CLOUDS, SUN_BEYOND } from '../anime/clouds.ts';
 import { Clouds, SkyDome } from '../anime/parts.tsx';
@@ -55,7 +55,8 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
   }, [dayMap, nightMap, moonMap]);
   const { earth, atmosphere } = useMemo(() => {
     const e = createEarthMaterial(dayMap, nightMap, low);
-    const a = createAtmosphereMaterial();
+    // the thin limb atmosphere of SC06 (the old shell read as a hazy halo behind the planet)
+    const a = createLimbAtmosphereMaterial(EARTH.radius, new THREE.Vector3(...EARTH.position));
     (e.uniforms['uSun']?.value as THREE.Vector3).copy(SUN);
     (a.uniforms['uSun']?.value as THREE.Vector3).copy(SUN);
     return { earth: e, atmosphere: a };
@@ -126,7 +127,7 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
           <sphereGeometry args={[EARTH.radius, low ? 64 : 128, low ? 48 : 96]} />
         </mesh>
         <mesh position={[...EARTH.position]} material={atmosphere}>
-          <sphereGeometry args={[EARTH.radius * 1.03, 64, 48]} />
+          <sphereGeometry args={[EARTH.radius * 1.04, 96, 64]} />
         </mesh>
         <mesh position={[...MOON.position]} rotation={[0, 2.4, 0]}>
           <sphereGeometry args={[MOON.radius, 48, 32]} />

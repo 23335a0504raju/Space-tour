@@ -3,6 +3,8 @@ import type { Fact } from './fact.ts';
 export interface Identity {
   readonly name: Fact<string>;
   readonly role: Fact<string>;
+  /** Short role for the header brand line. */
+  readonly shortRole: Fact<string>;
   /** Opening hook line (copy approved by Raju, not a factual claim). */
   readonly tagline: Fact<string>;
   readonly summary: Fact<string>;

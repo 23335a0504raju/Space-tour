@@ -98,7 +98,7 @@ test('journey: flight plan jumps straight to a chapter', async ({ page }) => {
   await expect(panel(page, 'Technology stack')).toBeVisible();
   // visitor-facing section label (internal SC codes are no longer shown)
   await expect(
-    page.locator('p[aria-live="polite"]').filter({ hasText: /05 \/ 07\s+Tech Stack/ }),
+    page.locator('p[aria-live="polite"]').filter({ hasText: /05\s*\/\s*Tech Stack/ }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -106,6 +106,8 @@ test('journey: flight plan jumps straight to a chapter', async ({ page }) => {
 test('journey: header Projects jumps to the project installations', async ({ page }) => {
   await page.goto('/?gate=off');
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
+  const menu = page.getByRole('button', { name: 'Menu' });
+  if (await menu.isVisible()) await menu.click();
   await page
     .getByRole('navigation', { name: 'Primary' })
     .getByRole('button', { name: 'Projects' })

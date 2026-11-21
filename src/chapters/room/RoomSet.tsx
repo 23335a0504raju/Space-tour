@@ -30,7 +30,7 @@ export interface RoomSetHandle {
 // ── Image-based lighting (shared, ref-counted, generated once per renderer + tier) ──
 const iblCache = new Map<
   string,
-  { texture: THREE.Texture; users: number; unregister: () => void }
+  { target: THREE.WebGLRenderTarget; users: number; unregister: () => void }
 >();
 
 /** Interior image-based lighting, registered under the "room" environment key (room + cockpit). */
@@ -41,12 +41,16 @@ export function RoomLighting() {
   return tier === 'balanced' ? <HdriIbl gl={gl} /> : <ProceduralIbl gl={gl} />;
 }
 
-function useSharedIbl(key: string, make: () => THREE.Texture) {
+/**
+ * PMREM results are render targets: only renderTarget.dispose() frees their GL texture in three
+ * r187 (texture.dispose() returns early for render-target textures), so the cache keeps the target.
+ */
+function useSharedIbl(key: string, make: () => THREE.WebGLRenderTarget) {
   useEffect(() => {
     let entry = iblCache.get(key);
     if (!entry) {
-      const texture = make();
-      entry = { texture, users: 0, unregister: registerEnvironment('room', texture) };
+      const target = make();
+      entry = { target, users: 0, unregister: registerEnvironment('room', target.texture) };
       iblCache.set(key, entry);
     }
     entry.users += 1;
@@ -57,7 +61,7 @@ function useSharedIbl(key: string, make: () => THREE.Texture) {
       const e = iblCache.get(key);
       if (e && --e.users === 0) {
         e.unregister();
-        e.texture.dispose();
+        e.target.dispose();
         iblCache.delete(key);
       }
     };
@@ -70,7 +74,7 @@ function HdriIbl({ gl }: { gl: THREE.WebGLRenderer }) {
     () => () => {
       const pmrem = new THREE.PMREMGenerator(gl);
       hdr.mapping = THREE.EquirectangularReflectionMapping;
-      const t = pmrem.fromEquirectangular(hdr).texture;
+      const t = pmrem.fromEquirectangular(hdr);
       pmrem.dispose();
       return t;
     },
@@ -84,7 +88,7 @@ function ProceduralIbl({ gl }: { gl: THREE.WebGLRenderer }) {
   const make = useMemo(
     () => () => {
       const pmrem = new THREE.PMREMGenerator(gl);
-      const t = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      const t = pmrem.fromScene(new RoomEnvironment(), 0.04);
       pmrem.dispose();
       return t;
     },
@@ -275,12 +279,6 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
         <CrewChair />
       </group>
       <Prop url={ROOM_MODELS.plant} position={[-0.85, DESK.top, -2.62]} />
-      <Prop
-        url={ROOM_MODELS.notepads}
-        position={[0.62, DESK.top, -2.45]}
-        scale={0.45}
-        rotation={[0, 0.2, 0]}
-      />
 
       {/* developer workstation (code-built) */}
       <Monitor position={[0, DESK.top + 0.343, -2.7]} rotationY={0} firstLine={60} />

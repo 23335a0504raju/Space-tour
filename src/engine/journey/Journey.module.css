@@ -19,7 +19,7 @@
   transition: opacity 180ms linear;
 }
 
-/* Bottom bar: [Flight plan] [progress track with section ticks] [03 / 07 Strengths] [← →] */
+/* Bottom bar: [Flight plan] … [← →] (the progress line moved under the header, 2026-11-21) */
 .bottom {
   position: fixed;
   left: 0;
@@ -34,14 +34,69 @@
   background: linear-gradient(rgb(5 6 10 / 0%), rgb(5 6 10 / 85%) 55%);
 }
 
-.track {
-  position: relative;
+.spacer {
   flex: 1;
-  height: 2px;
-  background: var(--color-rule);
 }
 
-.progressFill {
+/*
+ * Story progress under the header (navbar brief, 2026-11-21): an editorial reading line.
+ * Number and title on the left, percentage on the right, a 1 px gold fill underneath.
+ */
+.story {
+  position: fixed;
+  top: 76px;
+  left: var(--gutter);
+  right: var(--gutter);
+  z-index: 9;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  row-gap: 7px;
+  pointer-events: none;
+}
+
+.storyLabel {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgb(233 231 225 / 72%);
+  text-shadow: 0 1px 10px rgb(5 6 10 / 80%);
+}
+
+.storyNum {
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.storySep {
+  color: rgb(233 231 225 / 30%);
+}
+
+.storyPct {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: rgb(233 231 225 / 60%);
+  text-shadow: 0 1px 10px rgb(5 6 10 / 80%);
+}
+
+.storyTrack {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 1px;
+  background: rgb(233 231 225 / 12%);
+  overflow: hidden;
+}
+
+.storyFill {
   position: absolute;
   inset: 0;
   background: var(--color-accent);
@@ -49,64 +104,16 @@
   transform-origin: left center;
 }
 
-/* section ticks: a generous invisible hit area around a small mark */
-.tick {
-  position: absolute;
-  top: 50%;
-  width: 22px;
-  height: 22px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-}
+@media (max-width: 720px) {
+  .story {
+    top: 60px;
+    row-gap: 5px;
+  }
 
-.tick::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-bg);
-  box-shadow: inset 0 0 0 1px var(--color-muted);
-  transform: translate(-50%, -50%);
-  transition: transform 160ms ease;
-}
-
-.tick[data-passed]::after {
-  background: var(--color-accent);
-  box-shadow: none;
-}
-
-.tick[data-current]::after {
-  width: 11px;
-  height: 11px;
-  background: var(--color-accent);
-  box-shadow: 0 0 0 3px rgb(214 167 86 / 25%);
-}
-
-.tick:hover::after {
-  transform: translate(-50%, -50%) scale(1.35);
-}
-
-.progressLabel {
-  min-width: 9.5rem;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--color-text);
-  white-space: nowrap;
-}
-
-.progressCount {
-  margin-right: var(--space-2);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-accent);
+  .storyLabel,
+  .storyPct {
+    font-size: 0.625rem;
+  }
 }
 
 .stepper {
@@ -282,9 +289,8 @@
 }
 
 /*
- * Phone bottom bar: the progress line runs across the top of the bar, with the Flight Plan button
- * and the current section on the row below. The previous/next buttons are dropped (a thumb scrolls;
- * the section ticks and the Flight Plan jump anywhere); they used to run off the right edge.
+ * Phone bottom bar: the Flight Plan button only. The previous/next buttons are dropped (a thumb
+ * scrolls; the Flight Plan jumps anywhere); they used to run off the right edge.
  */
 @media (max-width: 720px) {
   .bottom {
@@ -292,17 +298,6 @@
     gap: var(--space-1) var(--space-4);
     min-height: 0;
     padding: var(--space-3) var(--gutter) var(--space-2);
-  }
-
-  .track {
-    order: -1;
-    flex: 1 0 100%;
-  }
-
-  .progressLabel {
-    min-width: 0;
-    margin-left: auto;
-    font-size: 0.6875rem;
   }
 
   .stepper {

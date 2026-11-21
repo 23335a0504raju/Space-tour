@@ -203,6 +203,7 @@
 }
 
 .bay {
+  justify-self: start;
   align-self: start;
   display: inline-flex;
   align-items: center;
@@ -541,6 +542,12 @@
     font-size: 1.5rem;
   }
 
+  /* long roles (DocumentDB) took four lines at body size on a 360 px phone */
+  .showcase .role {
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+
   .showList {
     font-size: 0.8125rem;
   }
@@ -578,6 +585,11 @@
 
   .showActions .bay {
     min-height: 40px;
+  }
+
+  /* source and demo links live in the full details here: they were cut at the card's edge */
+  .showActions a:nth-of-type(n + 2) {
+    display: none;
   }
 }
 

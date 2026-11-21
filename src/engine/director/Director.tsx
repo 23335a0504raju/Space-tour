@@ -39,6 +39,8 @@ export interface DirectorLinks {
   readonly overlays: Map<string, OverlayEntry>;
   dip: HTMLElement | null;
   progressBar: HTMLElement | null;
+  /** Overall story percentage (header progress line); text written only when it changes. */
+  progressText: HTMLElement | null;
   track: Track;
 }
 
@@ -175,6 +177,10 @@ export function Director({ master, frame, links }: Props) {
 
     if (links.progressBar)
       links.progressBar.style.transform = `scaleX(${master.progress.toFixed(4)})`;
+    if (links.progressText) {
+      const pct = `${Math.round(master.progress * 100)}%`;
+      if (links.progressText.textContent !== pct) links.progressText.textContent = pct;
+    }
   });
 
   return null;

@@ -27,7 +27,6 @@ import {
 import { dprForBudget, PIXEL_BUDGET_MP } from '../quality/pixelBudget.ts';
 import type { QualityTier } from '../quality/pixelBudget.ts';
 import { buildTrack, classifyAspect, progressFor } from '../scroll/resolver.ts';
-import type { Track } from '../scroll/resolver.ts';
 import { sectionIndexFor, sections } from '../../chapters/sections.ts';
 import { ScrollTrack } from '../scroll/ScrollTrack.tsx';
 import { usePacedWheel } from '../scroll/usePacedWheel.ts';
@@ -199,58 +198,64 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
 const num = (i: number) => String(i + 1).padStart(2, '0');
 
 /**
+ * Story progress under the header (navbar brief, 2026-11-21): chapter number and title, the
+ * overall percentage, and a hairline gold fill. The fill and the percentage are written by the
+ * Director from the one master progress (no React state, no extra scroll listener); the label
+ * changes once per section, so it never flickers.
+ */
+function StoryLine({ links }: { links: DirectorLinks }) {
+  const current = useJourneyStore((s) => sectionIndexFor(s.activeIndex));
+  const section = sections[current];
+  return (
+    <div className={styles.story}>
+      <p className={styles.storyLabel} aria-live="polite">
+        <span className={styles.storyNum}>{num(current)}</span>
+        <span className={styles.storySep} aria-hidden="true">
+          /
+        </span>
+        {section?.label}
+      </p>
+      <span
+        className={styles.storyPct}
+        aria-hidden="true"
+        ref={(el) => {
+          links.progressText = el;
+        }}
+      >
+        0%
+      </span>
+      <div className={styles.storyTrack} aria-hidden="true">
+        <div
+          className={styles.storyFill}
+          ref={(el) => {
+            links.progressBar = el;
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
  * Bottom bar: Flight Plan menu, the progress track with one tick per visitor section, the current
  * section, and previous/next. The fill is written by the Director every frame (no React state);
  * the label changes once per chapter.
  */
 function BottomBar({
-  links,
-  track,
   entered,
   onJump,
   onStep,
 }: {
-  links: DirectorLinks;
-  track: Track;
   entered: boolean;
   onJump: (id: string) => void;
   onStep: (dir: 1 | -1) => void;
 }) {
   const current = useJourneyStore((s) => sectionIndexFor(s.activeIndex));
-  const section = sections[current];
   return (
     <div className={styles.bottom}>
       {/* hidden behind the start gate (its dock owns that corner); the header stays reachable */}
       {entered && <FlightPlan current={current} onJump={onJump} />}
-      <div className={styles.track}>
-        <div
-          className={styles.progressFill}
-          ref={(el) => {
-            links.progressBar = el;
-          }}
-        />
-        {/* pointer shortcut only: the Flight Plan menu is the accessible list of the same jumps */}
-        {sections.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            tabIndex={-1}
-            aria-hidden="true"
-            className={styles.tick}
-            data-current={i === current || undefined}
-            data-passed={i < current || undefined}
-            style={{ left: `${progressFor(track, s.chapterIds[0] ?? s.target, 0) * 100}%` }}
-            title={s.label}
-            onClick={() => onJump(s.target)}
-          />
-        ))}
-      </div>
-      <p className={styles.progressLabel} aria-live="polite">
-        <span className={styles.progressCount}>
-          {num(current)} / {num(sections.length - 1)}
-        </span>{' '}
-        {section?.label}
-      </p>
+      <span className={styles.spacer} />
       {entered && (
         <span className={styles.stepper}>
           <button type="button" aria-label="Previous stop" onClick={() => onStep(-1)}>
@@ -326,7 +331,14 @@ function JourneyCanvas() {
   const styleRef = useRef<StyleBlendEffect>(null);
   const lensRef = useRef<LensEffect>(null);
   const links = useMemo<DirectorLinks>(
-    () => ({ groups: new Map(), overlays: new Map(), dip: null, progressBar: null, track }),
+    () => ({
+      groups: new Map(),
+      overlays: new Map(),
+      dip: null,
+      progressBar: null,
+      progressText: null,
+      track,
+    }),
     // links is created once; track updates are written in the effect below
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -530,7 +542,8 @@ function JourneyCanvas() {
       />
       <OverlayLayer links={links} />
       <div ref={fadeRef} className={styles.jumpFade} aria-hidden="true" />
-      <BottomBar links={links} track={track} entered={entered} onJump={jump} onStep={step} />
+      <StoryLine links={links} />
+      <BottomBar entered={entered} onJump={jump} onStep={step} />
 
       {reducedNotice && (
         <div className={styles.notice} role="status">
