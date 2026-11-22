@@ -16,7 +16,14 @@ const flat = (color: string, extra: THREE.MeshStandardMaterialParameters = {}) =
 const glow = (color: string, k = 2) => new THREE.Color(color).multiplyScalar(k);
 
 /** Gradient sky dome (horizon → zenith). Follow the ship by wrapping it in a moving group. */
-export function SkyDome({ colors }: { colors: readonly [string, string, string, string] }) {
+export function SkyDome({
+  colors,
+  live,
+}: {
+  colors: readonly [string, string, string, string];
+  /** four colours written every frame (a blend between worlds); overrides `colors` */
+  live?: { readonly current: readonly THREE.Color[] };
+}) {
   const mat = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -39,6 +46,11 @@ export function SkyDome({ colors }: { colors: readonly [string, string, string, 
     [colors],
   );
   useDisposeOnUnmount(mat);
+  useFrame(() => {
+    if (!live) return;
+    const u = mat.uniforms['uC']!.value as THREE.Color[];
+    for (let i = 0; i < 4; i += 1) u[i]!.copy(live.current[i]!);
+  });
   return (
     <mesh material={mat} renderOrder={-10} frustumCulled={false}>
       <sphereGeometry args={[1200, 32, 20]} />

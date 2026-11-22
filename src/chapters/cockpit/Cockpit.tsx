@@ -17,6 +17,7 @@ import {
   arrivalKeys,
   doorOpen,
   span,
+  COCKPIT_OUT,
 } from './arrival.ts';
 import type { Drive } from '../astronaut/Astronaut.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
@@ -660,7 +661,9 @@ const cockpitKeys: ShotKey[] = [
   // across to the Education screen (clears the astronaut and the empty seat back)
   { t: 0.7, position: [-0.15, 1.78, 0.45], target: [0.75, 1.11, -1.31], fov: 40 },
   // down onto the ignition switch
-  { t: 1, position: [0.05, 1.38, -0.3], target: [0, 0.88, -1.15], fov: 36 },
+  { t: 0.86, position: [0.05, 1.38, -0.3], target: [0, 0.88, -1.15], fov: 36 },
+  // then up and out through the windscreen (cockpit → launch pad join: SC05 opens at this spot)
+  { t: 1, position: COCKPIT_OUT.position, target: COCKPIT_OUT.target, fov: COCKPIT_OUT.fov },
 ];
 
 export const sc04CrewRecord: ChapterImpl = {

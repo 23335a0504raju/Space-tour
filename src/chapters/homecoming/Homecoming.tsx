@@ -9,6 +9,8 @@ import { Astronaut } from '../astronaut/Astronaut.tsx';
 import type { Drive } from '../astronaut/Astronaut.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield } from '../greybox/parts.tsx';
+import { TRAVEL_STARS } from '../handoff.ts';
+import { TRAVEL_SKY } from '../space/skyFrame.ts';
 import { HelVela } from '../ship/HelVela.tsx';
 import {
   BEACON,
@@ -21,6 +23,8 @@ import {
   homecomingShot,
   walkWeight,
   walkedDistance,
+  HANDOFF,
+  handoffWeight,
 } from './homecoming.ts';
 
 /** SC13 · Homecoming & Final Transmission (FINAL_STORYLINE SC13). Earth maps: NASA (A021, A022). */
@@ -42,6 +46,21 @@ const drive: Drive = (t, api, body) => {
   // standing pose = the end of the stand-up clip
   api.set('standUp', api.duration('standUp'), 1 - w);
 };
+
+const tmp = {
+  pos: new THREE.Vector3(),
+  from: new THREE.Vector3(),
+  sun: new THREE.Vector3(),
+};
+/** Earth's map orientation: this chapter's, and SC12's turned a quarter (handoff). */
+const ROT_13 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, 1.9, 0));
+const ROT_12 = new THREE.Quaternion()
+  .setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
+  .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, 1.0, 0)));
+/** The shared flight sky, turned into this chapter's frame (SC12's -z heading is -x here). */
+const SKY_13 = new THREE.Quaternion()
+  .setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
+  .multiply(TRAVEL_SKY);
 
 function HomecomingScene({ id, frame }: ChapterSceneProps) {
   const gl = useThree((s) => s.gl);
@@ -75,7 +94,28 @@ function HomecomingScene({ id, frame }: ChapterSceneProps) {
 
   const beacon = useRef<THREE.Group>(null);
   const ring = useRef<THREE.Mesh>(null);
+  const globe = useRef<THREE.Mesh>(null);
+  const shell = useRef<THREE.Mesh>(null);
+  const sun = useRef<THREE.DirectionalLight>(null);
   useFrame(({ clock }) => {
+    // SC12's Earth and sun at the boundary, settling into this chapter's (handoff)
+    if (frame.id === id && globe.current && shell.current) {
+      const w = handoffWeight(frame.t);
+      tmp.pos.set(...EARTH.position).lerp(tmp.from.set(...HANDOFF.earth), w);
+      const r = EARTH.radius + (HANDOFF.earthRadius - EARTH.radius) * w;
+      globe.current.position.copy(tmp.pos);
+      globe.current.scale.setScalar(r / EARTH.radius);
+      globe.current.quaternion.copy(ROT_13).slerp(ROT_12, w);
+      shell.current.position.copy(tmp.pos);
+      shell.current.scale.setScalar(r / EARTH.radius);
+      tmp.sun
+        .copy(SUN_DIR)
+        .lerp(tmp.from.set(...HANDOFF.sun).normalize(), w)
+        .normalize();
+      (earth.uniforms['uSun']!.value as THREE.Vector3).copy(tmp.sun);
+      (atmosphere.uniforms['uSun']!.value as THREE.Vector3).copy(tmp.sun);
+      sun.current?.position.copy(tmp.sun).multiplyScalar(100);
+    }
     if (frame.id === id && beacon.current) {
       const k = beaconRise(frame.t);
       beacon.current.scale.setScalar(Math.max(k, 0.001));
@@ -89,14 +129,15 @@ function HomecomingScene({ id, frame }: ChapterSceneProps) {
 
   return (
     <group>
-      <Starfield count={5000} radius={1500} seed={91} />
-      <mesh position={[...EARTH.position]} rotation={[0.3, 1.9, 0]} material={earth}>
+      <Starfield {...TRAVEL_STARS} follow orient={SKY_13} />
+      <mesh ref={globe} position={[...EARTH.position]} rotation={[0.3, 1.9, 0]} material={earth}>
         <sphereGeometry args={[EARTH.radius, low ? 64 : 128, low ? 48 : 96]} />
       </mesh>
-      <mesh position={[...EARTH.position]} material={atmosphere}>
+      <mesh ref={shell} position={[...EARTH.position]} material={atmosphere}>
         <sphereGeometry args={[EARTH.radius * 1.03, 64, 48]} />
       </mesh>
       <directionalLight
+        ref={sun}
         position={[SUN_DIR.x * 100, SUN_DIR.y * 100, SUN_DIR.z * 100]}
         color="#fff1dc"
         intensity={3}

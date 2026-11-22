@@ -3,6 +3,7 @@ import { EARTH as SC06_EARTH, OPENING as SC06_OPENING } from '../sunrise/sunrise
 import type { ShotState } from '../../engine/camera/shots.ts';
 import type { AspectClass } from '../types.ts';
 import { HELVELA } from '../ship/helvelaDimensions.ts';
+import { COCKPIT_OUT } from '../cockpit/arrival.ts';
 
 /**
  * SC05 Ignition & Ascent: story maths for the HelVela II's VTOL departure (the hero ship chosen by
@@ -59,6 +60,22 @@ export const ORBIT_CAMERA = {
   fov: SC06_OPENING.fov,
 } as const;
 export const ORBIT_EARTH_FROM_SHIP = fromTravel(SC06_EARTH.centre);
+
+/**
+ * Cockpit → launch pad join: SC04 ends just beyond the bow, looking along the heading. The
+ * cockpit's floor sits at this point of the hull (local frame: bow toward -x, so the cockpit's
+ * (x, y, z) is (z, y, -x) here), and the camera pulls back from there over the first tenth.
+ */
+export const COCKPIT_AT = [-31, 9, 0] as const;
+const fromCockpit = (v: readonly [number, number, number]) =>
+  [COCKPIT_AT[0] + v[2], COCKPIT_AT[1] + v[1], COCKPIT_AT[2] - v[0]] as const;
+export const PAD_START = {
+  position: fromCockpit(COCKPIT_OUT.position),
+  target: fromCockpit(COCKPIT_OUT.target),
+  fov: COCKPIT_OUT.fov,
+} as const;
+/** 1 at the boundary (the cockpit's last picture) → 0 once the wide pad shot has taken over. */
+export const fromCockpitWeight = (t: number) => 1 - span(t, 0, 0.1);
 
 /** Climb progress 0..1 after the hover. */
 const climb = (t: number) => clamp01((t - BEATS.hover) / (1 - BEATS.hover));
@@ -199,6 +216,15 @@ export function ascentShot(
     tgtB.set(out.position.x - 460, ship.y - 30, out.position.z - 140);
     out.target.copy(tgtA).lerp(tgtB, lift);
     out.fov = 46 + 6 * lift;
+  }
+  // the way in: out of the cockpit, pulling back to the pad (exact at t = 0)
+  const w0 = fromCockpitWeight(t);
+  if (w0 > 0) {
+    shipToWorld(t, local.set(...PAD_START.position), p);
+    shipToWorld(t, local.set(...PAD_START.target), q);
+    out.position.lerp(p, w0);
+    out.target.lerp(q, w0);
+    out.fov += (PAD_START.fov - out.fov) * w0;
   }
   // orbit insertion: SC06's opening shot, relative to the ship (exact at t = 1)
   const w = toOrbit(t);

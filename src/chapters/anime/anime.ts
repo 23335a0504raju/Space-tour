@@ -75,3 +75,37 @@ export const LANDMARKS: Readonly<Record<AreaId, readonly [number, number, number
   proof: [55, -8, -110],
   horizon: [-95, 22, -330],
 };
+
+/** The worlds in flight order. */
+export const ORDER: readonly AreaId[] = ['discipline', 'proof', 'horizon'];
+
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const smooth = (x: number) => {
+  const c = clamp01(x);
+  return c * c * (3 - 2 * c);
+};
+
+/**
+ * Continuous flight between worlds (handoff): the sky and light of a world blend toward its
+ * neighbour's, meeting at the same halfway colours on both sides of every boundary (this world at
+ * t = 1 and the next at t = 0 both show mix(this, next, 0.5)). Result: sky = mix(a, b, k).
+ */
+export function skyMix(area: AreaId, t: number): { a: AreaId; b: AreaId; k: number } {
+  const i = ORDER.indexOf(area);
+  const prev = ORDER[i - 1];
+  const next = ORDER[i + 1];
+  if (prev && t < 0.2) return { a: prev, b: area, k: 0.5 + 0.5 * smooth(t / 0.2) };
+  if (next && t > 0.8) return { a: area, b: next, k: 0.5 * smooth((t - 0.8) / 0.2) };
+  return { a: area, b: area, k: 0 };
+}
+
+/**
+ * Landmark scale 0..1 about the ship: worlds grow around the ship as it enters and shrink away as
+ * it leaves, so no model ever pops at a boundary. The first world is already there (SC10 emerges
+ * into it).
+ */
+export function markScale(area: AreaId, t: number): number {
+  const enter = area === 'discipline' ? 1 : smooth(t / 0.2);
+  const leave = smooth((1 - t) / 0.15);
+  return enter * leave;
+}

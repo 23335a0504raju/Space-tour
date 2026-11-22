@@ -7,9 +7,12 @@ import { useJourneyStore } from '../../engine/store.ts';
 import { createLimbAtmosphereMaterial, createEarthMaterial } from '../../shaders/earth.ts';
 import { AREAS } from '../anime/anime.ts';
 import { PAINTED_CLOUDS, SUN_BEYOND } from '../anime/clouds.ts';
-import { Clouds, SkyDome } from '../anime/parts.tsx';
+import { Clouds, RingedPlanet, SkyDome } from '../anime/parts.tsx';
+import { HORIZON_PLANETS } from '../anime/areas.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield } from '../greybox/parts.tsx';
+import { TRAVEL_STARS } from '../handoff.ts';
+import { TRAVEL_SKY } from '../space/skyFrame.ts';
 import { BlackHole } from '../crossing/BlackHole.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
 import {
@@ -67,6 +70,7 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
   const dome = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
   const painted = useRef<THREE.Group>(null);
+  const painted2 = useRef<THREE.Group>(null);
   const real = useRef<THREE.Group>(null);
   const stars = useRef<THREE.Group>(null);
   const sunTarget = useMemo(() => new THREE.Object3D(), []);
@@ -80,6 +84,7 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
       sunTarget.position.set(0, 0, z);
       // which world is on stage is a pure function of t
       if (painted.current) painted.current.visible = t < T_GATE + 0.03;
+      if (painted2.current) painted2.current.visible = t < T_GATE + 0.03;
       if (real.current) real.current.visible = t > T_EXIT - 0.05;
       // real stars only exist once the painted sky is behind us
       if (stars.current) stars.current.visible = t > T_GATE + 0.04;
@@ -102,8 +107,16 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
         </mesh>
       </group>
 
+      {/* the big ringed planet of SC11c, still ahead (its place relative to the ship) */}
+      <group ref={painted2}>
+        <RingedPlanet
+          position={[HORIZON_PLANETS.big[0], HORIZON_PLANETS.big[1], HORIZON_PLANETS.big[2] + 220]}
+          radius={40}
+        />
+      </group>
+
       <group ref={stars} visible={false}>
-        <Starfield count={5000} radius={1500} seed={81} />
+        <Starfield {...TRAVEL_STARS} follow orient={TRAVEL_SKY} />
       </group>
       <directionalLight ref={light} target={sunTarget} color="#fff1dc" intensity={3} />
       <primitive object={sunTarget} />

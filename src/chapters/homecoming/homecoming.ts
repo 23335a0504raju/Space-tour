@@ -1,5 +1,12 @@
 import { sampleKeys } from '../../engine/camera/shots.ts';
 import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
+import { createShotState } from '../../engine/camera/shots.ts';
+import { blendShot } from '../handoff.ts';
+import {
+  EARTH as SC12_EARTH,
+  DAWN_SUN as SC12_SUN,
+  TRAVEL as SC12_TRAVEL,
+} from '../return/return.ts';
 
 /**
  * SC13 Homecoming & Final Transmission story maths (no React; unit-tested). The ship holds high
@@ -39,4 +46,36 @@ const keys: ShotKey[] = [
   { t: 1, position: [-8.6, 5.3, 12], target: [-5.3, 4.1, 0], fov: 42 },
 ];
 
-export const homecomingShot = (t: number, out: ShotState) => void sampleKeys(keys, t, out);
+/**
+ * SC12 → SC13 (continuous flight): SC12 flies along -z, this chapter along -x, so a vector (x, y, z)
+ * there is (z, y, -x) here. The chapter opens on SC12's last frame (camera, Earth, sun) and eases
+ * to its deck view over the first fifth.
+ */
+export const fromReturn = (v: readonly [number, number, number]) => [v[2], v[1], -v[0]] as const;
+export const HANDOFF = {
+  position: fromReturn([-24, 8, 58]),
+  target: fromReturn([14, -12, -90]),
+  fov: 48,
+  /** SC12's Earth relative to its ship at the end, in this frame */
+  earth: fromReturn([
+    SC12_EARTH.position[0],
+    SC12_EARTH.position[1],
+    SC12_EARTH.position[2] + SC12_TRAVEL,
+  ]),
+  earthRadius: SC12_EARTH.radius,
+  sun: fromReturn(SC12_SUN),
+} as const;
+/** 1 at the boundary (SC12's picture) → 0 once the deck view has taken over. */
+export const handoffWeight = (t: number) => 1 - span(t, 0, 0.22);
+
+const pose = createShotState();
+export function homecomingShot(t: number, out: ShotState): void {
+  sampleKeys(keys, t, out);
+  const w = handoffWeight(t);
+  if (w > 0) {
+    pose.position.set(...HANDOFF.position);
+    pose.target.set(...HANDOFF.target);
+    pose.fov = HANDOFF.fov;
+    blendShot(out, pose, w);
+  }
+}

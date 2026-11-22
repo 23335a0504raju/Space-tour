@@ -32,7 +32,8 @@ export const styleAt = (t: number) =>
 export const gateOpen = (t: number) => 0.9 + 0.1 * span(t, 0, 0.12);
 
 const rel: ShotKey[] = [
-  { t: 0, position: [-12, 6, 48], target: [0, 2, -60], fov: 52 },
+  // SC11c's last frame (handoff): behind the ship, the ringed planet ahead on the left
+  { t: 0, position: [0, 10, 40], target: [-10, 8, -80], fov: 52 },
   // fast push toward the gate, then wide and tight inside the tunnel
   { t: 0.2, position: [8, 7, 50], target: [0, 0, -50], fov: 60 },
   { t: 0.45, position: [0, 6, 46], target: [0, 0, -50], fov: 68 },

@@ -10,6 +10,9 @@ import { HOLE_AHEAD, saturnShip, saturnShot } from './saturn/saturn.ts';
 import { GATE, crossingShot, shipZ as crossingZ } from './crossing/crossing.ts';
 import type { Vec3 } from './handoff.ts';
 import { departureShot } from './greybox/departure.ts';
+import { ORDER, areaShot, markScale, skyMix } from './anime/anime.ts';
+import { returnShot, shipZ as returnZ } from './return/return.ts';
+import { HANDOFF, homecomingShot } from './homecoming/homecoming.ts';
 import { LIFT } from './room/layout.ts';
 import { COCKPIT_DOOR } from './cockpit/arrival.ts';
 import { sc04CrewRecord } from './cockpit/Cockpit.tsx';
@@ -32,6 +35,73 @@ function picture(cam: ShotState, ship: THREE.Vector3, planet: THREE.Vector3) {
 const close = (a: number[], b: number[]) => a.forEach((x, i) => expect(x).toBeCloseTo(b[i]!, 4));
 
 describe('continuous flight between chapters (handoff.ts)', () => {
+  it('the anime worlds meet at the same camera, sky and ship at every boundary', () => {
+    for (let i = 0; i + 1 < ORDER.length; i += 1) {
+      const a = ORDER[i]!;
+      const b = ORDER[i + 1]!;
+      const ea = createShotState();
+      const sb = createShotState();
+      areaShot(a, 1, ea);
+      areaShot(b, 0, sb);
+      // both frames are relative to the ship (it flies 220 m per world)
+      const rel = (s: ShotState, z: number) => s.position.clone().sub(new THREE.Vector3(0, 0, z));
+      close(rel(ea, -220).toArray(), rel(sb, 0).toArray());
+      expect(ea.fov).toBeCloseTo(sb.fov, 6);
+      // the sky meets halfway on both sides
+      const m1 = skyMix(a, 1);
+      const m2 = skyMix(b, 0);
+      expect(m1.a).toBe(m2.a);
+      expect(m1.b).toBe(m2.b);
+      expect(m1.k).toBeCloseTo(m2.k, 9);
+      // worlds shrink away and grow in: nothing pops
+      expect(markScale(a, 1)).toBe(0);
+      expect(markScale(b, 0)).toBe(0);
+    }
+  });
+
+  it('SC11c ends on exactly the picture SC12 opens with', () => {
+    const end = createShotState();
+    const start = createShotState();
+    areaShot('horizon', 1, end);
+    returnShot(0, start);
+    close(
+      end.position
+        .clone()
+        .sub(new THREE.Vector3(0, 0, -220))
+        .toArray(),
+      start.position
+        .clone()
+        .sub(new THREE.Vector3(0, 0, returnZ(0)))
+        .toArray(),
+    );
+    expect(end.fov).toBeCloseTo(start.fov, 6);
+  });
+
+  it('SC12 ends on exactly the picture SC13 opens with (a quarter turn): camera and Earth', () => {
+    const end = createShotState();
+    returnShot(1, end);
+    const shipEnd = new THREE.Vector3(0, 0, returnZ(1));
+    const turn = (p: THREE.Vector3) => new THREE.Vector3(p.z, p.y, -p.x);
+    const camRel = turn(end.position.clone().sub(shipEnd));
+    const start = createShotState();
+    homecomingShot(0, start);
+    close(camRel.toArray(), start.position.toArray());
+    expect(end.fov).toBeCloseTo(start.fov, 6);
+    expect(HANDOFF.earthRadius).toBe(240);
+  });
+
+  it('SC04 ends out of the windscreen exactly where SC05 opens: same spot on the ship, heading and lens', () => {
+    const end = shot((t, o) => sc04CrewRecord.shot(t, o, 'landscape'), 1);
+    const start = createShotState();
+    ascentShot(0, start, true);
+    // SC05's camera, relative to the cockpit's place on the hull (turned back into the cockpit frame)
+    const at = new THREE.Vector3(-31, 9 + 3, 0); // hull origin sits mountY above the pad
+    const rel = start.position.clone().sub(at);
+    const asCockpit = new THREE.Vector3(-rel.z, rel.y, rel.x);
+    close(asCockpit.toArray(), end.position.toArray());
+    expect(end.fov).toBeCloseTo(start.fov, 6);
+  });
+
   it('SC03 ends on the lift door exactly as SC04 opens on it (same distance, height and lens)', () => {
     const end = shot(departureShot, 1);
     const start = shot((t, o) => sc04CrewRecord.shot(t, o, 'landscape'), 0);

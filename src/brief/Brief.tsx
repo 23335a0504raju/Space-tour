@@ -297,6 +297,75 @@ export function Brief() {
           by <a href="https://sketchfab.com/Lezalit">Lezalit</a>, licensed under{' '}
           <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; modified.
         </p>
+        <p className={styles.credits}>
+          Anime worlds: 3D models from Sketchfab, modified (simplified and recompressed), credited
+          to their authors:
+        </p>
+        <ul className={styles.credits}>
+          <li key="https://sketchfab.com/3d-models/naruto-shippuden-naruto-ea2e5dff481243b9973f2bb34a384031">
+            <a href="https://sketchfab.com/3d-models/naruto-shippuden-naruto-ea2e5dff481243b9973f2bb34a384031">
+              “Naruto Shippuden- Naruto”
+            </a>{' '}
+            by <a href="https://sketchfab.com/lopuh22721">#Anime resource!!!</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/ichiraku-ramen-naruto-c57a7c0bdca4446aade5241cc621f56e">
+            <a href="https://sketchfab.com/3d-models/ichiraku-ramen-naruto-c57a7c0bdca4446aade5241cc621f56e">
+              “Ichiraku Ramen (Naruto)”
+            </a>{' '}
+            by <a href="https://sketchfab.com/Doverlock">Doverlock</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by-nc/4.0/">CC BY-NC 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/death-note-17e2a68603464169b22ea5cdb8572f69">
+            <a href="https://sketchfab.com/3d-models/death-note-17e2a68603464169b22ea5cdb8572f69">
+              “Death note”
+            </a>{' '}
+            by <a href="https://sketchfab.com/XRUNFF">xRUN</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/ryuk-from-death-note-cf0ccb0310ea4bdd97122b6183e9e71b">
+            <a href="https://sketchfab.com/3d-models/ryuk-from-death-note-cf0ccb0310ea4bdd97122b6183e9e71b">
+              “Ryuk from Death Note”
+            </a>{' '}
+            by <a href="https://sketchfab.com/PotBin">PotBin</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/free-london-kinnaird-house-ff13d8c9407f4796886a689a758dc862">
+            <a href="https://sketchfab.com/3d-models/free-london-kinnaird-house-ff13d8c9407f4796886a689a758dc862">
+              “[FREE] London, Kinnaird House”
+            </a>{' '}
+            by <a href="https://sketchfab.com/99.Miles">99.Miles</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/tanjiro-kamado-from-demon-slayer-fully-rigged-0ab5b317b7654fd29255d22182537ded">
+            <a href="https://sketchfab.com/3d-models/tanjiro-kamado-from-demon-slayer-fully-rigged-0ab5b317b7654fd29255d22182537ded">
+              “Tanjiro Kamado from Demon Slayer - Fully Rigged”
+            </a>{' '}
+            by <a href="https://sketchfab.com/Light.k">Light.k</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/nezuko-kamado-demon-slayer-134a47bc3d2247d0a4dafc20fa037c53">
+            <a href="https://sketchfab.com/3d-models/nezuko-kamado-demon-slayer-134a47bc3d2247d0a4dafc20fa037c53">
+              “Nezuko Kamado-Demon Slayer”
+            </a>{' '}
+            by <a href="https://sketchfab.com/atharvaj365">Atharva Jagtap</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/blossom-katana-6cff8d381e2948ef9527d3d99e80520c">
+            <a href="https://sketchfab.com/3d-models/blossom-katana-6cff8d381e2948ef9527d3d99e80520c">
+              “Blossom Katana”
+            </a>{' '}
+            by <a href="https://sketchfab.com/MitchellBekke">Mitchell Bekke</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/low-poly-farm-v2-0e91a96ca6ee44569cf94972e30b5be4">
+            <a href="https://sketchfab.com/3d-models/low-poly-farm-v2-0e91a96ca6ee44569cf94972e30b5be4">
+              “Low Poly Farm V2”
+            </a>{' '}
+            by <a href="https://sketchfab.com/Edwin3D">EdwinRC</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+        </ul>
       </footer>
     </>
   );

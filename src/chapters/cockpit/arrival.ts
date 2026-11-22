@@ -68,3 +68,13 @@ export const arrivalKeys: ShotKey[] = [
   // he sits
   { t: 0.24, position: [0.35, 1.8, 0.55], target: [-0.8, 1.0, -0.45], fov: 48 },
 ];
+
+/**
+ * The camera's last pose (cockpit → launch pad join): out through the windscreen opening, just
+ * beyond the bow, looking along the heading (-z). SC05 opens at the same place in its own frame.
+ */
+export const COCKPIT_OUT = {
+  position: [0, 1.8, -2.4] as const,
+  target: [0, 1.65, -60] as const,
+  fov: 50,
+};
