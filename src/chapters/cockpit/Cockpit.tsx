@@ -7,6 +7,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Astronaut as Crew } from '../astronaut/Astronaut.tsx';
+import { LaunchBackdrop } from '../ascent/Ascent.tsx';
 import { LiftDoor } from '../room/LiftDoor.tsx';
 import {
   ARRIVAL,
@@ -21,7 +22,7 @@ import {
 } from './arrival.ts';
 import type { Drive } from '../astronaut/Astronaut.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
-import { Astronaut as StandIn, seeded, Starfield } from '../greybox/parts.tsx';
+import { Astronaut as StandIn, seeded } from '../greybox/parts.tsx';
 import { useCabinSurface } from '../room/surfaces.ts';
 import { RoomLighting } from '../room/RoomSet.tsx';
 import { educationScreen, experienceScreen, flightPlanScreen } from './screens.ts';
@@ -299,116 +300,9 @@ function Pedestal() {
     </group>
   );
 }
-
-/** Vertical glow gradient for the horizon haze (canvas, so no file to ship). */
-function useHorizonGlow(): THREE.CanvasTexture {
-  const tex = useMemo(() => {
-    const c = document.createElement('canvas');
-    c.width = 4;
-    c.height = 128;
-    const g = c.getContext('2d');
-    if (g) {
-      const grad = g.createLinearGradient(0, 0, 0, 128);
-      grad.addColorStop(0, 'rgba(70,110,170,0)');
-      grad.addColorStop(0.62, 'rgba(120,150,200,0.22)');
-      grad.addColorStop(0.86, 'rgba(255,170,100,0.5)');
-      grad.addColorStop(1, 'rgba(255,170,100,0)');
-      g.fillStyle = grad;
-      g.fillRect(0, 0, 4, 128);
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }, []);
-  useDisposeOnUnmount(tex);
-  return tex;
-}
-
-/** The distant launch complex: a scatter of floodlights and beacons along the horizon (one draw). */
-function ComplexLights() {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  const COUNT = 90;
-  useEffect(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    const rand = seeded(23);
-    const m = new THREE.Matrix4();
-    const c = new THREE.Color();
-    const palette = ['#ffd9a0', '#fff1d6', '#9fd4ff', '#ff6a4a', '#ffd9a0'];
-    for (let i = 0; i < COUNT; i += 1) {
-      const x = (rand() - 0.5) * 220;
-      const z = -70 - rand() * 60;
-      const y = -5.7 + rand() * 1.4 * rand();
-      const k = 0.5 + rand() * 1.1;
-      mesh.setMatrixAt(i, m.makeScale(k, k, k).setPosition(x, y, z));
-      mesh.setColorAt(i, c.set(palette[Math.floor(rand() * palette.length)] ?? '#ffd9a0'));
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, []);
-  return (
-    <instancedMesh ref={ref} args={[undefined, undefined, COUNT]} frustumCulled={false}>
-      <sphereGeometry args={[0.28, 8, 6]} />
-      {/* above 1.0 so the post chain's bloom picks them up */}
-      <meshBasicMaterial color={new THREE.Color(2.2, 2.2, 2.2)} toneMapped={false} />
-    </instancedMesh>
-  );
-}
-
-/** Launch tower and pad under floodlights, seen through the windscreen. Lambert: no room IBL. */
+/** The windscreen shows SC05's opening picture itself (same sky, clouds, pad and tower). */
 function TowerView() {
-  const glow = useHorizonGlow();
-  return (
-    <group>
-      <Starfield count={2500} radius={260} seed={17} />
-      {/* haze on the horizon, and the complex's lights below it */}
-      <mesh position={[0, -2.2, -115]}>
-        <planeGeometry args={[420, 32]} />
-        <meshBasicMaterial
-          map={glow}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          toneMapped={false}
-        />
-      </mesh>
-      <ComplexLights />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -6, -40]}>
-        <planeGeometry args={[200, 120]} />
-        <meshLambertMaterial color="#06080c" />
-      </mesh>
-      <group position={[-3.4, -6, -9]}>
-        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-          <mesh key={i} position={[0, i * 2.4, 0]}>
-            <boxGeometry args={[1.6, 0.18, 1.6]} />
-            <meshLambertMaterial color="#2d3037" />
-          </mesh>
-        ))}
-        {[-0.75, 0.75].map((x) =>
-          [-0.75, 0.75].map((z) => (
-            <mesh key={`${x}${z}`} position={[x, 8, z]}>
-              <boxGeometry args={[0.12, 16, 0.12]} />
-              <meshLambertMaterial color="#3a3d44" />
-            </mesh>
-          )),
-        )}
-        {[3, 7, 11].map((y) => (
-          <mesh key={y} position={[0.9, y, 0.9]}>
-            <sphereGeometry args={[0.09, 10, 8]} />
-            <meshBasicMaterial color="#ff5a4a" toneMapped={false} />
-          </mesh>
-        ))}
-      </group>
-      <spotLight
-        position={[4, 10, -2]}
-        angle={0.5}
-        penumbra={0.8}
-        intensity={260}
-        distance={40}
-        color="#dfe8ff"
-      />
-    </group>
-  );
+  return <LaunchBackdrop />;
 }
 
 /**

@@ -30,6 +30,7 @@ import {
   altitude,
   armSwing,
   ascentShot,
+  COCKPIT_AT,
   REDUCED_MOTION as REDUCED_MOTION_FLAG,
   clampsOpen,
   engine as engineAt,
@@ -958,6 +959,85 @@ function PadWithGround({
     <group ref={ref}>
       <Pad clamps={clamps} />
     </group>
+  );
+}
+
+/**
+ * SC05's opening view (the pad at night: dusk horizon, Milky Way, cloud deck, settlements, pad and
+ * tower) for the cockpit windscreen, so SC04 → SC05 is the same picture. Everything is SC05's own, in
+ * SC05's frame, turned and offset into the cockpit's frame (the inverse of `fromCockpit` in ascent.ts).
+ * Static: the state at t = 0 (on the pad, no engine, no thin air).
+ */
+export function LaunchBackdrop() {
+  const gl = useThree((s) => s.gl);
+  const low = useJourneyStore((s) => s.tier === 'low');
+  const balanced = useJourneyStore((s) => s.tier === 'balanced');
+  const dpr = useThree((s) => s.viewport.dpr);
+  const skyFollow = useRef<THREE.Group>(null);
+  const clamps = useRef<(THREE.Group | null)[]>([]);
+  const arm = useRef<THREE.Group>(null);
+  const cloudMats = useRef<THREE.ShaderMaterial[]>([]);
+  const skyMat = useMemo(
+    () =>
+      createSkyMaterial(
+        bakeSky(gl, balanced ? 4096 : 2048),
+        GALAXY_ROT,
+        GALAXY.normal,
+        low ? 2 : 4,
+      ),
+    [gl, balanced, low],
+  );
+  const stars = useMemo(() => makeStars(low ? 2500 : 6000, 77, -0.04, 1, -0.02), [low]);
+  const starMat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: starVertex,
+        fragmentShader: starFragment,
+        uniforms: { uScale: { value: Math.min(dpr, 2) }, uFade: { value: 0.7 } },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    [dpr],
+  );
+  const lights = useMemo(() => makeGroundLights(low ? 1400 : 3200), [low]);
+  const lightsMat = useMemo(
+    () =>
+      new THREE.PointsMaterial({
+        size: 1.6,
+        sizeAttenuation: false,
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    [],
+  );
+  useDisposeOnUnmount(skyMat, stars, starMat, lights, lightsMat);
+  useFrame(({ camera, clock }) => {
+    skyFollow.current?.position.copy(camera.position);
+    for (const m of cloudMats.current) m.uniforms.uTime!.value = clock.elapsedTime; // ambient drift
+  });
+  // cockpit frame ← SC05 frame: v = (-p.z, p.y - 9, p.x + 31)
+  return (
+    <>
+      <group ref={skyFollow} rotation={[0, -Math.PI / 2, 0]}>
+        <mesh material={skyMat} renderOrder={-1} frustumCulled={false}>
+          <sphereGeometry args={[1500, 48, 24]} />
+        </mesh>
+        <points geometry={stars} material={starMat} frustumCulled={false} />
+      </group>
+      <group
+        position={[0, -(PAD.mountY + COCKPIT_AT[1]), -COCKPIT_AT[0]]}
+        rotation={[0, -Math.PI / 2, 0]}
+      >
+        <Pad clamps={clamps} />
+        <LaunchPad />
+        <Tower arm={arm} />
+        <points geometry={lights} material={lightsMat} frustumCulled={false} />
+        <CloudDeck layers={low ? 3 : 6} octaves={low ? 3 : 5} glow={cloudMats} />
+      </group>
+    </>
   );
 }
 
