@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import gsap from 'gsap';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { useJourneyStore } from '../../engine/store.ts';
 
@@ -137,9 +138,17 @@ const skyVertex = /* glsl */ `
 
 const baked = new Map<number, THREE.Texture>();
 
+/** Horizontal bands the bake is split into, one per tick (no single long GPU stall). */
+const BAKE_BANDS = 8;
+
 /**
  * The shared baked Milky Way (equirectangular, sRGB-encoded in 8 bits: decode with pow 2.2). SC05
  * samples it in its own sky dome. Lives for the session; never dispose it.
+ *
+ * Progressive (loader fix, 2026-11-22): the texture is returned at once and filled in afterwards.
+ * Its shader compiles off the main thread first, then one band renders per tick. Baking it in one
+ * call blocked the main thread for ~2.5 s (shader link plus a 4096 × 2048 procedural pass); it
+ * runs behind the start gate's warm-up pass, so the sky is complete before anyone sees it.
  */
 export function bakeSky(gl: THREE.WebGLRenderer, width: number): THREE.Texture {
   const hit = baked.get(width);
@@ -163,12 +172,28 @@ export function bakeSky(gl: THREE.WebGLRenderer, width: number): THREE.Texture {
   const scene = new THREE.Scene();
   scene.add(quad);
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const height = width / 2;
+  let band = 0;
+  const step = () => {
+    const prev = gl.getRenderTarget();
+    rt.scissor.set(0, (band * height) / BAKE_BANDS, width, height / BAKE_BANDS);
+    rt.scissorTest = true;
+    gl.setRenderTarget(rt);
+    gl.render(scene, cam);
+    rt.scissorTest = false;
+    gl.setRenderTarget(prev);
+    band += 1;
+    if (band < BAKE_BANDS) return;
+    gsap.ticker.remove(step);
+    quad.geometry.dispose();
+    mat.dispose();
+  };
+  // compile for the bake target (its encoding is part of the program), off the main thread
   const prev = gl.getRenderTarget();
   gl.setRenderTarget(rt);
-  gl.render(scene, cam);
+  const compiled = gl.compileAsync(scene, cam);
   gl.setRenderTarget(prev);
-  quad.geometry.dispose();
-  mat.dispose();
+  void compiled.catch(() => undefined).then(() => gsap.ticker.add(step));
   baked.set(width, rt.texture);
   return rt.texture;
 }
@@ -177,10 +202,13 @@ const SKY_RADIUS = 1900; // inside the 2 km far plane, behind every subject
 
 export function DeepSky({
   rotation = 0,
+  quaternion,
   gain = 1,
 }: {
   /** Turn about the vertical axis, so each chapter frames a different stretch of the sky. */
   rotation?: number;
+  /** A full orientation instead (the shared flight sky, chapters/space/skyFrame.ts). */
+  quaternion?: THREE.Quaternion;
   /** Overall brightness (1 = reference). */
   gain?: number;
 }) {
@@ -199,12 +227,16 @@ export function DeepSky({
     [gl, width, gain],
   );
   useDisposeOnUnmount(material);
+  const orientation = useMemo(
+    () => quaternion ?? new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotation, 0)),
+    [quaternion, rotation],
+  );
   const group = useRef<THREE.Group>(null);
   // camera-centred: the sky is at infinity, so it never parallaxes
   useFrame(({ camera }) => group.current?.position.copy(camera.position));
   return (
     <group ref={group}>
-      <mesh rotation={[0, rotation, 0]} material={material} renderOrder={-10} frustumCulled={false}>
+      <mesh quaternion={orientation} material={material} renderOrder={-10} frustumCulled={false}>
         <sphereGeometry args={[SKY_RADIUS, 64, 32]} />
       </mesh>
     </group>

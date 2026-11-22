@@ -17,6 +17,10 @@ import { createPlumeGeometry, createPlumeMaterial } from '../../shaders/plume.ts
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { seeded, starFragment, starVertex } from '../greybox/parts.tsx';
 import { GALAXY, bakeSky } from '../space/DeepSky.tsx';
+import { GALAXY_ROT, SC05_BAND, SC05_SKY } from '../space/skyFrame.ts';
+import { Starfield } from '../greybox/parts.tsx';
+import { TRAVEL_STARS } from '../handoff.ts';
+import { EARTH as SC06_EARTH, EARTH_QUAT, sunDirection } from '../sunrise/sunrise.ts';
 import { HELVELA, HelVela } from '../ship/HelVela.tsx';
 import { LaunchPad, PIT } from './LaunchPad.tsx';
 import type { EngineLevel } from '../ship/Spacecraft.tsx';
@@ -36,6 +40,8 @@ import {
   orbitEarth,
   shipPose,
   thinAir,
+  toOrbit,
+  ORBIT_EARTH_FROM_SHIP,
 } from './ascent.ts';
 
 /**
@@ -467,28 +473,6 @@ function CloudDeck({
   );
 }
 
-/**
- * The Milky Way as seen from the pad (review 2026-11-21: the reference is a Milky Way night photo).
- * The band is a great circle through a low core ahead-left of the opening shot, rising steeply to the
- * upper right. `GALAXY_ROT` turns an SC05 direction into the baked deep sky's galaxy frame.
- */
-const SC05_CORE = new THREE.Vector3(-0.5, 0.1, -0.86).normalize();
-const SC05_BAND = new THREE.Vector3()
-  .crossVectors(SC05_CORE, new THREE.Vector3(0.35, 0.93, -0.1))
-  .normalize();
-const GALAXY_ROT = (() => {
-  const frame = (n: THREE.Vector3, c: THREE.Vector3) => {
-    const cc = c
-      .clone()
-      .sub(n.clone().multiplyScalar(c.dot(n)))
-      .normalize();
-    return new THREE.Matrix4().makeBasis(n, cc, new THREE.Vector3().crossVectors(n, cc));
-  };
-  const from = frame(SC05_BAND, SC05_CORE);
-  const to = frame(GALAXY.normal.clone(), GALAXY.core.clone());
-  return new THREE.Matrix3().setFromMatrix4(to.multiply(from.transpose()));
-})();
-
 /** Camera-centred star sprites: power-law brightness, tinted, denser on the band, dimmed low down. */
 function makeStars(n: number, seed: number, yMin: number, yMax: number, horizon: number) {
   const rand = seeded(seed);
@@ -580,7 +564,26 @@ const ORBIT_ROT = (() => {
   return new THREE.Euler().setFromRotationMatrix(world.multiply(local.transpose()));
 })();
 
-function OrbitEarth({ fade }: { fade: { current: number } }) {
+/** SC06's Earth seen from this frame: its map orientation and its opening sun, turned a quarter. */
+const QUARTER = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+const SC06_QUAT = QUARTER.clone().multiply(EARTH_QUAT);
+const SC06_SUN = (() => {
+  const d: [number, number, number] = [0, 0, 0];
+  sunDirection(0, d);
+  return new THREE.Vector3(...d).applyQuaternion(QUARTER).normalize();
+})();
+const ORBIT_QUAT = new THREE.Quaternion().setFromEuler(ORBIT_ROT);
+const SCALE_END = SC06_EARTH.radius / ORBIT_EARTH.radius;
+
+function OrbitEarth({
+  fade,
+  id,
+  frame,
+}: {
+  fade: { current: number };
+  id: string;
+  frame: ChapterSceneProps['frame'];
+}) {
   const gl = useThree((s) => s.gl);
   const low = useJourneyStore((s) => s.tier !== 'balanced');
   // shared with SC06 through the loader cache (same URLs): never disposed here
@@ -604,6 +607,8 @@ function OrbitEarth({ fade }: { fade: { current: number } }) {
   }, [day, night, low]);
   useDisposeOnUnmount(earth, limb);
   const group = useRef<THREE.Group>(null);
+  const globe = useRef<THREE.Mesh>(null);
+  const tmp = useMemo(() => ({ ship: new THREE.Vector3(), end: new THREE.Vector3() }), []);
   useFrame(({ camera }) => {
     const g = group.current;
     if (!g) return;
@@ -616,13 +621,28 @@ function OrbitEarth({ fade }: { fade: { current: number } }) {
       camera.position.y - ORBIT_EARTH.radius - ORBIT_EARTH.height,
       camera.position.z,
     );
+    // orbit insertion: becomes SC06's Earth around the ship (exact at t = 1)
+    const m = frame.id === id ? toOrbit(frame.t) : 0;
+    let k = 1;
+    if (m > 0) {
+      shipPose(frame.t, tmp.ship);
+      tmp.end.set(...ORBIT_EARTH_FROM_SHIP).add(tmp.ship);
+      g.position.lerp(tmp.end, m);
+      k = 1 + (SCALE_END - 1) * m;
+    }
+    g.scale.setScalar(k);
+    globe.current?.quaternion.copy(ORBIT_QUAT).slerp(SC06_QUAT, m);
+    (earth.uniforms.uSun!.value as THREE.Vector3).copy(ORBIT_SUN).lerp(SC06_SUN, m).normalize();
+    (limb.uniforms.uSun!.value as THREE.Vector3).copy(ORBIT_SUN).lerp(SC06_SUN, m).normalize();
     (limb.uniforms.uCentre!.value as THREE.Vector3).copy(g.position);
+    limb.uniforms.uRadius!.value = ORBIT_EARTH.radius * k;
+    limb.uniforms.uH!.value = ORBIT_EARTH.radius * k * 0.0075;
     earth.uniforms.uOpacity!.value = f;
     limb.uniforms.uFade!.value = f;
   });
   return (
     <group ref={group} visible={false}>
-      <mesh rotation={ORBIT_ROT} material={earth} renderOrder={5} frustumCulled={false}>
+      <mesh ref={globe} rotation={ORBIT_ROT} material={earth} renderOrder={5} frustumCulled={false}>
         <sphereGeometry args={[ORBIT_EARTH.radius, low ? 96 : 192, low ? 64 : 128]} />
       </mesh>
       <mesh material={limb} renderOrder={6} frustumCulled={false}>
@@ -633,7 +653,21 @@ function OrbitEarth({ fade }: { fade: { current: number } }) {
 }
 
 // ── The scene ────────────────────────────────────────────────────────────────────
+const MOON_DIR = new THREE.Vector3(-30, 70, -110);
+const MOON_COLOR = new THREE.Color('#a9c2ff');
+/** SC06's earthshine ([0, -100, 40] in its frame), turned into this one. */
+const EARTHSHINE_DIR = new THREE.Vector3(40, -100, 0);
+const EARTHSHINE_COLOR = new THREE.Color('#5b7fc4');
+const FILL_SKY = new THREE.Color('#33415c');
+const FILL_GROUND = new THREE.Color('#070708');
+const SC06_SKY_COLOR = new THREE.Color('#1c2740');
+const SC06_GROUND_COLOR = new THREE.Color('#23396b');
+
 function AscentScene({ id, frame }: ChapterSceneProps) {
+  const moonLight = useRef<THREE.DirectionalLight>(null);
+  const fill = useRef<THREE.HemisphereLight>(null);
+  const flightSky = useRef<THREE.Group>(null);
+  const flightStars = useMemo(() => ({ current: 0 }), []);
   const low = useJourneyStore((s) => s.tier === 'low');
   useLaunchEnvironment();
 
@@ -653,16 +687,18 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
   const gl = useThree((s) => s.gl);
   const balanced = useJourneyStore((s) => s.tier === 'balanced');
   // the shared Milky Way bake (session-lifetime, owned by DeepSky: never disposed here)
-  const skyMat = useMemo(
-    () =>
-      createSkyMaterial(
-        bakeSky(gl, balanced ? 4096 : 2048),
-        GALAXY_ROT,
-        GALAXY.normal,
-        low ? 2 : 4,
-      ),
-    [gl, balanced, low],
-  );
+  const skyMat = useMemo(() => {
+    const m = createSkyMaterial(
+      bakeSky(gl, balanced ? 4096 : 2048),
+      GALAXY_ROT,
+      GALAXY.normal,
+      low ? 2 : 4,
+    );
+    // fades over the shared flight sky at the top of the climb (it sits behind, at 1.9 km)
+    m.transparent = true;
+    m.depthWrite = false;
+    return m;
+  }, [gl, balanced, low]);
   const dpr = useThree((s) => s.viewport.dpr);
   const plumeMat = useMemo(() => createPlumeMaterial(low), [low]);
   const glowMat = useMemo(() => createPlumeMaterial(low, true), [low]);
@@ -800,6 +836,24 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
     lowStarMat.uniforms.uFade!.value = orb;
     starMat.uniforms.uFade!.value = 0.7 + 0.3 * thin;
     skyMat.uniforms.uGalaxyGain!.value = 1.6 + 0.6 * thin;
+    // orbit insertion: the shared flight sky (behind the dome) and its stars take over
+    const hand = toOrbit(t);
+    skyMat.uniforms.uAlpha!.value = 1 - hand;
+    starMat.uniforms.uFade!.value *= 1 - hand;
+    lowStarMat.uniforms.uFade!.value *= 1 - hand;
+    flightStars.current = hand;
+    if (flightSky.current) flightSky.current.visible = hand > 0.001;
+    // the ship's light turns into SC06's opening light: earthshine from below, a cool fill
+    if (moonLight.current) {
+      moonLight.current.position.copy(MOON_DIR).lerp(EARTHSHINE_DIR, hand);
+      moonLight.current.intensity = 2.6 + (0.9 - 2.6) * hand;
+      moonLight.current.color.copy(MOON_COLOR).lerp(EARTHSHINE_COLOR, hand);
+    }
+    if (fill.current) {
+      fill.current.color.copy(FILL_SKY).lerp(SC06_SKY_COLOR, hand);
+      fill.current.groundColor.copy(FILL_GROUND).lerp(SC06_GROUND_COLOR, hand);
+      fill.current.intensity = 0.28 + (0.5 - 0.28) * hand;
+    }
     // settlements vanish under the deck once the camera is above it (they glittered through it)
     lightsMat.opacity =
       1 - 0.9 * Math.min(1, Math.max(0, (camera.position.y - CLOUDS.bottom) / 160));
@@ -807,6 +861,10 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
 
   return (
     <group>
+      {/* the shared flight sky, revealed as the dome fades (orbit insertion) */}
+      <group ref={flightSky} visible={false}>
+        <Starfield {...TRAVEL_STARS} follow orient={SC05_SKY} fade={flightStars} />
+      </group>
       <group ref={sky}>
         <mesh material={skyMat} renderOrder={-1} frustumCulled={false}>
           <sphereGeometry args={[1500, 48, 24]} />
@@ -817,8 +875,13 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
 
       {/* low fill so the shadow side stays dark; the moon sits behind the pad as a cool rim light,
           the floods and the engine glow are the warm keys (contrast, not even grey) */}
-      <hemisphereLight args={['#33415c', '#070708', 0.28]} />
-      <directionalLight position={[-30, 70, -110]} intensity={2.6} color="#a9c2ff" />
+      <hemisphereLight ref={fill} args={['#33415c', '#070708', 0.28]} />
+      <directionalLight
+        ref={moonLight}
+        position={[-30, 70, -110]}
+        intensity={2.6}
+        color="#a9c2ff"
+      />
       <Flood position={[44, 16, 22]} intensity={3600} />
       <Flood position={[-46, 16, 24]} intensity={3200} />
       <pointLight ref={plumeLight} color="#ff9a52" intensity={0} distance={0} decay={2} />
@@ -874,7 +937,7 @@ function AscentScene({ id, frame }: ChapterSceneProps) {
 
       <Smoke count={low ? 90 : 220} t={story} />
       <CloudDeck layers={low ? 3 : 6} octaves={low ? 3 : 5} glow={clouds} />
-      <OrbitEarth fade={orbit} />
+      <OrbitEarth fade={orbit} id={id} frame={frame} />
     </group>
   );
 }
@@ -903,5 +966,6 @@ export const sc05Ascent: ChapterImpl = {
   shot: (t, out, aspect) => ascentShot(t, out, REDUCED_MOTION_FLAG, aspect),
   portraitShift: 0, // no text in SC05: keep the ship centred
   background: '#050912',
-  environment: { key: 'launch-night', intensity: 0.6 },
+  // the launch IBL lets go as the ship reaches orbit (SC06 has none)
+  environment: { key: 'launch-night', intensity: (t: number) => 0.6 * (1 - toOrbit(t)) },
 };

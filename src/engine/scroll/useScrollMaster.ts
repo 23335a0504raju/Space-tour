@@ -26,8 +26,11 @@ export interface ScrollMaster {
 }
 
 export interface ScrollMasterOptions {
-  /** Seconds the playhead takes to catch up with the scrollbar (the ONE smoothing layer). */
-  readonly scrub: number;
+  /**
+   * Seconds the playhead takes to catch up with the scrollbar, or `true` to follow it directly
+   * (the journey: the wheel follower is then the one smoothing layer).
+   */
+  readonly scrub: number | true;
 }
 
 /**

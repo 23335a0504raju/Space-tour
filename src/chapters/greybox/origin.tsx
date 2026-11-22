@@ -1,6 +1,8 @@
-import { Suspense, useRef } from 'react';
+import { Suspense, useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Astronaut } from '../astronaut/Astronaut.tsx';
+import { LiftDoor } from '../room/LiftDoor.tsx';
+import { LIFT } from '../room/layout.ts';
 import type { AstronautApi, Drive } from '../astronaut/Astronaut.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { RoomSet } from '../room/RoomSet.tsx';
@@ -11,6 +13,7 @@ import {
   chairPose,
   clamp01,
   departureShot,
+  doorOpen,
   liftLight,
   roomShot,
   span,
@@ -78,8 +81,10 @@ const departureDrive: Drive = (t, api, body, elapsed) => {
 
 function DepartureScene({ id, frame }: ChapterSceneProps) {
   const set = useRef<RoomSetHandle>(null);
+  const door = useMemo(() => ({ current: 1 }), []);
   useFrame(() => {
     if (frame.id !== id || !set.current) return;
+    door.current = doorOpen(frame.t);
     set.current.setLift(liftLight(frame.t));
     const c = chairPose(frame.t);
     set.current.setChair(c.x, c.z, c.rotY);
@@ -89,6 +94,8 @@ function DepartureScene({ id, frame }: ChapterSceneProps) {
       <Suspense fallback={<StandIn position={SEAT} rotation={[0, Math.PI, 0]} />}>
         <Astronaut chapterId={id} frame={frame} drive={departureDrive} />
       </Suspense>
+      {/* the lift door, in its doorway, its face to the east (where the camera ends) */}
+      <LiftDoor position={[LIFT.x, LIFT.y, LIFT.z]} rotationY={Math.PI / 2} open={door} />
     </RoomSet>
   );
 }

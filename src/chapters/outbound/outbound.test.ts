@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createShotState } from '../../engine/camera/shots.ts';
-import { BELT, MARS, MOON, TRAVEL, outboundShot, shipZ } from './outbound.ts';
+import { BELT, END_Z, MARS, MOON, TRAVEL, outboundShot, shipZ } from './outbound.ts';
 
 describe('SC07 outbound maths', () => {
   it('the ship flies the full route and clamps outside [0,1]', () => {
     expect(shipZ(0)).toBe(-0);
-    expect(shipZ(1)).toBe(-TRAVEL);
-    expect(shipZ(2)).toBe(-TRAVEL);
+    expect(shipZ(1)).toBe(END_Z);
+    expect(shipZ(2)).toBe(END_Z);
+    // it ends past the belt, in open space
+    expect(END_Z).toBeLessThan(BELT.centre[2] - BELT.spread[2]);
+    expect(shipZ(0.9)).toBe(-0.9 * TRAVEL);
   });
   it('passes close to the Moon, then Mars, then reaches the belt, in order', () => {
     const z = (b: { position: readonly number[] }) => b.position[2] ?? 0;

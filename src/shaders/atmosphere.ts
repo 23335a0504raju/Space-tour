@@ -41,6 +41,8 @@ export function createSkyMaterial(
       uBandN: { value: bandNormal },
       /** sine of how far the horizon has dropped (SC05's curved planet at the top of the climb) */
       uDip: { value: 0 },
+      /** opacity: SC05 lets the shared flight sky (behind it) take over at the top of the climb */
+      uAlpha: { value: 1 },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -51,7 +53,7 @@ export function createSkyMaterial(
     `,
     fragmentShader: /* glsl */ `
       uniform vec3 uHorizon; uniform vec3 uZenith; uniform float uThin;
-      uniform sampler2D uGalaxy; uniform mat3 uGalaxyRot; uniform float uGalaxyGain; uniform vec3 uBandN; uniform float uDip;
+      uniform sampler2D uGalaxy; uniform mat3 uGalaxyRot; uniform float uGalaxyGain; uniform vec3 uBandN; uniform float uDip; uniform float uAlpha;
       varying vec3 vDir;
       float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       float n3(vec3 x) {
@@ -109,7 +111,7 @@ export function createSkyMaterial(
         // half-step dither: the dark gradients band on 8-bit displays
         float r = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
         col += (r - 0.5) / 255.0;
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(col, uAlpha);
         #include <colorspace_fragment>
       }
     `,

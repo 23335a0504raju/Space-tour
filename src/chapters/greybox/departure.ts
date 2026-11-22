@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { sampleKeys } from '../../engine/camera/shots.ts';
 import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
 import { CHAIR_REST, LIFT, PLATFORM, SEAT } from '../room/layout.ts';
+import { DOOR_VIEW } from '../room/doorView.ts';
 
 /**
  * SC03 Departure motion: every value here is a pure function of story time t, so scrolling back
@@ -14,7 +15,14 @@ const easeInOutSine = (x: number) => -(Math.cos(Math.PI * clamp01(x)) - 1) / 2;
 
 /** Story-time windows. */
 export const STAND = { start: 0.04, end: 0.26 } as const;
-export const WALK = { start: 0.26, end: 0.96 } as const;
+export const WALK = { start: 0.26, end: 0.86 } as const;
+/**
+ * The lift (lift → cockpit join): he walks a step inside, the door slides shut behind him, and the
+ * camera closes in until the door fills the frame (exactly as SC04 opens on the same door).
+ */
+export const LIFT_INSIDE = { x: LIFT.x - 0.55, z: LIFT.z } as const;
+export const DOOR_SHUT = { start: 0.88, end: 0.95 } as const;
+export const doorOpen = (t: number) => 1 - span(t, DOOR_SHUT.start, DOOR_SHUT.end);
 
 /**
  * The chair is pushed back from the desk while the astronaut stands, so the body never shares
@@ -60,6 +68,7 @@ export const PATH_POINTS: ReadonlyArray<readonly [number, number, number]> = [
   [-4.25, -8.15, 0],
   [-4.3, -8.65, 0],
   [LIFT.x, LIFT.z, LIFT.y],
+  [LIFT.x - 0.55, LIFT.z, LIFT.y],
 ];
 const PATH = new THREE.CatmullRomCurve3(
   PATH_POINTS.map(([x, z, y]) => new THREE.Vector3(x, y, z)),
@@ -124,9 +133,15 @@ export const departureKeys: ShotKey[] = [
   // follow them up onto the platform and walk behind them along it to the lift (the console
   // block beside the platform hid them from the deck)
   { t: 0.82, position: [-5.2, 2.05, -3.4], target: [-5.3, 1.8, -7.0], fov: 52 },
-  // over the north stairs to the deck east of the lift, looking straight into its doorway
-  { t: 0.92, position: [-4.0, 2.0, -7.0], target: [-4.6, 1.3, -8.6], fov: 52 },
-  { t: 1, position: [-3.0, 1.75, -7.6], target: [-5.6, 1.3, -8.8], fov: 50 },
+  // over the north stairs to the deck east of the lift, looking into its doorway
+  { t: 0.9, position: [-3.5, 1.9, -7.6], target: [-4.9, 1.4, -8.8], fov: 50 },
+  // the door shuts; the camera closes in until it fills the frame (SC04 opens on the same view)
+  {
+    t: 1,
+    position: [LIFT.x + DOOR_VIEW.distance, DOOR_VIEW.height, LIFT.z],
+    target: [LIFT.x, DOOR_VIEW.height, LIFT.z],
+    fov: DOOR_VIEW.fov,
+  },
 ];
 
 /** How much the camera aims at the walker instead of the keyed target. */

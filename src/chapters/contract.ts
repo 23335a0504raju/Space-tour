@@ -51,5 +51,9 @@ export interface ChapterImpl {
   /** Colour of the dip when leaving this chapter (default black; white for the door → hatch cut). */
   readonly exitColor?: string;
   /** Image-based lighting registered via engine/environment.ts (applied by the Director). */
-  readonly environment?: { readonly key: string; readonly intensity: number };
+  readonly environment?: {
+    readonly key: string;
+    /** A number, or a function of story time t (SC05 lets its IBL go as it reaches orbit). */
+    readonly intensity: number | ((t: number) => number);
+  };
 }

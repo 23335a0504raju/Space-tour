@@ -28,12 +28,10 @@ export function readDeviceSignals(): DeviceSignals {
     deviceMemory?: number;
     connection?: { saveData?: boolean };
   };
-  let webgl2: boolean;
-  try {
-    webgl2 = Boolean(document.createElement('canvas').getContext('webgl2'));
-  } catch {
-    webgl2 = false;
-  }
+  // The API's presence, not a probe context: creating a throwaway WebGL2 context froze the page
+  // for ~0.6 s at start-up (profile, 2026-11-22). A context that later fails is reported by the
+  // canvas itself (webgl status 'lost').
+  const webgl2 = typeof WebGL2RenderingContext !== 'undefined';
   return {
     webgl2,
     deviceMemoryGb: nav.deviceMemory ?? null,

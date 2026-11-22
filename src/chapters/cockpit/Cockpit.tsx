@@ -3,9 +3,21 @@ import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { useJourneyStore } from '../../engine/store.ts';
 import { sampleKeys } from '../../engine/camera/shots.ts';
 import type { ShotKey } from '../../engine/camera/shots.ts';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Astronaut as Crew } from '../astronaut/Astronaut.tsx';
+import { LiftDoor } from '../room/LiftDoor.tsx';
+import {
+  ARRIVAL,
+  COCKPIT_DOOR,
+  PILOT_SEAT,
+  arrivalAt,
+  arrivalDistance,
+  arrivalKeys,
+  doorOpen,
+  span,
+} from './arrival.ts';
 import type { Drive } from '../astronaut/Astronaut.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Astronaut as StandIn, seeded, Starfield } from '../greybox/parts.tsx';
@@ -398,16 +410,61 @@ function TowerView() {
   );
 }
 
-const PILOT_SEAT: [number, number, number] = [-0.5, 0.06, -0.12];
-
-/** Seated in the left seat; the sitting-idle loop is ambient (wall-clock). */
-const pilotDrive: Drive = (_t, api, body, elapsed) => {
-  body.position.set(PILOT_SEAT[0], PILOT_SEAT[1], PILOT_SEAT[2]);
-  body.rotation.set(0, Math.PI, 0);
-  api.set('sitIdle', elapsed % api.duration('sitIdle'), 1);
+/**
+ * Out of the lift, round the seat and down into it (arrival.ts), then seated; the sitting-idle loop
+ * is ambient (wall-clock). Clip weights cross-fade in story time, so reversing is exact.
+ */
+const seatTurn = new THREE.Vector3();
+const pilotDrive: Drive = (t, api, body, elapsed) => {
+  const heading = arrivalAt(t, body.position);
+  const toWalk = span(t, ARRIVAL.walk[0], ARRIVAL.walk[0] + 0.02);
+  const toSit = span(t, ARRIVAL.sit[0] - 0.01, ARRIVAL.sit[0] + 0.01);
+  const toIdle = span(t, ARRIVAL.sit[1] - 0.01, ARRIVAL.sit[1] + 0.02);
+  // standing in the lift (the stand-up clip's last pose), then walking (foot-locked)
+  api.set('standUp', api.duration('standUp'), (1 - toWalk) * (1 - toSit));
+  const d = arrivalDistance(t);
+  const walkTime = api.walkSpeed > 0 ? (d / api.walkSpeed) % api.duration('walk') : 0;
+  api.set('walk', walkTime, toWalk * (1 - toSit));
+  // turn to face the console and lower into the seat
+  const sitK = span(t, ARRIVAL.sit[0], ARRIVAL.sit[1]);
+  api.set('sitDown', sitK * api.duration('sitDown'), toSit * (1 - toIdle));
+  api.set('sitIdle', elapsed % api.duration('sitIdle'), toIdle);
+  const turn = span(t, ARRIVAL.sit[0] - 0.01, ARRIVAL.sit[0] + 0.03);
+  const dh = Math.atan2(Math.sin(Math.PI - heading), Math.cos(Math.PI - heading));
+  body.rotation.set(0, heading + dh * turn, 0);
+  if (sitK > 0) {
+    seatTurn.set(...PILOT_SEAT);
+    body.position.lerp(seatTurn, sitK);
+  }
 };
 
+/** The lift cab behind the rear bulkhead: a small lit box he steps out of. */
+function LiftCab() {
+  return (
+    <group position={[0.9, 0, 2.12]}>
+      <mesh position={[0, 1.2, 0]}>
+        <boxGeometry args={[1.1, 2.4, 1.04]} />
+        <meshStandardMaterial
+          color="#c9d0da"
+          roughness={0.55}
+          metalness={0.3}
+          side={THREE.BackSide}
+        />
+      </mesh>
+      <mesh position={[0, 2.38, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.8, 0.6]} />
+        <meshBasicMaterial color={new THREE.Color(2.2, 2.3, 2.5)} toneMapped={false} />
+      </mesh>
+      <pointLight position={[0, 2.1, 0]} color="#e8f0ff" intensity={2.4} distance={3} decay={2} />
+    </group>
+  );
+}
+
 function CockpitScene({ id, frame }: ChapterSceneProps) {
+  const door = useMemo(() => ({ current: 0 }), []);
+  useFrame(() => {
+    if (frame.id === id) door.current = doorOpen(frame.t);
+  });
   const shadows = useJourneyStore((s) => s.tier === 'balanced');
   const hull = useCabinSurface('wall', [5, 3], '#4a515c');
   const deck = useCabinSurface('floor', [4, 3], '#9aa0aa');
@@ -431,9 +488,18 @@ function CockpitScene({ id, frame }: ChapterSceneProps) {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -0.1]} material={deck} receiveShadow>
         <planeGeometry args={[3.6, 3.4]} />
       </mesh>
-      <mesh position={[0, 1.4, 1.6]} rotation={[0, Math.PI, 0]} material={hull}>
-        <planeGeometry args={[3.8, 2.8]} />
+      {/* rear bulkhead, with the lift doorway x ∈ [0.35, 1.45], y ∈ [0, 2.3] */}
+      <mesh position={[-0.775, 1.4, 1.6]} rotation={[0, Math.PI, 0]} material={hull}>
+        <planeGeometry args={[2.25, 2.8]} />
       </mesh>
+      <mesh position={[1.675, 1.4, 1.6]} rotation={[0, Math.PI, 0]} material={hull}>
+        <planeGeometry args={[0.45, 2.8]} />
+      </mesh>
+      <mesh position={[0.9, 2.55, 1.6]} rotation={[0, Math.PI, 0]} material={hull}>
+        <planeGeometry args={[1.1, 0.5]} />
+      </mesh>
+      <LiftCab />
+      <LiftDoor position={COCKPIT_DOOR} rotationY={Math.PI} open={door} />
 
       {/* front bulkhead with the windscreen opening x ∈ [-1.25, 1.25], y ∈ [1.4, 2.15] */}
       <mesh position={[0, 0.65, -1.75]}>
@@ -587,8 +653,8 @@ function CockpitScene({ id, frame }: ChapterSceneProps) {
 }
 
 const cockpitKeys: ShotKey[] = [
-  // through the hatch from behind the seats
-  { t: 0, position: [0.9, 1.7, 2.0], target: [0.05, 0.95, -1.0], fov: 52 },
+  // the lift door (SC03's last frame), the arrival, the seat (arrival.ts)
+  ...arrivalKeys,
   // over the shoulder onto the Experience screen (camera line checked to clear the astronaut's head)
   { t: 0.35, position: [0.35, 1.75, 0.45], target: [-0.75, 1.11, -1.31], fov: 40 },
   // across to the Education screen (clears the astronaut and the empty seat back)

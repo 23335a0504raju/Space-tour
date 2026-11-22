@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { DeepSky, GALAXY } from '../space/DeepSky.tsx';
@@ -62,17 +62,31 @@ export const starFragment = /* glsl */ `
  * a few bright with spikes), colours run from blue-white to warm, and density rises toward the
  * galactic band. Additive point sprites: one draw call.
  */
+const IDENTITY = new THREE.Quaternion();
+
 export function Starfield({
   count = 8000,
   radius = 400,
   seed = 1,
   sky = true,
+  follow = false,
+  orient,
+  fade,
 }: {
   count?: number;
   radius?: number;
   seed?: number;
   /** Draw the deep-sky backdrop behind the stars (off where a chapter has its own sky). */
   sky?: boolean;
+  /**
+   * Stars at infinity: they move with the camera (no parallax), so chapters that share a seed show
+   * the very same stars at a boundary (handoff.ts).
+   */
+  follow?: boolean;
+  /** Orientation of the stars and the deep sky (the shared flight sky, skyFrame.ts). */
+  orient?: THREE.Quaternion;
+  /** Star brightness 0..1, read every frame (SC05 brings the flight stars in over its own). */
+  fade?: { current: number };
 }) {
   const geometry = useMemo(() => {
     const rand = seeded(seed);
@@ -124,10 +138,19 @@ export function Starfield({
     [dpr],
   );
   useDisposeOnUnmount(geometry, material);
+  const holder = useRef<THREE.Group>(null);
+  useFrame(({ camera }) => {
+    if (follow) holder.current?.position.copy(camera.position);
+    if (fade) material.uniforms.uFade!.value = fade.current;
+  });
   return (
     <>
-      {sky && <DeepSky rotation={((seed % 5) - 2) * 0.14} />}
-      <points geometry={geometry} material={material} frustumCulled={false} />
+      {sky && (
+        <DeepSky rotation={((seed % 5) - 2) * 0.14} {...(orient ? { quaternion: orient } : {})} />
+      )}
+      <group ref={holder} quaternion={orient ?? IDENTITY}>
+        <points geometry={geometry} material={material} frustumCulled={false} />
+      </group>
     </>
   );
 }

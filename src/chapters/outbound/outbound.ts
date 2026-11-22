@@ -1,5 +1,8 @@
 import { sampleKeys } from '../../engine/camera/shots.ts';
 import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
+import { CHASE_06_07, carry } from '../handoff.ts';
+import type { Vec3 } from '../handoff.ts';
+import { JUPITER, SHIP_START as JUPITER_SHIP_START } from '../jupiter/jupiter.ts';
 
 /**
  * SC07 Outbound story maths (no React/three scene code; unit-tested). The ship flies down -z at a
@@ -7,7 +10,20 @@ import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
  * pure function of t, so reverse scrolling is exact.
  */
 export const TRAVEL = 1000;
-export const shipZ = (t: number) => -Math.min(1, Math.max(0, t)) * TRAVEL;
+/**
+ * Out of the belt the ship speeds up toward Jupiter (handoff.ts): an extra run over the last
+ * tenth, so the chapter ends in open space with Jupiter growing ahead, never mid-belt.
+ */
+export const EXIT = { from: 0.9, extra: 250 } as const;
+export function shipZ(t: number): number {
+  const c = Math.min(1, Math.max(0, t));
+  const k = Math.max(0, (c - EXIT.from) / (1 - EXIT.from));
+  return -c * TRAVEL - k * k * EXIT.extra;
+}
+export const END_Z = shipZ(1);
+/** Jupiter ahead: SC08's Jupiter carried into this frame by the ship's position at the boundary. */
+export const JUPITER_AHEAD: Vec3 = carry([0, 0, END_Z], JUPITER.position, JUPITER_SHIP_START);
+export const JUPITER_RADIUS = JUPITER.radius;
 
 /** Earth, left behind: seen over the bow at the start. Lit from the ship's side (its own sun). */
 export const EARTH = { radius: 240, position: [-60, -250, 380] as const } as const;
@@ -22,11 +38,13 @@ export const SUN = [0.55, 0.35, 0.75] as const;
 
 /** Camera offsets relative to the ship (position, then look-at offset). */
 const rel: ShotKey[] = [
-  // look back over the bow: the ship and the whole lit Earth shrinking behind it
-  { t: 0, position: [12, 4, -35], target: [-30, -60, 200], fov: 50 },
+  // SC06's departure chase (handoff.ts): below-behind, looking up past the ship
+  { t: 0, ...CHASE_06_07 },
+  // swing round to look back over the bow: the ship and the whole lit Earth shrinking behind it
+  { t: 0.045, position: [12, 4, -35], target: [-30, -60, 200], fov: 50 },
   // swing abeam, then settle into the chase camera (behind and above, looking ahead)
-  { t: 0.035, position: [38, 8, 2], target: [0, -10, 60], fov: 50 },
-  { t: 0.09, position: [14, 6, 46], target: [-10, 0, -80], fov: 54 },
+  { t: 0.08, position: [38, 8, 2], target: [0, -10, 60], fov: 50 },
+  { t: 0.11, position: [14, 6, 46], target: [-10, 0, -80], fov: 54 },
   // Moon pass: it grows ahead on the left, then sweeps past the port side
   { t: 0.15, position: [12, 6, 42], target: [-22, -2, -70], fov: 56 },
   { t: 0.19, position: [12, 6, 40], target: [-34, -4, -34], fov: 58 },

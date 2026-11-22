@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { createShotState } from '../../engine/camera/shots.ts';
 import { DESK, LIFT, PIT, PLATFORM } from '../room/layout.ts';
-import { WALK, chairPose, departureShot, liftLight, walkerAt } from './departure.ts';
+import { LIFT_INSIDE, WALK, chairPose, departureShot, liftLight, walkerAt } from './departure.ts';
 
 /** Chair footprint in its own frame (Poly Haven modern_arm_chair_01 bounds, metres). */
 const CHAIR_LOCAL = { minX: -0.41, maxX: 0.41, minZ: -0.575, maxZ: 0.41 };
@@ -49,9 +49,9 @@ describe('SC03 departure motion', () => {
     expect(min).toBeGreaterThan(1.0);
   });
 
-  it('ends standing on the lift platform, with its light full only at the end', () => {
+  it('ends inside the lift, with its light full only at the end', () => {
     walkerAt(1, p);
-    expect(Math.hypot(p.x - LIFT.x, p.z - LIFT.z)).toBeLessThan(0.05);
+    expect(Math.hypot(p.x - LIFT_INSIDE.x, p.z - LIFT_INSIDE.z)).toBeLessThan(0.05);
     expect(liftLight(1)).toBe(1);
     for (const t of samples(0, WALK.start + 0.3)) expect(liftLight(t)).toBe(0);
   });

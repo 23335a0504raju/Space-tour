@@ -21,9 +21,13 @@ import {
   MERCURY,
   MOON,
   SUN,
+  JUPITER_AHEAD,
+  JUPITER_RADIUS,
   outboundShot,
   shipZ,
 } from './outbound.ts';
+import { TRAVEL_STARS, jupiterTurn } from '../handoff.ts';
+import { TRAVEL_SKY } from '../space/skyFrame.ts';
 
 /** SC07 · Outbound (FINAL_STORYLINE SC07): Moon pass, Mars sweep, the belt. NASA textures A023/A025. */
 const TEX = {
@@ -31,6 +35,7 @@ const TEX = {
   mars: '/assets/textures/mars_2k.ktx2',
   day: '/assets/textures/earth_day_2k.ktx2',
   night: '/assets/textures/earth_night_2k.ktx2',
+  jupiter: '/assets/textures/jupiter_2k.ktx2',
 } as const;
 const ENGINE = { current: 0.45 };
 const SUN_POS = new THREE.Vector3(...SUN).normalize().multiplyScalar(200);
@@ -39,20 +44,25 @@ const SPREAD: [number, number, number] = [...BELT.spread];
 function OutboundScene({ id, frame }: ChapterSceneProps) {
   const gl = useThree((s) => s.gl);
   const low = useJourneyStore((s) => s.tier !== 'balanced');
-  const [moonMap, marsMap, dayMap, nightMap] = useLoader(getKTX2Loader(gl), [
+  const [moonMap, marsMap, dayMap, nightMap, jupiterMap] = useLoader(getKTX2Loader(gl), [
     TEX.moon,
     TEX.mars,
     TEX.day,
     TEX.night,
+    TEX.jupiter,
   ]);
   useLayoutEffect(() => {
-    for (const t of [moonMap, marsMap, dayMap, nightMap]) {
+    for (const t of [moonMap, marsMap, dayMap, nightMap, jupiterMap]) {
       if (t) {
         t.colorSpace = THREE.SRGBColorSpace;
         t.anisotropy = 4;
       }
     }
-  }, [moonMap, marsMap, dayMap, nightMap]);
+  }, [moonMap, marsMap, dayMap, nightMap, jupiterMap]);
+  const jupiterHaze = useMemo(() => createRimMaterial('#f0cfa0', 0.45, 2.4), []);
+  useDisposeOnUnmount(jupiterHaze);
+  const jupiter = useRef<THREE.Mesh>(null);
+  const jupiterRim = useRef<THREE.Mesh>(null);
   const { earth, earthAtmo } = useMemo(() => {
     if (!dayMap || !nightMap) throw new Error('SC07: Earth textures missing');
     const e = createEarthMaterial(dayMap, nightMap, low);
@@ -68,7 +78,20 @@ function OutboundScene({ id, frame }: ChapterSceneProps) {
   const ship = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
   const sunTarget = useMemo(() => new THREE.Object3D(), []);
-  useFrame(() => {
+  useFrame(({ clock, camera }) => {
+    const j = jupiter.current;
+    if (j) {
+      j.rotation.y = jupiterTurn(clock.elapsedTime);
+      // Jupiter waits beyond the belt: hidden until its near side is well inside the 2 km far plane,
+      // then it brightens out of the dark as the ship closes in (it used to show, clipped, at Mars)
+      const near = camera.position.distanceTo(j.position) - JUPITER_RADIUS;
+      const k = Math.min(1, Math.max(0, (1550 - near) / 350));
+      const m = j.material as THREE.MeshStandardMaterial;
+      m.opacity = k;
+      m.transparent = k < 1;
+      j.visible = k > 0.001;
+      if (jupiterRim.current) jupiterRim.current.visible = k > 0.999;
+    }
     if (frame.id !== id) return;
     const z = shipZ(frame.t);
     ship.current?.position.set(0, 0, z);
@@ -78,7 +101,7 @@ function OutboundScene({ id, frame }: ChapterSceneProps) {
   });
   return (
     <group>
-      <Starfield count={7000} radius={1500} seed={41} />
+      <Starfield {...TRAVEL_STARS} follow orient={TRAVEL_SKY} />
       <directionalLight ref={light} target={sunTarget} color="#fff2e0" intensity={3.4} />
       <primitive object={sunTarget} />
       <hemisphereLight args={['#33415f', '#08090d', 0.12]} />
@@ -106,6 +129,14 @@ function OutboundScene({ id, frame }: ChapterSceneProps) {
       <group position={[...BELT.centre]}>
         <Belt count={low ? 130 : 520} spread={SPREAD} seed={9} low={low} />
       </group>
+      {/* Jupiter ahead, beyond the belt: where SC08 has it from the ship (handoff.ts) */}
+      <mesh ref={jupiter} position={[...JUPITER_AHEAD]} rotation={[0.12, 0.6, 0.05]}>
+        <sphereGeometry args={[JUPITER_RADIUS, low ? 64 : 128, low ? 48 : 96]} />
+        <meshStandardMaterial map={jupiterMap ?? null} roughness={1} metalness={0} />
+      </mesh>
+      <mesh ref={jupiterRim} position={[...JUPITER_AHEAD]} material={jupiterHaze}>
+        <sphereGeometry args={[JUPITER_RADIUS * 1.05, 48, 32]} />
+      </mesh>
       <HelVela ref={ship} engine={ENGINE} rotation={[0, -Math.PI / 2, 0]} />
     </group>
   );

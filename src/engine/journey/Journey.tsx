@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Bloom, EffectComposer, SMAA, ToneMapping, wrapEffect } from '@react-three/postprocessing';
+import type { EffectComposer as EffectComposerImpl } from 'postprocessing';
 import { StyleBlendEffect } from '../../shaders/styleBlend.ts';
 import { LensEffect } from '../../shaders/lens.ts';
 import { ToneMappingMode } from 'postprocessing';
@@ -32,10 +33,16 @@ import { ScrollTrack } from '../scroll/ScrollTrack.tsx';
 import { usePacedWheel } from '../scroll/usePacedWheel.ts';
 import { useScrollMaster } from '../scroll/useScrollMaster.ts';
 import { preloadJourney } from '../assets/preload.ts';
+import { compileChapter } from '../assets/warm.ts';
 import { useJourneyStore } from '../store.ts';
 import styles from './Journey.module.css';
 
-const SCRUB_SECONDS = 0.35;
+/**
+ * No second smoothing layer: the wheel follower (pacing.ts) is the one ease, and the story follows
+ * the page directly, as on the reference site (Lenis + direct scrub). The old 0.35 s scrub on top of
+ * the wheel ease made motion lag and float (scroll fix, 2026-11-22).
+ */
+const SCRUB = true;
 /** Chapters kept mounted around the active one (lifecycle "warm" window). */
 const WARM_WINDOW = 1;
 /** Slow networks: stop waiting for the full download after this and stream the rest. */
@@ -112,15 +119,73 @@ function ToneMappingOwner({ composer }: { composer: boolean }) {
   return null;
 }
 
-/** Mounts one chapter's scene, registers its group with the Director and precompiles shaders. */
+/**
+ * Before the first frame is drawn, compile the whole scene as it will be drawn (off the main
+ * thread), then report ready. Drawing it straight away linked every shader of the first scene
+ * synchronously: a 1.2 s freeze of the start gate when its title appeared.
+ */
+function FirstFrame({
+  when,
+  links,
+  drawTarget,
+  onReady,
+}: {
+  when: boolean;
+  links: DirectorLinks;
+  drawTarget: () => THREE.WebGLRenderTarget | null;
+  onReady: () => void;
+}) {
+  const { gl, camera, scene } = useThree();
+  useEffect(() => {
+    if (!when) return;
+    let live = true;
+    const done = () => live && onReady();
+    // a slow driver must not keep the scene hidden: draw anyway after a while
+    const giveUp = window.setTimeout(done, 4000);
+    // as the Director will show it: only the active chapter visible
+    const active = chapters[useJourneyStore.getState().activeIndex]?.id;
+    const saved = new Map<THREE.Group, boolean>();
+    for (const [id, g] of links.groups) {
+      saved.set(g, g.visible);
+      g.visible = id === active;
+    }
+    const previous = gl.getRenderTarget();
+    gl.setRenderTarget(drawTarget());
+    const pending = gl.compileAsync(scene, camera);
+    gl.setRenderTarget(previous);
+    for (const [g, v] of saved) g.visible = v;
+    void pending.catch(() => undefined).then(done);
+    return () => {
+      live = false;
+      window.clearTimeout(giveUp);
+    };
+  }, [when, gl, camera, scene, links, drawTarget, onReady]);
+  return null;
+}
+
+/** Runs `onCommit` once its Suspense boundary has committed (the scene's content exists). */
+function Committed({ onCommit }: { onCommit: () => void }) {
+  useEffect(() => onCommit(), [onCommit]);
+  return null;
+}
+
+/**
+ * Mounts one chapter's scene and registers its group with the Director. Once the scene's content
+ * is in (after its Suspense boundary resolves), its shaders compile off the main thread and its
+ * textures upload, while it is still hidden in the warm window. (Compiling on mount, as before, compiled an empty
+ * group: the shaders then linked synchronously on the chapter's first frame.)
+ */
 function ChapterSlot({
   id,
   frame,
   links,
+  drawTarget,
 }: {
   id: string;
   frame: JourneyFrame;
   links: DirectorLinks;
+  /** Where the scene is really drawn (the post chain's input buffer), so shaders compile for it. */
+  drawTarget: () => THREE.WebGLRenderTarget | null;
 }) {
   const ref = useRef<THREE.Group>(null);
   const { gl, camera, scene } = useThree();
@@ -130,14 +195,25 @@ function ChapterSlot({
     const group = ref.current;
     if (!group) return;
     links.groups.set(id, group);
-    // compile() skips invisible objects, so show the group just for the synchronous part.
-    group.visible = true;
-    gl.compileAsync(group, camera, scene).catch(() => undefined);
     group.visible = frame.id === id;
     return () => {
       links.groups.delete(id);
     };
-  }, [id, gl, camera, scene, links, frame]);
+  }, [id, links, frame]);
+
+  const compile = useCallback(() => {
+    const group = ref.current;
+    if (!group) return;
+    let live = true;
+    // a frame later: the scene's own effects (materials made in effects) have run
+    requestAnimationFrame(() => {
+      if (!live) return;
+      void compileChapter(gl, camera, scene, group, links.groups, drawTarget());
+    });
+    return () => {
+      live = false;
+    };
+  }, [gl, camera, scene, links, drawTarget]);
 
   if (!impl) return null;
   const { Scene } = impl;
@@ -146,6 +222,7 @@ function ChapterSlot({
       {/* Per-chapter boundary: a chapter streaming in assets never blanks the others. */}
       <Suspense fallback={null}>
         <Scene id={id} frame={frame} />
+        <Committed onCommit={compile} />
       </Suspense>
     </group>
   );
@@ -334,7 +411,6 @@ function JourneyCanvas() {
     () => ({
       groups: new Map(),
       overlays: new Map(),
-      dip: null,
       progressBar: null,
       progressText: null,
       track,
@@ -343,7 +419,7 @@ function JourneyCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-  const master = useScrollMaster(trackEl, { scrub: SCRUB_SECONDS });
+  const master = useScrollMaster(trackEl, { scrub: SCRUB });
   // wheel/trackpad: capped per event and followed at a capped speed (one flick no longer flies the whole story)
   const entered = useJourneyStore((s) => s.entered);
   const enter = useJourneyStore((s) => s.enter);
@@ -363,13 +439,21 @@ function JourneyCanvas() {
     };
   }, [setAssetsReady]);
   usePacedWheel(!prefersReducedMotion() && entered);
+
+  const composerRef = useRef<EffectComposerImpl>(null);
+  const drawTarget = useCallback(() => composerRef.current?.inputBuffer ?? null, []);
   const tier = useJourneyStore((s) => s.tier);
   const webgl = useJourneyStore((s) => s.webgl);
   const activeIndex = useJourneyStore((s) => s.activeIndex);
   const setWebgl = useJourneyStore((s) => s.setWebgl);
   const setNavigate = useJourneyStore((s) => s.setNavigate);
   const [reducedNotice, setReducedNotice] = useState(prefersReducedMotion);
-  useGsapDrivenFrames(webgl === 'ok');
+  const sceneShown = useJourneyStore((s) => s.sceneShown);
+  // no drawing behind the start gate's opaque cover (see store.sceneShown), and none before the
+  // first scene's shaders have compiled (FirstFrame)
+  const [firstFrameReady, setFirstFrameReady] = useState(false);
+  const onFirstFrameReady = useCallback(() => setFirstFrameReady(true), []);
+  useGsapDrivenFrames(webgl === 'ok' && firstFrameReady);
 
   useEffect(() => {
     links.track = track;
@@ -504,11 +588,17 @@ function JourneyCanvas() {
           <StyleSync frame={frame} effect={styleRef} />
           <LensSync effect={lensRef} />
           <Director master={master.state} frame={frame} links={links} />
+          <FirstFrame
+            when={(sceneShown || entered) && assetsReady}
+            links={links}
+            drawTarget={drawTarget}
+            onReady={onFirstFrameReady}
+          />
           {mounted.map((c) => (
-            <ChapterSlot key={c.id} id={c.id} frame={frame} links={links} />
+            <ChapterSlot key={c.id} id={c.id} frame={frame} links={links} drawTarget={drawTarget} />
           ))}
           {tier === 'balanced' && (
-            <EffectComposer multisampling={0}>
+            <EffectComposer ref={composerRef} multisampling={0}>
               <Lens ref={lensRef} />
               <Bloom
                 mipmapBlur
@@ -525,7 +615,7 @@ function JourneyCanvas() {
             </EffectComposer>
           )}
           {lowStyle && (
-            <EffectComposer multisampling={0}>
+            <EffectComposer ref={composerRef} multisampling={0}>
               <Lens ref={lensRef} />
               <ToneMapping mode={ToneMappingMode.AGX} />
               <StyleBlend ref={styleRef} />
@@ -533,13 +623,6 @@ function JourneyCanvas() {
           )}
         </Canvas>
       </div>
-      <div
-        className={styles.dip}
-        aria-hidden="true"
-        ref={(el) => {
-          links.dip = el;
-        }}
-      />
       <OverlayLayer links={links} />
       <div ref={fadeRef} className={styles.jumpFade} aria-hidden="true" />
       <StoryLine links={links} />

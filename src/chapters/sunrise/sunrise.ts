@@ -1,5 +1,6 @@
-import { sampleKeys } from '../../engine/camera/shots.ts';
+import { createShotState, sampleKeys } from '../../engine/camera/shots.ts';
 import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
+import { CHASE_06_07, blendShot, chaseShot } from '../handoff.ts';
 
 /**
  * SC06 Orbital Sunrise story maths (no React/three, unit-tested). Everything is a pure function of
@@ -12,6 +13,8 @@ import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
  * horizon is ~450 m away and dips ~26° below level.
  */
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+// (three only for the shot's scratch vector)
+import * as THREE from 'three';
 const ease = (x: number) => x * x * (3 - 2 * x);
 export const span = (t: number, a: number, b: number) => ease(clamp01((t - a) / (b - a)));
 
@@ -66,12 +69,49 @@ export function sunDirection(t: number, out: [number, number, number]): void {
 /** Direct sunlight on the ship: earthshine-dark until the limb is cleared, then full. */
 export const sunLight = (t: number) => 0.04 + 2.4 * span(t, 0.16, 0.42);
 
-/** Ship heading (rad about y). Bow toward -z (the sunrise), then turns outward at the end. */
-export const shipYaw = (t: number) => -Math.PI / 2 + span(t, 0.86, 0.99) * 0.5;
-/** Main-engine level: the burn after the turn. */
-export const engineLevel = (t: number) => span(t, 0.9, 0.98);
-/** Ship drift forward along its heading, small and steady. */
-export const shipDrift = (t: number) => -t * 6 - span(t, 0.9, 1) * 20;
+/**
+ * Ship heading (rad about y): bow toward -z, the heading SC07 flies on. The departure is a burn
+ * straight out (handoff.ts), so the ship is on SC07's line at the boundary.
+ */
+export const SHIP_YAW = -Math.PI / 2;
+/** Main-engine level: the departure burn. */
+export const engineLevel = (t: number) => span(t, 0.86, 0.94);
+/** Where the burn starts and how far it carries the ship by the end of the chapter (m). */
+export const BURN = { from: 0.86, distance: 140 } as const;
+/** Ship position: a slow drift, then the departure burn (accelerating) down -z. */
+export function shipZ(t: number): number {
+  const k = clamp01((t - BURN.from) / (1 - BURN.from));
+  return -t * 6 - k * k * BURN.distance;
+}
+
+/**
+ * Earth's orientation: India (22°N 79°E) under the ship with east pointing ahead (-z), so the ship
+ * flies into the sunrise. SphereGeometry: lon φ, colatitude θ → (-cosφ sinθ, cosθ, sinφ sinθ).
+ * (Shared with SC05, whose orbit Earth turns into this one at the boundary.)
+ */
+export const EARTH_QUAT = (() => {
+  const lat = THREE.MathUtils.degToRad(22);
+  const lon = THREE.MathUtils.degToRad(79);
+  const th = Math.PI / 2 - lat;
+  const ph = lon + Math.PI;
+  const up = new THREE.Vector3(
+    -Math.cos(ph) * Math.sin(th),
+    Math.cos(th),
+    Math.sin(ph) * Math.sin(th),
+  );
+  const east = new THREE.Vector3(Math.sin(ph), 0, Math.cos(ph)).normalize();
+  const north = new THREE.Vector3().crossVectors(up, east);
+  const local = new THREE.Matrix4().makeBasis(east, north, up);
+  // the point under the opening camera, a little ahead of it
+  const U = new THREE.Vector3(0, 40, -60).sub(new THREE.Vector3(...EARTH.centre)).normalize();
+  const E = new THREE.Vector3(0, 0, -1).projectOnPlane(U).normalize();
+  const N = new THREE.Vector3().crossVectors(U, E);
+  const world = new THREE.Matrix4().makeBasis(E, N, U);
+  return new THREE.Quaternion().setFromRotationMatrix(world.multiply(local.transpose()));
+})();
+
+/** SC06's opening camera, exported for SC05's hand-over. */
+export const OPENING = { position: EYE, target: [0, -150, -400], fov: 48 } as const;
 
 const keys: ShotKey[] = [
   // behind and above the ship, looking along the hull at the dark limb: the sunrise is ahead
@@ -84,4 +124,14 @@ const keys: ShotKey[] = [
   { t: 1, position: [-30, 12, 50], target: [-10, -20, -200], fov: 46 },
 ];
 
-export const sunriseShot = (t: number, out: ShotState) => void sampleKeys(keys, t, out);
+const ship = new THREE.Vector3();
+const chase = createShotState();
+export function sunriseShot(t: number, out: ShotState): void {
+  sampleKeys(keys, t, out);
+  // the departure: the camera drops in below-behind the ship as it burns away (SC07 opens here)
+  const w = span(t, BURN.from, 0.97);
+  if (w > 0) {
+    chaseShot(ship.set(0, 0, shipZ(t)), CHASE_06_07, chase);
+    blendShot(out, chase, w);
+  }
+}

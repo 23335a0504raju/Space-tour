@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { EARTH as SC06_EARTH, OPENING as SC06_OPENING } from '../sunrise/sunrise.ts';
 import type { ShotState } from '../../engine/camera/shots.ts';
 import type { AspectClass } from '../types.ts';
 import { HELVELA } from '../ship/helvelaDimensions.ts';
@@ -44,6 +45,21 @@ export const CLOUDS = { bottom: 360, top: 520 } as const;
 const MAX_ALT = 1150;
 const FORWARD = 650;
 
+/**
+ * Orbit insertion (handoff.ts, SC05 → SC06): over the last stretch the ship levels off, the main
+ * engine cuts, and the camera settles into SC06's opening shot. SC06 flies toward -z, this chapter
+ * toward -x: a travel-frame offset (x, y, z) is (z, y, -x) here.
+ */
+export const toOrbit = (t: number) => span(t, 0.88, 0.98);
+const fromTravel = (v: readonly [number, number, number]) => [v[2], v[1], -v[0]] as const;
+/** SC06's opening camera and Earth, relative to its ship (at its origin), in this frame. */
+export const ORBIT_CAMERA = {
+  position: fromTravel(SC06_OPENING.position),
+  target: fromTravel(SC06_OPENING.target),
+  fov: SC06_OPENING.fov,
+} as const;
+export const ORBIT_EARTH_FROM_SHIP = fromTravel(SC06_EARTH.centre);
+
 /** Climb progress 0..1 after the hover. */
 const climb = (t: number) => clamp01((t - BEATS.hover) / (1 - BEATS.hover));
 
@@ -63,7 +79,7 @@ export function pitch(t: number): number {
   const dx = forward(t + dt) - forward(t - dt);
   // capped at ~31°: an aircraft-like climb (the flight path itself is steeper)
   const path = Math.min(0.55, Math.atan2(dy, Math.max(dx, 1e-6)));
-  return path * span(t, BEATS.hover, BEATS.hover + 0.12);
+  return path * span(t, BEATS.hover, BEATS.hover + 0.12) * (1 - toOrbit(t));
 }
 
 /** Ship pose: keel-centre position and the rotation about z (negative pitch lifts the -x bow). */
@@ -74,7 +90,8 @@ export function shipPose(t: number, out: THREE.Vector3): number {
 
 /** Main-engine intensity 0..1; the lift jets fade out once the climb is established. */
 export const engine = (t: number) =>
-  0.6 * span(t, BEATS.ignition[0], BEATS.ignition[1]) + 0.4 * span(t, 0.2, BEATS.liftoff);
+  (0.6 * span(t, BEATS.ignition[0], BEATS.ignition[1]) + 0.4 * span(t, 0.2, BEATS.liftoff)) *
+  (1 - span(t, 0.88, 0.97));
 export const liftJets = (t: number) => engine(t) * (1 - span(t, BEATS.hover + 0.04, 0.55));
 
 /** 0 at sea level → 1 high up: plume expansion, sky darkening, star visibility. */
@@ -182,6 +199,19 @@ export function ascentShot(
     tgtB.set(out.position.x - 460, ship.y - 30, out.position.z - 140);
     out.target.copy(tgtA).lerp(tgtB, lift);
     out.fov = 46 + 6 * lift;
+  }
+  // orbit insertion: SC06's opening shot, relative to the ship (exact at t = 1)
+  const w = toOrbit(t);
+  if (w > 0) {
+    p.set(
+      ship.x + ORBIT_CAMERA.position[0],
+      ship.y + ORBIT_CAMERA.position[1],
+      ORBIT_CAMERA.position[2],
+    );
+    q.set(ship.x + ORBIT_CAMERA.target[0], ship.y + ORBIT_CAMERA.target[1], ORBIT_CAMERA.target[2]);
+    out.position.lerp(p, w);
+    out.target.lerp(q, w);
+    out.fov += (ORBIT_CAMERA.fov - out.fov) * w;
   }
   if (aspect === 'portrait') {
     // exterior shots only; the onboard deck camera keeps its place on the hull (hard cuts either side)

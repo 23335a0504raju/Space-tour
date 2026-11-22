@@ -36,7 +36,7 @@ export function usePacedWheel(enabled: boolean): void {
       }
       if (target === window.scrollY) return;
       const vh = window.innerHeight;
-      const next = follow(window.scrollY, target, gsap.ticker.deltaRatio(), vh);
+      const next = follow(window.scrollY, target, gsap.ticker.deltaRatio());
       chargeBurst(burst, next - window.scrollY, target - window.scrollY, vh);
       window.scrollTo({ top: next, behavior: 'instant' });
       last = window.scrollY;

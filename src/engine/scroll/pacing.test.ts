@@ -23,12 +23,15 @@ describe('scroll pacing', () => {
     expect(wheelStep(1, 2, VH)).toBe(PACING.maxStep * VH);
   });
 
-  it('delivers one notch in full, about 90 % within 0.25 s', () => {
+  it('delivers one notch in full, like the reference: half in 0.1 s, 90 % within 0.35 s', () => {
     let y = 0;
     const target = clampLead(0, wheelStep(100, 0, VH), VH);
-    for (let i = 0; i < 15; i += 1) y = follow(y, target, 1, VH);
+    for (let i = 0; i < 6; i += 1) y = follow(y, target, 1);
+    expect(y).toBeGreaterThan(45);
+    expect(y).toBeLessThan(60);
+    for (let i = 6; i < 21; i += 1) y = follow(y, target, 1);
     expect(y).toBeGreaterThan(90);
-    for (let i = 0; i < 60; i += 1) y = follow(y, target, 1, VH);
+    for (let i = 0; i < 90; i += 1) y = follow(y, target, 1);
     expect(y).toBe(100);
   });
 
@@ -37,17 +40,34 @@ describe('scroll pacing', () => {
     let target = 0;
     for (let f = 0; f < 120; f += 1) {
       if (f % 6 === 0) target = clampLead(y, target + wheelStep(100, 0, VH), VH);
-      y = follow(y, target, 1, VH);
+      y = follow(y, target, 1);
     }
-    for (let f = 0; f < 60; f += 1) y = follow(y, target, 1, VH);
+    for (let f = 0; f < 60; f += 1) y = follow(y, target, 1);
     expect(y).toBe(2000);
   });
 
-  it('never travels faster than maxSpeed, even with a far target', () => {
+  it('speed is bounded smoothly by the lead: never more than maxLead × ease per frame', () => {
     let y = 0;
-    for (let i = 0; i < 60; i += 1) y = follow(y, 1e6, 1, VH);
-    expect(y).toBeLessThanOrEqual(PACING.maxSpeed * VH * 60 + 1e-6);
-    expect(y).toBeGreaterThan(PACING.maxSpeed * VH * 50);
+    let target = 0;
+    let fastest = 0;
+    for (let i = 0; i < 120; i += 1) {
+      target = clampLead(y, target + 400, VH); // input far beyond the lead, every frame
+      const next = follow(y, target, 1);
+      fastest = Math.max(fastest, next - y);
+      y = next;
+    }
+    expect(fastest).toBeLessThanOrEqual(PACING.maxLead * VH * PACING.ease + 1e-6);
+  });
+
+  it('eases out without a constant-speed plateau (one ease, no cap)', () => {
+    let y = 0;
+    const steps: number[] = [];
+    for (let i = 0; i < 30; i += 1) {
+      const next = follow(y, 300, 1);
+      steps.push(next - y);
+      y = next;
+    }
+    for (let i = 1; i < steps.length; i += 1) expect(steps[i]!).toBeLessThan(steps[i - 1]!);
   });
 
   it('discards input beyond the lead instead of queueing it', () => {
@@ -67,7 +87,7 @@ describe('scroll pacing', () => {
       const d = deltas[f] ?? 0;
       if (d && admitWheel(burst, f * (1000 / 60), VH))
         target = clampLead(y, target + wheelStep(d, 0, VH), VH);
-      const next = follow(y, target, 1, VH);
+      const next = follow(y, target, 1);
       chargeBurst(burst, next - y, target - y, VH);
       y = next;
     }
@@ -102,10 +122,10 @@ describe('scroll pacing', () => {
 
   it('settles exactly on the target and is frame-rate independent', () => {
     let a = 0;
-    for (let i = 0; i < 120; i += 1) a = follow(a, 100, 1, VH);
+    for (let i = 0; i < 120; i += 1) a = follow(a, 100, 1);
     expect(a).toBe(100);
     let b = 0;
-    for (let i = 0; i < 60; i += 1) b = follow(b, 100, 2, VH);
+    for (let i = 0; i < 60; i += 1) b = follow(b, 100, 2);
     expect(b).toBe(100);
   });
 });

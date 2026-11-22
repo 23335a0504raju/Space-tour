@@ -8,13 +8,26 @@ import { createEarthMaterial, createLimbAtmosphereMaterial } from '../../shaders
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield, seeded } from '../greybox/parts.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
+import { LIGHT_07, TRAVEL_STARS } from '../handoff.ts';
+import { TRAVEL_SKY } from '../space/skyFrame.ts';
+
+const DIR_07 = new THREE.Vector3(...LIGHT_07.direction).normalize();
+const KEY_06 = new THREE.Color('#fff1dc');
+const KEY_07 = new THREE.Color(LIGHT_07.color);
+const SKY_06 = new THREE.Color('#1c2740');
+const SKY_07 = new THREE.Color(LIGHT_07.sky);
+const GROUND_06 = new THREE.Color('#23396b');
+const GROUND_07 = new THREE.Color(LIGHT_07.ground);
 import {
   EARTH,
+  EARTH_QUAT,
   MOON,
   SUN_DISTANCE,
   engineLevel,
-  shipDrift,
-  shipYaw,
+  shipZ,
+  BURN,
+  SHIP_YAW,
+  span,
   sunDirection,
   sunLight,
   sunriseShot,
@@ -78,31 +91,6 @@ function sunTextures() {
   };
 }
 
-/**
- * Earth's orientation: India (22°N 79°E) under the ship with east pointing ahead (-z), so the ship
- * flies into the sunrise. SphereGeometry: lon φ, colatitude θ → (-cosφ sinθ, cosθ, sinφ sinθ).
- */
-function earthQuaternion(): THREE.Quaternion {
-  const lat = THREE.MathUtils.degToRad(22);
-  const lon = THREE.MathUtils.degToRad(79);
-  const th = Math.PI / 2 - lat;
-  const ph = lon + Math.PI;
-  const up = new THREE.Vector3(
-    -Math.cos(ph) * Math.sin(th),
-    Math.cos(th),
-    Math.sin(ph) * Math.sin(th),
-  );
-  const east = new THREE.Vector3(Math.sin(ph), 0, Math.cos(ph)).normalize();
-  const north = new THREE.Vector3().crossVectors(up, east);
-  const local = new THREE.Matrix4().makeBasis(east, north, up);
-  // the point under the opening camera, a little ahead of it
-  const U = new THREE.Vector3(0, 40, -60).sub(new THREE.Vector3(...EARTH.centre)).normalize();
-  const E = new THREE.Vector3(0, 0, -1).projectOnPlane(U).normalize();
-  const N = new THREE.Vector3().crossVectors(U, E);
-  const world = new THREE.Matrix4().makeBasis(E, N, U);
-  return new THREE.Quaternion().setFromRotationMatrix(world.multiply(local.transpose()));
-}
-
 function SunriseScene({ id, frame }: ChapterSceneProps) {
   const gl = useThree((s) => s.gl);
   const low = useJourneyStore((s) => s.tier !== 'balanced');
@@ -119,7 +107,7 @@ function SunriseScene({ id, frame }: ChapterSceneProps) {
       earth: createEarthMaterial(day, night, low),
       atmosphere: createLimbAtmosphereMaterial(EARTH.radius, new THREE.Vector3(...EARTH.centre)),
       sun: sunTextures(),
-      earthRot: new THREE.Euler().setFromQuaternion(earthQuaternion()),
+      earthRot: new THREE.Euler().setFromQuaternion(EARTH_QUAT),
       // lit by the Sun alone (a crescent here) plus faint grey earthshine; the scene's cool earthshine
       // light would tint it blue
       moon: new THREE.ShaderMaterial({
@@ -150,6 +138,8 @@ function SunriseScene({ id, frame }: ChapterSceneProps) {
   const sunLightRef = useRef<THREE.DirectionalLight>(null);
   const sunGroup = useRef<THREE.Group>(null);
   const ship = useRef<THREE.Group>(null);
+  const fill = useRef<THREE.HemisphereLight>(null);
+  const earthshine = useRef<THREE.DirectionalLight>(null);
   useFrame(({ camera }) => {
     if (frame.id !== id) return;
     const t = frame.t;
@@ -158,26 +148,33 @@ function SunriseScene({ id, frame }: ChapterSceneProps) {
     (atmosphere.uniforms['uSun']?.value as THREE.Vector3).set(dir[0], dir[1], dir[2]);
     (moon.uniforms['uSun']?.value as THREE.Vector3).set(dir[0], dir[1], dir[2]);
     const l = sunLightRef.current;
+    // the departure: the ship's light turns into SC07's (the planet and Moon light themselves)
+    const w = span(t, BURN.from, 1);
     if (l) {
-      l.position.set(dir[0], dir[1], dir[2]).multiplyScalar(200);
-      l.intensity = sunLight(t);
+      l.position.set(dir[0], dir[1], dir[2]).lerp(DIR_07, w).normalize().multiplyScalar(200);
+      l.intensity = sunLight(t) + (LIGHT_07.intensity - sunLight(t)) * w;
+      l.color.copy(KEY_06).lerp(KEY_07, w);
     }
+    if (fill.current) {
+      fill.current.color.copy(SKY_06).lerp(SKY_07, w);
+      fill.current.groundColor.copy(GROUND_06).lerp(GROUND_07, w);
+      fill.current.intensity = 0.5 + (LIGHT_07.ambient - 0.5) * w;
+    }
+    if (earthshine.current) earthshine.current.intensity = 0.9 * (1 - w);
     const s = sunGroup.current;
     // anchored to the camera: the Sun is at infinity (a fixed point 1.5 km out dropped behind the
     // planet through parallax); the Earth's limb, ~450 m away, still hides it by depth
     if (s) s.position.set(dir[0], dir[1], dir[2]).multiplyScalar(SUN_DISTANCE).add(camera.position);
     if (ship.current) {
-      ship.current.rotation.y = shipYaw(t);
-      // drift along the bow heading
-      ship.current.position.set(0, 0, 0);
-      ship.current.translateX(-shipDrift(t));
+      ship.current.rotation.y = SHIP_YAW;
+      ship.current.position.set(0, 0, shipZ(t));
     }
     ENGINE.current = engineLevel(t);
   });
 
   return (
     <group>
-      <Starfield count={5000} radius={1500} seed={31} />
+      <Starfield {...TRAVEL_STARS} follow orient={TRAVEL_SKY} />
       <mesh position={[...EARTH.centre]} rotation={earthRot} material={earth}>
         <sphereGeometry args={[EARTH.radius, low ? 96 : 192, low ? 64 : 128]} />
       </mesh>
@@ -220,10 +217,10 @@ function SunriseScene({ id, frame }: ChapterSceneProps) {
       </group>
       <directionalLight ref={sunLightRef} color="#fff1dc" />
       {/* earthshine from below, cool sky from above: low, so the sunrise is the event */}
-      <hemisphereLight args={['#1c2740', '#23396b', 0.5]} />
+      <hemisphereLight ref={fill} args={['#1c2740', '#23396b', 0.5]} />
       {/* earthshine: the lit planet below is a broad cool source; gives the hull form and speculars
           while the Sun backlights it */}
-      <directionalLight position={[0, -100, 40]} intensity={0.9} color="#5b7fc4" />
+      <directionalLight ref={earthshine} position={[0, -100, 40]} intensity={0.9} color="#5b7fc4" />
       <HelVela ref={ship} engine={ENGINE} />
     </group>
   );

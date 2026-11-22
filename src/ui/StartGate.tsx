@@ -1,59 +1,103 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useProgress } from '@react-three/drei';
+import { addAfterEffect } from '@react-three/fiber';
 import gsap from 'gsap';
 import { content } from '../content/index.ts';
+import type { Fact } from '../content/fact.ts';
 import { preloadJourney } from '../engine/assets/preload.ts';
 import { useJourneyStore } from '../engine/store.ts';
-import { FactText, shouldShow } from './FactText.tsx';
+import { PACING, wheelStep } from '../engine/scroll/pacing.ts';
+import { shouldShow } from './FactText.tsx';
+import { createRingState, ShardRing } from './shardRing.ts';
 import styles from './StartGate.module.css';
 
 const { identity } = content;
 
 /** Loader quiet for this long (ms) means the first scene's assets are in. */
 const QUIET_MS = 1200;
-/** Pause between "100%" and the reveal, so shaders finish compiling behind the curtain. */
+/** Pause after loading, so shaders finish compiling behind the cover. */
 const REVEAL_DELAY_MS = 450;
+/** Fastest the ring may assemble (fraction per second): a cached visit still sees it gather. */
+const ASSEMBLE_RATE = 0.62;
 const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+<>/';
+/** Scroll distance (screens) that burns the opening all the way through. */
+const OPEN_SCREENS = 1.25;
+/** Opening at which the journey starts (the hole has cleared the screen). */
+const OPEN_DONE = 0.985;
 
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const fileName = (url: string) => url.split(/[?#]/)[0]?.split('/').pop() ?? url;
 const canvasEl = () => document.querySelector<HTMLElement>('[data-journey-canvas]');
-/** Letterbox bar height in px: a 2.39:1-ish frame on desktop, thinner but tappable on phones. */
-const barHeight = () => Math.round(Math.max(window.innerHeight * 0.1, 76));
+const factText = (f: Fact<unknown>) => (shouldShow(f) ? String(f.value) : '');
 
-/** Decode reveal: characters resolve left to right out of random glyphs (UI only, not story). */
-function scramble(el: HTMLElement, text: string, duration: number): gsap.core.Tween {
+/**
+ * Grow a short label into its full form, the way "The ai Edition" grows into "Renaissance":
+ * the missing text is typed in on both sides of the short word, through a short glyph scramble.
+ */
+function grow(el: HTMLElement, short: string, full: string, duration: number): gsap.core.Tween {
+  const at = full.indexOf(short);
+  const pre = at >= 0 ? full.slice(0, at) : '';
+  const post = at >= 0 ? full.slice(at + short.length) : full.slice(short.length);
+  const core = at >= 0 ? short : full.slice(0, short.length);
   const o = { p: 0 };
+  const junk = (n: number) => {
+    let s = '';
+    for (let i = 0; i < n; i += 1) s += GLYPHS[Math.floor(Math.random() * GLYPHS.length)] ?? '';
+    return s;
+  };
   return gsap.to(o, {
     p: 1,
     duration,
-    ease: 'power1.inOut',
-    onStart: () => void (el.style.opacity = '1'),
+    ease: 'power2.inOut',
     onUpdate: () => {
-      const settled = Math.floor(o.p * text.length);
-      let out = '';
-      for (let i = 0; i < text.length; i += 1) {
-        const ch = text[i] ?? '';
-        out +=
-          i < settled || ch === ' '
-            ? ch
-            : (GLYPHS[Math.floor(Math.random() * GLYPHS.length)] ?? '');
-      }
-      el.textContent = out;
+      const nPre = Math.round(o.p * pre.length);
+      const nPost = Math.round(o.p * post.length);
+      const edge = o.p < 1 ? 2 : 0;
+      const left = pre.slice(pre.length - nPre);
+      const right = post.slice(0, nPost);
+      el.textContent =
+        (nPre > 0 && edge ? junk(Math.min(edge, nPre)) + left.slice(edge) : left) +
+        core +
+        (nPost > 0 && edge ? right.slice(0, -edge) + junk(Math.min(edge, nPost)) : right);
     },
-    onComplete: () => void (el.textContent = text),
+    onComplete: () => void (el.textContent = full),
   });
 }
 
 /**
- * Opening sequence (FIX_LIST 8). Three beats, all UI state before the journey starts (story
- * state stays a pure function of scroll progress):
- *  1. Signal: black frame, starfield, a ring and counter driven by the real asset loader, and the
- *     files arriving as a telemetry log.
- *  2. Title: the stars jump to warp, the black splits into letterbox bars that open on the live
- *     SC02 shot (slow push-in, pointer parallax), and the name decodes in. One Begin action.
- *  3. Hand-off (< 2 s): copy blurs out, bars retract, the camera eases to SC02's title card.
- * The header (Projects, Contact, Brief) sits above it, so every action works from the first frame.
+ * Guide lines of the opening (after the reference's architectural construction lines): a golden
+ * rectangle and its spiral arcs around the title, two long diagonals, two large circles and
+ * registration marks. Each draws in over its own window of the load fraction ([from, to]).
+ */
+const GUIDES: readonly { d: string; from: number; to: number }[] = [
+  { d: 'M60 0 L1600 960', from: 0, to: 0.35 },
+  { d: 'M1540 0 L0 960', from: 0.05, to: 0.4 },
+  { d: 'M640 0 V300', from: 0.08, to: 0.25 },
+  { d: 'M760 0 V300', from: 0.12, to: 0.3 },
+  { d: 'M476 300 H1124 V700 H476 Z', from: 0.15, to: 0.5 },
+  { d: 'M876 300 V700', from: 0.3, to: 0.45 },
+  { d: 'M876 548 H1124', from: 0.38, to: 0.5 },
+  { d: 'M972 548 V700', from: 0.45, to: 0.55 },
+  { d: 'M476 700 A400 400 0 0 1 876 300', from: 0.4, to: 0.62 },
+  { d: 'M876 300 A248 248 0 0 1 1124 548', from: 0.5, to: 0.68 },
+  { d: 'M1124 548 A152 152 0 0 1 972 700', from: 0.58, to: 0.74 },
+  { d: 'M540 250 A520 520 0 1 1 1580 250', from: 0.25, to: 0.75 },
+  { d: 'M-140 960 A560 560 0 0 1 980 960', from: 0.35, to: 0.8 },
+  { d: 'M1124 860 H1600', from: 0.6, to: 0.75 },
+  { d: 'M540 230 h40 v40 h-40 Z M520 250 h80 M560 210 v80', from: 0.55, to: 0.7 },
+  { d: 'M1180 760 h40 v40 h-40 Z M1160 780 h80 M1200 740 v80', from: 0.65, to: 0.82 },
+];
+
+/**
+ * Opening sequence (task 8, after Shopify Editions Winter '26). UI state before the journey
+ * starts; story state stays a pure function of scroll progress.
+ *  1. Loading: guide lines draw in and a ring of shards and sparkles assembles around the name,
+ *     both driven by the real download fraction.
+ *  2. Title: the role grows to its full form, the tagline and the Begin / Explore projects
+ *     actions appear. The cover stays solid.
+ *  3. Opening (scroll, reversible; or Begin): the cover burns away. A spark at the centre eats an
+ *     organic hole outward, two smaller spots join it, and the burn front shows the first scene
+ *     arriving in fragments under a bright fibrous edge (shardRing.ts). The camera pushes through.
+ * The header sits above the gate, so every header action works from the first frame.
  */
 export function StartGate() {
   const entered = useJourneyStore((s) => s.entered);
@@ -67,29 +111,35 @@ export function StartGate() {
   const [ready, setReady] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [gone, setGone] = useState(false);
-  const [log, setLog] = useState<readonly string[]>([]);
 
   const root = useRef<HTMLElement>(null);
-  const stars = useRef<HTMLDivElement>(null);
-  const loader = useRef<HTMLDivElement>(null);
-  const barTop = useRef<HTMLDivElement>(null);
-  const barBottom = useRef<HTMLDivElement>(null);
-  const scrim = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const guides = useRef<SVGSVGElement>(null);
   const title = useRef<HTMLDivElement>(null);
-  const kicker = useRef<HTMLParagraphElement>(null);
+  const role = useRef<HTMLSpanElement>(null);
   const tagline = useRef<HTMLParagraphElement>(null);
-  const name = useRef<HTMLParagraphElement>(null);
-  const role = useRef<HTMLParagraphElement>(null);
-  const summary = useRef<HTMLParagraphElement>(null);
   const dock = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const warp = useRef({ v: 0 });
+  const ring = useRef(createRingState());
+  /** Where the visitor's scroll has taken the opening (0..1); `ring.open` eases toward it. */
+  const openTarget = useRef(0);
+  const phase = useRef<'loading' | 'title' | 'leaving'>('loading');
+  const chrome = useRef<HTMLDivElement>(null);
+  /** real download fraction (0..1), read by the ticker */
+  const fraction = useRef(0);
+  const readyRef = useRef(false);
 
-  // Real download progress of every journey file (bytes), and the files as they land.
+  const [first = '', ...rest] = factText(identity.name).split(' ');
+  const last = rest.join(' ');
+  const shortRole = factText(identity.shortRole);
+  const fullRole = factText(identity.role) || shortRole;
+  const taglineText = factText(identity.tagline);
+
+  // Real download progress of every journey file (bytes).
   useEffect(() => {
     const { unsubscribe } = preloadJourney((p) => {
+      fraction.current = Math.max(fraction.current, p.fraction);
       setPct((prev) => Math.max(prev, Math.min(99, Math.floor(p.fraction * 100))));
-      setLog(p.done.slice(-4).map(fileName));
     });
     return unsubscribe;
   }, []);
@@ -101,88 +151,207 @@ export function StartGate() {
     return () => window.clearTimeout(id);
   }, [assetsReady, progress, active]);
 
+  // reveal once the ring has had time to close (it assembles at a capped rate)
   useEffect(() => {
+    readyRef.current = ready;
     if (!ready) return;
-    const id = window.setTimeout(() => setRevealed(true), REVEAL_DELAY_MS);
+    const left = prefersReducedMotion() ? 0 : (1 - ring.current.assemble) / ASSEMBLE_RATE;
+    const id = window.setTimeout(() => setRevealed(true), Math.max(REVEAL_DELAY_MS, left * 1000));
     return () => window.clearTimeout(id);
   }, [ready]);
 
   const stage = gone ? 'gone' : entered ? 'leaving' : revealed ? 'title' : 'loading';
-  const taglineText = shouldShow(identity.tagline) ? String(identity.tagline.value) : '';
 
-  // Scroll is locked only while there is nothing to show yet (assets loading). Header jumps still
-  // work: they enter and unlock.
+  // Once loaded, the 3D scene starts drawing behind the solid cover. Its first frame links the
+  // first scene's shaders (a one-off stall, as on the reference site at its reveal); it happens
+  // here, before the title animates in, so the title and the opening stay smooth.
   useEffect(() => {
-    if (skipped || stage !== 'loading') return;
+    if (ready) useJourneyStore.getState().showScene();
+  }, [ready]);
+
+  // The page does not scroll before the journey starts: during the title the scroll burns the
+  // opening instead. Header jumps still work: they enter and unlock.
+  useEffect(() => {
+    if (skipped || (stage !== 'loading' && stage !== 'title')) return;
     document.documentElement.style.overflow = 'hidden';
     return () => {
       document.documentElement.style.overflow = '';
     };
   }, [skipped, stage]);
 
-  // From the title on, the first scroll input enters the journey (Begin stays as the explicit
-  // action). The scroll itself moves the story on from the live SC02 shot behind the gate.
+  // From the title on, scrolling burns the opening (after the reference site): a spark at the
+  // centre eats a hole outward as the visitor scrolls, and scrolling back closes it again. The
+  // journey starts once the hole has cleared the screen. Begin plays the same opening by itself.
   useEffect(() => {
     if (skipped || stage !== 'title') return;
-    const go = () => enter('scroll');
-    const SCROLL_KEYS = new Set(['ArrowDown', 'PageDown', 'End', ' ', 'ArrowRight']);
+    phase.current = 'title';
+    const reduced = prefersReducedMotion();
+    const modal = () => document.querySelector('dialog[open]') !== null;
+    const push = (px: number) => {
+      if (modal()) return;
+      if (reduced) {
+        if (px > 0) enter('scroll');
+        return;
+      }
+      const dist = window.innerHeight * OPEN_SCREENS;
+      openTarget.current = Math.min(1, Math.max(0, openTarget.current + px / dist));
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || modal()) return;
+      e.preventDefault();
+      push(wheelStep(e.deltaY, e.deltaMode, window.innerHeight));
+    };
+    let lastY: number | null = null;
+    const onTouchStart = (e: TouchEvent) => {
+      lastY = e.touches[0]?.clientY ?? null;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const y = e.touches[0]?.clientY;
+      if (lastY === null || y === undefined || modal()) return;
+      e.preventDefault();
+      push((lastY - y) * 1.5);
+      lastY = y;
+    };
+    const FORWARD = new Set(['ArrowDown', 'PageDown', ' ', 'ArrowRight']);
+    const BACK = new Set(['ArrowUp', 'PageUp', 'ArrowLeft']);
     const onKey = (e: KeyboardEvent) => {
-      if (!SCROLL_KEYS.has(e.key)) return;
       // Space on the focused Begin button is a Begin press, not a scroll
       if (e.key === ' ' && (e.target as HTMLElement | null)?.closest('button, a')) return;
-      go();
+      const step = window.innerHeight * OPEN_SCREENS * 0.34;
+      if (FORWARD.has(e.key)) push(step);
+      else if (BACK.has(e.key)) push(-step);
+      else if (e.key === 'End') push(window.innerHeight * OPEN_SCREENS);
+      else return;
+      e.preventDefault();
     };
-    const opts = { passive: true } as const;
-    window.addEventListener('wheel', go, opts);
-    window.addEventListener('touchmove', go, opts);
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('keydown', onKey);
     return () => {
-      window.removeEventListener('wheel', go);
-      window.removeEventListener('touchmove', go);
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('keydown', onKey);
     };
   }, [skipped, stage, enter]);
 
-  useLayoutEffect(() => {
-    root.current?.style.setProperty('--bar', `${barHeight()}px`);
-  }, []);
+  // The ring: one 2D canvas drawn on the GSAP ticker (the one clock) until the gate is gone.
+  useEffect(() => {
+    const el = canvas.current;
+    if (skipped || !el) return;
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const small = Math.min(window.innerWidth, window.innerHeight) < 600;
+    const renderer = new ShardRing(el, {
+      shards: coarse || small ? 900 : 2600,
+      sparks: coarse || small ? 220 : 480,
+      fragments: coarse || small ? 380 : 1500,
+      cover: '#05060a',
+    });
+    const paths = guides.current ? [...guides.current.querySelectorAll('path')] : [];
+    const reduced = prefersReducedMotion();
+    const state = ring.current;
+    let shown = -1;
+    let lastOpen = -1;
+    let started = false;
+    const cam = canvasEl();
+    renderer.resize();
+    const onResize = () => renderer.resize();
+    window.addEventListener('resize', onResize);
+    const tick = (time: number, dt: number) => {
+      // the displayed assembly follows the real fraction, eased and rate-capped
+      const target = readyRef.current ? 1 : fraction.current * 0.97;
+      if (reduced) state.assemble = target;
+      else if (state.assemble < target) {
+        const step = Math.min(
+          target - state.assemble,
+          Math.max((target - state.assemble) * (1 - Math.exp(-2.4 * (dt / 1000))), 0.002),
+          ASSEMBLE_RATE * (dt / 1000),
+        );
+        state.assemble += step;
+      }
+      if (Math.abs(state.assemble - shown) > 0.0005) {
+        shown = state.assemble;
+        for (let i = 0; i < paths.length; i += 1) {
+          const g = GUIDES[i];
+          if (!g) continue;
+          const k = Math.min(1, Math.max(0, (shown - g.from) / (g.to - g.from)));
+          paths[i]!.style.strokeDashoffset = String(1 - k);
+        }
+        if (title.current && !readyRef.current) {
+          title.current.style.opacity = String(0.2 + 0.8 * Math.min(1, shown * 1.4));
+        }
+      }
+      if (phase.current === 'title' && !reduced) {
+        // same ease as the page scroll (pacing.ts): one smoothing layer, frame-rate independent
+        const k = 1 - Math.pow(1 - PACING.ease, gsap.ticker.deltaRatio());
+        const gap = openTarget.current - state.open;
+        state.open = Math.abs(gap) < 0.0004 ? openTarget.current : state.open + gap * k;
+        if (!started && openTarget.current >= 1 && state.open > OPEN_DONE) {
+          started = true;
+          useJourneyStore.getState().enter('scroll');
+        }
+      }
+      if (phase.current !== 'loading' && state.open !== lastOpen) {
+        lastOpen = state.open;
+        // the title, guides and actions burn away with the first stretch of the opening
+        const ease = (v: number) => v * v * (3 - 2 * v);
+        const keep = 1 - ease(Math.min(1, Math.max(0, (state.open - 0.38) / 0.32)));
+        if (chrome.current) {
+          chrome.current.style.opacity = String(keep);
+          chrome.current.style.visibility = keep < 0.01 ? 'hidden' : '';
+        }
+        if (dock.current && phase.current === 'title') {
+          dock.current.style.opacity = String(1 - ease(Math.min(1, state.open / 0.08)));
+        }
+        // and the camera pushes through the hole
+        if (cam) gsap.set(cam, { scale: 1.06 - 0.06 * state.open });
+      }
+      renderer.draw(state, reduced ? 0 : time);
+    };
+    gsap.ticker.add(tick);
+    const copy = document.createElement('canvas');
+    const copyCtx = copy.getContext('2d');
+    const source = () => document.querySelector<HTMLCanvasElement>('[data-journey-canvas] canvas');
+    const stopCopy = addAfterEffect(() => {
+      const open = state.open;
+      if (!copyCtx || open <= 0 || open >= 1) return;
+      const src = source();
+      if (!src) return;
+      const cw = Math.max(1, Math.round(window.innerWidth / 3));
+      const ch = Math.max(1, Math.round(window.innerHeight / 3));
+      if (copy.width !== cw || copy.height !== ch) {
+        copy.width = cw;
+        copy.height = ch;
+      }
+      copyCtx.drawImage(src, 0, 0, cw, ch);
+      renderer.scene = copy;
+    });
+    return () => {
+      gsap.ticker.remove(tick);
+      stopCopy();
+      window.removeEventListener('resize', onResize);
+    };
+  }, [skipped]);
 
-  // Beat 2: warp, letterbox reveal, push-in, decode.
+  // Beat 2: the portal opens on the live first shot, the role grows, the actions arrive.
   useLayoutEffect(() => {
     if (stage !== 'title' || skipped) return;
-    const els = {
-      kicker: kicker.current,
-      tagline: tagline.current,
-      name: name.current,
-      role: role.current,
-      summary: summary.current,
-    };
-    const bars = [barTop.current, barBottom.current];
     const cam = canvasEl();
-    const barPx = barHeight();
     if (prefersReducedMotion()) {
-      gsap.set([loader.current, stars.current], { autoAlpha: 0 });
-      gsap.set(bars, { height: barPx });
-      gsap.set([scrim.current, ...Object.values(els), dock.current], { opacity: 1 });
+      gsap.set([title.current, tagline.current, dock.current], { opacity: 1, y: 0 });
+      if (role.current) role.current.textContent = fullRole;
       button.current?.focus({ preventScroll: true });
       return;
     }
     const rise = { opacity: 1, y: 0, ease: 'power3.out' };
     const tl = gsap.timeline();
-    tl.to(warp.current, { v: 1, duration: 0.7, ease: 'power2.in' }, 0)
-      .to(loader.current, { scale: 1.5, autoAlpha: 0, duration: 0.55, ease: 'power2.in' }, 0.05)
-      .to(stars.current, { autoAlpha: 0, duration: 0.35 }, 0.6)
-      .to(bars, { height: barPx, duration: 1.15, ease: 'expo.inOut' }, 0.5)
-      .fromTo(scrim.current, { opacity: 0 }, { opacity: 1, duration: 1 }, 0.9)
-      .fromTo(els.kicker, { opacity: 0, y: 14 }, { ...rise, duration: 0.6 }, 1.1)
-      .fromTo(els.name, { opacity: 0, y: 14 }, { ...rise, duration: 0.7 }, 1.75)
-      .fromTo(els.role, { opacity: 0, y: 14 }, { ...rise, duration: 0.7 }, 1.9)
-      .fromTo(els.summary, { opacity: 0, y: 14 }, { ...rise, duration: 0.8 }, 2.05)
-      .fromTo(dock.current, { opacity: 0, y: 10 }, { ...rise, duration: 0.6 }, 2.2)
-      .call(() => button.current?.focus({ preventScroll: true }), undefined, 2.3);
-    if (els.tagline) tl.add(scramble(els.tagline, taglineText, 1.1), 1.2);
-    if (cam) {
-      tl.fromTo(cam, { scale: 1.14 }, { scale: 1.03, duration: 5, ease: 'power2.out' }, 0.5);
+    tl.to(title.current, { opacity: 1, duration: 0.4 }, 0)
+      .fromTo(tagline.current, { opacity: 0, y: 10 }, { ...rise, duration: 0.7 }, 1.3)
+      .fromTo(dock.current, { opacity: 0, y: 10 }, { ...rise, duration: 0.6 }, 1.6)
+      .call(() => button.current?.focus({ preventScroll: true }), undefined, 1.7);
+    if (role.current && fullRole !== shortRole) {
+      tl.add(grow(role.current, shortRole, fullRole, 1.1), 0.35);
     }
 
     // pointer parallax on the live shot (fine pointers only)
@@ -200,12 +369,15 @@ export function StartGate() {
       tl.kill();
       if (onMove) window.removeEventListener('pointermove', onMove);
     };
-  }, [stage, skipped, taglineText]);
+  }, [stage, skipped, fullRole, shortRole]);
 
-  // Beat 3: hand-off. The Journey eases the camera to SC02's title card at the same moment.
+  // Beat 3: the opening finishes. After a scroll entry the hole has already cleared the screen;
+  // Begin and header jumps play the whole burn by themselves.
   useLayoutEffect(() => {
     if (stage !== 'leaving' || skipped) return;
+    phase.current = 'leaving';
     const cam = canvasEl();
+    const state = ring.current;
     const finish = () => {
       if (cam) gsap.set(cam, { clearProps: 'transform' });
       setGone(true);
@@ -214,23 +386,18 @@ export function StartGate() {
       finish();
       return;
     }
-    if (cam) gsap.killTweensOf(cam);
-    const tl = gsap.timeline({ onComplete: finish });
-    tl.to(
-      title.current,
-      { opacity: 0, y: -12, filter: 'blur(12px)', duration: 0.45, ease: 'power2.in' },
-      0,
-    )
-      .to([dock.current, loader.current, stars.current], { autoAlpha: 0, duration: 0.3 }, 0)
-      .to(
-        [barTop.current, barBottom.current],
-        { height: 0, duration: 0.9, ease: 'expo.inOut' },
-        0.1,
-      )
-      .to(scrim.current, { opacity: 0, duration: 0.8 }, 0.1);
-    if (cam) tl.to(cam, { scale: 1, x: 0, y: 0, duration: 1.1, ease: 'power2.inOut' }, 0);
-    return () => void tl.kill();
-  }, [stage, skipped]);
+    gsap.killTweensOf(state);
+    state.assemble = 1;
+    const left = 1 - state.open;
+    const byScroll = enteredBy === 'scroll';
+    const tween = gsap.to(state, {
+      open: 1,
+      duration: byScroll ? 0.25 : 0.3 + 2.1 * left,
+      ease: byScroll ? 'power1.out' : 'power1.inOut',
+      onComplete: finish,
+    });
+    return () => void tween.kill();
+  }, [stage, skipped, enteredBy]);
 
   // never leave the canvas transformed, whatever path unmounts the gate
   useEffect(
@@ -250,85 +417,65 @@ export function StartGate() {
   const shown = ready ? 100 : pct;
   return (
     <section ref={root} className={styles.gate} aria-label="Start" inert={entered}>
-      <div ref={scrim} className={styles.scrim} />
-      <div ref={barTop} className={`${styles.bar} ${styles.barTop}`} />
-      <div ref={barBottom} className={`${styles.bar} ${styles.barBottom}`} />
-      <div ref={stars} className={styles.stars}>
-        <Starfield warp={warp} />
-      </div>
-
-      <div ref={loader} className={styles.loader} aria-hidden="true">
-        <p className={styles.loaderKicker}>{ready ? 'Signal acquired' : 'Acquiring signal'}</p>
-        <div className={styles.dial}>
-          <svg className={styles.ring} viewBox="0 0 100 100">
-            <circle className={styles.ringTicks} cx="50" cy="50" r="46" pathLength={120} />
-            <circle className={styles.ringTrack} cx="50" cy="50" r="40" />
-            <circle
-              className={styles.ringFill}
-              cx="50"
-              cy="50"
-              r="40"
-              pathLength={100}
-              strokeDasharray={100}
-              strokeDashoffset={100 - shown}
-            />
-          </svg>
-          <span className={styles.count}>{String(shown).padStart(3, '0')}</span>
-        </div>
-        <ol className={styles.log}>
-          {log.map((f, i) => (
-            <li key={`${f}-${i}`}>{f}</li>
+      <canvas ref={canvas} className={styles.ring} aria-hidden="true" />
+      <div ref={chrome} className={styles.chrome}>
+        <svg
+          ref={guides}
+          className={styles.guides}
+          viewBox="0 0 1600 1000"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+        >
+          {GUIDES.map((g) => (
+            <path key={g.d} d={g.d} pathLength={1} />
           ))}
-        </ol>
-      </div>
-      <progress
-        className="visually-hidden"
-        max={100}
-        value={shown}
-        aria-label="Loading the journey"
-      />
+        </svg>
+        <progress
+          className="visually-hidden"
+          max={100}
+          value={shown}
+          aria-label="Loading the journey"
+        />
 
-      {/* aria-hidden: the header's h1 and the SC02 introduction carry the same facts for AT */}
-      <div ref={title} className={styles.title} aria-hidden="true">
-        <p ref={kicker} className={styles.kicker}>
-          Mission 001 · Origin
-        </p>
-        <p ref={tagline} className={styles.tagline}>
-          {taglineText}
-        </p>
-        <p ref={name} className={styles.name}>
-          <FactText fact={identity.name} />
-        </p>
-        <p ref={role} className={styles.role}>
-          <FactText fact={identity.role} />
-        </p>
-        <p ref={summary} className={styles.summary}>
-          <FactText fact={identity.summary} />
-        </p>
-      </div>
+        {/* aria-hidden: the header's h1 and the first chapter's introduction carry the same facts */}
+        <div ref={title} className={styles.title} aria-hidden="true">
+          <p className={styles.name}>
+            <span className={styles.first}>{first}</span>
+            {last && <span className={styles.script}>{last}</span>}
+            <span ref={role} className={styles.role}>
+              {shortRole}
+            </span>
+          </p>
+          {taglineText && (
+            <p ref={tagline} className={styles.tagline}>
+              {taglineText}
+            </p>
+          )}
+        </div>
 
-      <div ref={dock} className={styles.dock}>
-        <p className={styles.status} aria-hidden="true">
-          <span className={styles.dot} /> Scroll to begin <span className={styles.arrow}>↓</span>
-        </p>
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.secondary}
-            disabled={stage !== 'title'}
-            onClick={() => useJourneyStore.getState().navigate?.('sc08-jupiter')}
-          >
-            Explore projects
-          </button>
-          <button
-            ref={button}
-            type="button"
-            className={styles.begin}
-            disabled={stage !== 'title'}
-            onClick={() => enter('begin')}
-          >
-            Begin mission <span aria-hidden="true">→</span>
-          </button>
+        <div ref={dock} className={styles.dock}>
+          <p className={styles.status} aria-hidden="true">
+            <span className={styles.dot} /> Scroll to begin <span className={styles.arrow}>↓</span>
+          </p>
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.secondary}
+              disabled={stage !== 'title'}
+              onClick={() => useJourneyStore.getState().navigate?.('sc08-jupiter')}
+            >
+              Explore projects
+            </button>
+            <button
+              ref={button}
+              type="button"
+              className={styles.begin}
+              disabled={stage !== 'title'}
+              onClick={() => enter('begin')}
+            >
+              Begin mission <span aria-hidden="true">→</span>
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -355,90 +502,4 @@ function ScrollHint() {
       Scroll · swipe · ← →
     </p>
   );
-}
-
-/**
- * Starfield for the Signal beat: drifts, leans with the pointer, and streaks into a warp as the
- * reveal starts. Plain 2D canvas on the GSAP ticker (the one clock); a still frame for reduced
- * motion; fewer stars on touch screens. Stops once hidden.
- */
-function Starfield({ warp }: { warp: React.RefObject<{ v: number }> }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const el = canvas.current;
-    const ctx = el?.getContext('2d');
-    if (!el || !ctx) return;
-    const count = window.matchMedia('(pointer: coarse)').matches ? 110 : 260;
-    const stars = Array.from({ length: count }, () => ({
-      x: Math.random() * 2 - 1,
-      y: Math.random() * 2 - 1,
-      z: Math.random() * 0.95 + 0.05,
-    }));
-    let w = 0;
-    let h = 0;
-    const look = { x: 0, y: 0, tx: 0, ty: 0 };
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio, 2);
-      w = el.clientWidth;
-      h = el.clientHeight;
-      el.width = w * dpr;
-      el.height = h * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-    const draw = (ratio: number) => {
-      ctx.clearRect(0, 0, w, h);
-      const v = warp.current.v;
-      const speed = (0.0018 + v * v * 0.09) * ratio;
-      look.x += (look.tx - look.x) * 0.05;
-      look.y += (look.ty - look.y) * 0.05;
-      const cx = w / 2 + look.x * 28;
-      const cy = h / 2 + look.y * 28;
-      const scale = Math.max(w, h) * 0.55;
-      ctx.lineCap = 'round';
-      for (const s of stars) {
-        const prevZ = s.z + speed * 1.8;
-        s.z -= speed;
-        if (s.z <= 0.02) {
-          s.x = Math.random() * 2 - 1;
-          s.y = Math.random() * 2 - 1;
-          s.z = 1;
-          continue;
-        }
-        const sx = cx + (s.x / s.z) * scale;
-        const sy = cy + (s.y / s.z) * scale;
-        const px = cx + (s.x / prevZ) * scale;
-        const py = cy + (s.y / prevZ) * scale;
-        const a = Math.min(1, (1 - s.z) * 1.4 + 0.12);
-        ctx.strokeStyle = `rgba(233, 231, 225, ${a})`;
-        ctx.lineWidth = 0.5 + (1 - s.z) * 1.7;
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(sx + 0.01, sy);
-        ctx.stroke();
-      }
-    };
-    const onMove = (e: PointerEvent) => {
-      look.tx = (e.clientX / window.innerWidth - 0.5) * 2;
-      look.ty = (e.clientY / window.innerHeight - 0.5) * 2;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-    if (prefersReducedMotion()) {
-      draw(0);
-      return () => window.removeEventListener('resize', resize);
-    }
-    const tick = () => {
-      if (el.parentElement?.style.visibility === 'hidden') return; // faded out by the reveal: stop drawing
-      draw(gsap.ticker.deltaRatio());
-    };
-    gsap.ticker.add(tick);
-    window.addEventListener('pointermove', onMove, { passive: true });
-    return () => {
-      gsap.ticker.remove(tick);
-      window.removeEventListener('resize', resize);
-      window.removeEventListener('pointermove', onMove);
-    };
-  }, [warp]);
-
-  return <canvas ref={canvas} className={styles.starsCanvas} aria-hidden="true" />;
 }

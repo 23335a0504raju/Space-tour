@@ -24,6 +24,11 @@ interface JourneyStore {
   readonly enteredBy: 'begin' | 'scroll' | 'jump' | null;
   /** Every journey asset downloaded (or the preload gave up); chapters mount only after this. */
   readonly assetsReady: boolean;
+  /**
+   * The 3D scene can be seen (the start gate's portal is open, or the gate is passed). Until then
+   * nothing is drawn: drawing behind the opaque cover only blocked the loader on shader links.
+   */
+  readonly sceneShown: boolean;
   setActiveIndex(index: number): void;
   setTier(tier: QualityTier): void;
   setWebgl(status: WebglStatus): void;
@@ -32,6 +37,7 @@ interface JourneyStore {
   closeBay(): void;
   enter(by?: 'begin' | 'scroll' | 'jump'): void;
   setAssetsReady(): void;
+  showScene(): void;
 }
 
 export const useJourneyStore = create<JourneyStore>((set) => ({
@@ -51,4 +57,6 @@ export const useJourneyStore = create<JourneyStore>((set) => ({
   enter: (by = 'begin') => set((s) => (s.entered ? s : { entered: true, enteredBy: by })),
   assetsReady: false,
   setAssetsReady: () => set({ assetsReady: true }),
+  sceneShown: typeof window !== 'undefined' && window.location.search.includes('gate=off'),
+  showScene: () => set({ sceneShown: true }),
 }));

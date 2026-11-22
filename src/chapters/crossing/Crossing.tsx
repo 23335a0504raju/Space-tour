@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
@@ -7,8 +7,20 @@ import { Starfield, seeded } from '../greybox/parts.tsx';
 import { PAINTED_CLOUDS, SUN_BEYOND } from '../anime/clouds.ts';
 import { Clouds } from '../anime/parts.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
+import { SolarSystem } from './SolarSystem.tsx';
+import { LIGHT_10, TRAVEL_STARS, smooth } from '../handoff.ts';
+import { TRAVEL_SKY } from '../space/skyFrame.ts';
 import { BlackHole } from './BlackHole.tsx';
-import { GATE, TUNNEL, crossingShot, holeRadiusAt, gateOpen, shipZ, styleAt } from './crossing.ts';
+import {
+  GATE,
+  HOLE_RADIUS,
+  TUNNEL,
+  crossingShot,
+  holeRadiusAt,
+  gateOpen,
+  shipZ,
+  styleAt,
+} from './crossing.ts';
 
 /**
  * SC10 · The Edge & The Crossing (FINAL_STORYLINE SC10). A quiet, cold edge of the system → the
@@ -16,10 +28,10 @@ import { GATE, TUNNEL, crossingShot, holeRadiusAt, gateOpen, shipZ, styleAt } fr
  * style pass driven by `style()`; this scene only provides the world it acts on.
  */
 const ENGINE = { current: 0.5 };
-const SUN_DIR = new THREE.Vector3(0.5, 0.35, 0.75).normalize().multiplyScalar(100).toArray();
+const SUN_DIR = new THREE.Vector3(...LIGHT_10.direction).normalize().multiplyScalar(100).toArray();
 
 /** Sparse icy debris near the flight line, so the edge reads as cold and empty (parallax only). */
-function EdgeDust() {
+function EdgeDust({ id, frame }: ChapterSceneProps) {
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
     const rand = seeded(17);
@@ -46,6 +58,10 @@ function EdgeDust() {
     [],
   );
   useDisposeOnUnmount(geo, mat);
+  // fades in after the boundary (SC09 has no dust: nothing may pop in at the cut)
+  useFrame(() => {
+    if (frame.id === id) mat.opacity = 0.6 * smooth(frame.t / 0.08);
+  });
   return <points geometry={geo} material={mat} frustumCulled={false} />;
 }
 
@@ -67,22 +83,26 @@ function CrossingScene({ id, frame }: ChapterSceneProps) {
   });
   return (
     <group>
-      <Starfield count={2200} radius={1500} seed={71} />
-      {/* the Sun, far behind: a small cold star */}
-      <mesh position={[-300, 120, 1500]}>
-        <sphereGeometry args={[5, 12, 8]} />
-        <meshBasicMaterial color={new THREE.Color(3, 2.6, 2.2)} toneMapped={false} />
-      </mesh>
-      <EdgeDust />
-      <directionalLight ref={light} target={sunTarget} color="#dfe8ff" intensity={2.2} />
+      <Starfield {...TRAVEL_STARS} follow orient={TRAVEL_SKY} />
+      {/* the Sun and the eight planets behind us: the look back (solarSystem.ts) */}
+      <Suspense fallback={null}>
+        <SolarSystem />
+      </Suspense>
+      <EdgeDust id={id} frame={frame} />
+      <directionalLight
+        ref={light}
+        target={sunTarget}
+        color={LIGHT_10.color}
+        intensity={LIGHT_10.intensity}
+      />
       <primitive object={sunTarget} />
-      <hemisphereLight args={['#4a5f8a', '#06070b', 0.5]} />
+      <hemisphereLight args={[LIGHT_10.sky, LIGHT_10.ground, LIGHT_10.ambient]} />
 
       <BlackHole
         id={id}
         frame={frame}
         z={GATE.z}
-        radius={16}
+        radius={HOLE_RADIUS}
         radiusAt={holeRadiusAt}
         tunnel={TUNNEL}
         open={gateOpen}

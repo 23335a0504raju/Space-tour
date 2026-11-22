@@ -49,6 +49,8 @@ export function BlackHole({ id, frame, z, radius, radiusAt, tunnel, open, flow =
   const length = tunnel.start - tunnel.end;
 
   const probe = useMemo(() => new THREE.Vector3(), []);
+  const ahead = useMemo(() => new THREE.Vector3(), []);
+  const toHole = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ clock, camera, size: viewport }) => {
     if (frame.id === id) {
       hole.uniforms['uOpen']!.value = open(frame.t);
@@ -71,13 +73,16 @@ export function BlackHole({ id, frame, z, radius, radiusAt, tunnel, open, flow =
       const persp = camera as THREE.PerspectiveCamera;
       const tanHalf = Math.tan((persp.fov * Math.PI) / 360);
       const re = (R * 1.7) / Math.max(d, 1) / (2 * tanHalf);
+      // behind the camera (the look back) there is nothing to lens
+      camera.getWorldDirection(ahead);
+      const inFront = ahead.dot(toHole.set(0, 0, z).sub(camera.position)) > 0;
       probe.set(0, 0, z).project(camera);
       lensState.owner = id;
       lensState.x = probe.x * 0.5 + 0.5;
       lensState.y = probe.y * 0.5 + 0.5;
       lensState.aspect = viewport.width / viewport.height;
       lensState.re =
-        cz > z && Number.isFinite(probe.x + probe.y) ? Math.min(0.75, re) * swallow : 0;
+        cz > z && inFront && Number.isFinite(probe.x + probe.y) ? Math.min(0.75, re) * swallow : 0;
       if (fallGroup.current) fallGroup.current.visible = reveal > 0.002;
     } else if (lensState.owner === id) {
       lensState.re = 0;
@@ -103,5 +108,44 @@ export function BlackHole({ id, frame, z, radius, radiusAt, tunnel, open, flow =
         </mesh>
       </group>
     </>
+  );
+}
+
+/**
+ * The same black hole seen from far away, for the chapter before (SC09, handoff.ts): the shader
+ * at SC10's opening size and brightness, facing the camera. It never owns the lens: at this
+ * distance SC10's Einstein ring is about 3 % of the screen height.
+ */
+export function DistantBlackHole({
+  position,
+  radius,
+  size,
+  open,
+}: {
+  position: readonly [number, number, number];
+  /** apparent radius (SC10 at t = 0) */
+  radius: number;
+  /** the radius its quad is built for (SC10's full hole) */
+  size: number;
+  open: number;
+}) {
+  const low = useJourneyStore((s) => s.tier !== 'balanced');
+  const hole = useMemo(() => createBlackHoleMaterial(low), [low]);
+  useDisposeOnUnmount(hole);
+  const quad = useRef<THREE.Mesh>(null);
+  useFrame(({ clock, camera }) => {
+    hole.uniforms['uOpen']!.value = open;
+    hole.uniforms['uFade']!.value = 1;
+    hole.uniforms['uTime']!.value = clock.elapsedTime;
+    if (quad.current) {
+      quad.current.quaternion.copy(camera.quaternion);
+      quad.current.scale.setScalar(radius / size);
+    }
+  });
+  const side = size * BLACK_HOLE_EXTENT * 2;
+  return (
+    <mesh ref={quad} position={[...position]} material={hole} renderOrder={5}>
+      <planeGeometry args={[side, side]} />
+    </mesh>
   );
 }

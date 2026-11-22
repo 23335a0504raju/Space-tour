@@ -1,8 +1,14 @@
 /**
  * Wheel pacing: pure maths for the scroll governor (unit-tested; the DOM wiring is in
  * usePacedWheel.ts). Each wheel event moves a *target* by the full wheel delta; the page follows
- * it with a short ease. The only brake is a speed cap, so a steady wheel feels direct while a hard
- * flick or trackpad momentum travels about one chapter, never the whole story.
+ * it with one exponential ease (the only smoothing layer: the story follows the page directly).
+ * A hard flick or trackpad momentum still travels about one chapter, never the whole story: the
+ * target may not run far ahead of the page, and a fling's budget runs out.
+ *
+ * 2026-11-22 (scroll fix): the ease matches the reference site (Shopify Editions, Lenis): one wheel
+ * notch is half done in ~0.1 s and 90 % done in ~0.33 s. The hard speed cap is gone: it made
+ * flings travel at a constant speed and stop abruptly. Speed is now bounded smoothly by
+ * maxLead × ease, about 2.7 screens per second at most.
  *
  * Distances are fractions of the viewport height (vh), so the feel is the same on any screen.
  * History: v1 kept 55 % of each notch and dropped the rest after 120 ms of silence, which made one
@@ -11,10 +17,8 @@
 export const PACING = {
   /** Largest target change one wheel event can make (vh). A mouse notch (~100 px) passes whole. */
   maxStep: 0.3,
-  /** Fraction of the remaining gap closed per 60 fps frame (~90 % in 0.22 s). */
-  ease: 0.16,
-  /** Fastest the page may travel, in vh per 60 fps frame: about 1.5 screens per second. */
-  maxSpeed: 0.025,
+  /** Fraction of the remaining gap closed per 60 fps frame (~50 % in 0.1 s, ~90 % in 0.33 s). */
+  ease: 0.11,
   /** Furthest the target may run ahead of the page (vh). Input beyond it is discarded, never queued. */
   maxLead: 0.45,
   /** Wheel silence (ms) that ends a continuous input stream (a fling and its momentum). */
@@ -61,11 +65,9 @@ export function wheelStep(deltaY: number, deltaMode: number, viewportH: number):
   return Math.max(-cap, Math.min(cap, px));
 }
 
-/** One follower step toward `target`; `ratio` = frame time / (1/60 s). */
-export function follow(current: number, target: number, ratio: number, viewportH: number): number {
+/** One follower step toward `target`; `ratio` = frame time / (1/60 s). Frame-rate independent. */
+export function follow(current: number, target: number, ratio: number): number {
   const gap = target - current;
   if (Math.abs(gap) < 0.25) return target;
-  const want = gap * (1 - Math.pow(1 - PACING.ease, ratio));
-  const cap = PACING.maxSpeed * viewportH * ratio;
-  return current + Math.max(-cap, Math.min(cap, want));
+  return current + gap * (1 - Math.pow(1 - PACING.ease, ratio));
 }

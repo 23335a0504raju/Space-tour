@@ -10,7 +10,7 @@ import { dwell, resolve } from '../scroll/resolver.ts';
 import type { Track } from '../scroll/resolver.ts';
 import type { ScrollMasterState } from '../scroll/useScrollMaster.ts';
 import { useJourneyStore } from '../store.ts';
-import { boundaryDip, restOpacity } from './overlayMath.ts';
+import { restOpacity } from './overlayMath.ts';
 
 /**
  * Portrait screens put the text panel in the bottom half and the header at the top, leaving a
@@ -37,7 +37,6 @@ export interface OverlayEntry {
 export interface DirectorLinks {
   readonly groups: Map<string, THREE.Group>;
   readonly overlays: Map<string, OverlayEntry>;
-  dip: HTMLElement | null;
   progressBar: HTMLElement | null;
   /** Overall story percentage (header progress line); text written only when it changes. */
   progressText: HTMLElement | null;
@@ -64,24 +63,17 @@ export function Director({ master, frame, links }: Props) {
       m.set(id, new THREE.Color(impl.background));
     return m;
   }, []);
-  const dipColors = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const [id, impl] of Object.entries(implementations))
-      m.set(id, impl.exitColor ?? '#000000');
-    return m;
-  }, []);
-  const lastDip = useMemo(() => ({ opacity: -1, color: '' }), []);
-
   // size the lens shift was last applied for (so it is only rewritten when something changes)
   const lens = useMemo(() => ({ w: 0, h: 0, shift: 0 }), []);
 
   useFrame(({ camera, scene, size }) => {
-    const r = resolve(links.track, master.progress);
+    const progress = master.progress;
+    const r = resolve(links.track, progress);
     const meta = chapters[r.index];
     const impl = implementations[r.id];
     if (!meta || !impl) return;
 
-    frame.progress = master.progress;
+    frame.progress = progress;
     frame.index = r.index;
     frame.id = r.id;
     frame.localT = r.localT;
@@ -97,7 +89,8 @@ export function Director({ master, frame, links }: Props) {
     // Image-based lighting of the active chapter (looked up each frame: it may finish loading later).
     const env = getEnvironment(impl.environment?.key);
     if (scene.environment !== env) scene.environment = env;
-    const envIntensity = impl.environment?.intensity ?? 1;
+    const ei = impl.environment?.intensity ?? 1;
+    const envIntensity = typeof ei === 'function' ? ei(frame.t) : ei;
     if (scene.environmentIntensity !== envIntensity) scene.environmentIntensity = envIntensity;
 
     const bg = backgrounds.get(r.id);
@@ -153,25 +146,6 @@ export function Director({ master, frame, links }: Props) {
         entry.el.style.visibility = visible ? 'visible' : 'hidden';
         entry.el.inert = !visible;
         entry.el.setAttribute('aria-hidden', String(!visible));
-      }
-    }
-
-    // Boundary dip masks grey-box cuts; colour comes from the chapter being left.
-    if (links.dip) {
-      const dip = boundaryDip(
-        r.localT,
-        r.index === 0 || chapters[r.index]?.seamlessFromPrevious === true,
-        r.index === chapters.length - 1 || chapters[r.index + 1]?.seamlessFromPrevious === true,
-      );
-      const leaving = r.localT > 0.5 ? r.id : (chapters[r.index - 1]?.id ?? r.id);
-      const color = dipColors.get(leaving) ?? '#000000';
-      if (Math.abs(dip - lastDip.opacity) > 0.002) {
-        links.dip.style.opacity = dip.toFixed(3);
-        lastDip.opacity = dip;
-      }
-      if (color !== lastDip.color) {
-        links.dip.style.background = color;
-        lastDip.color = color;
       }
     }
 
