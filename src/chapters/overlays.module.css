@@ -625,3 +625,44 @@
     white-space: nowrap;
   }
 }
+
+/* Phones: the tech stack's label column took 40% of a 360 px panel and the five groups ran past the
+   sheet. Labels sit above their technologies, the type tightens a step, and the stack panel takes
+   the taller sheet the project showcase uses, so every technology is shown without inner scroll. */
+@media (max-width: 720px) {
+  .rings > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1, 0.25rem);
+    padding: var(--space-2) 0;
+  }
+
+  .rings dd {
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+
+  .left:has(.rings),
+  .right:has(.rings) {
+    max-height: calc(100svh - 12.5rem);
+  }
+}
+
+/* Short phones (about 800 px tall or less): one more step tighter, so the last group is not cut. */
+@media (max-width: 720px) and (max-height: 800px) {
+  .left:has(.rings),
+  .right:has(.rings) {
+    padding: var(--space-4);
+  }
+
+  .panel:has(.rings) .heading {
+    font-size: 1.5rem;
+  }
+
+  .rings > div {
+    padding: var(--space-1, 0.25rem) 0;
+  }
+
+  .rings dd {
+    font-size: 0.8125rem;
+  }
+}

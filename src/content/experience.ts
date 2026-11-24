@@ -1,4 +1,4 @@
-import { conflict, fromSource, missing } from './fact.ts';
+import { confirmed, conflict, fromSource, missing } from './fact.ts';
 import { SRC } from './sources.ts';
 import type { Experience, WorkProject } from './types.ts';
 
@@ -25,8 +25,9 @@ const projectTemplate = (id: string, hint: string): WorkProject => ({
 
 const U = [SRC.userSpotmies];
 const LATER = 'Raju will send the full brief and links later (2026-11-24).';
-const permission = () =>
-  missing(false, 'Confirm Spotmies allows this project to be named publicly (confidentiality).');
+const A = [SRC.userAnswers];
+/** Raju, 2026-11-24: "yes no issue, under Spotmies mention them". */
+const permission = () => confirmed(true, A, 'Raju confirmed these may be named under Spotmies.');
 
 /**
  * Spotmies projects as Raju described them (session, 2026-11-24). Only what he said is recorded;
@@ -54,9 +55,13 @@ const spotmiesProjects: readonly WorkProject[] = [
     name: fromSource('Cloud and AWS management', U),
     summary: fromSource('AWS messaging and access management, and internal tools.', U),
     contribution: fromSource(
-      ['Managed AWS SMS, SNS and IAM', 'Built internal tools'],
-      U,
-      'Raju also wrote "by syncing": what was synced (accounts, data, environments)? Not added until he says.',
+      [
+        'Worked with AWS end to end: SMS, SNS and IAM',
+        'Connected the services and kept them working',
+        'Built internal tools',
+      ],
+      [...U, ...A],
+      'Raju: "in cloud I completely worked with AWS, SMS, SNS, IAM connectivity and working".',
     ),
     stack: fromSource(['AWS SNS', 'AWS SMS', 'AWS IAM'], U),
     links: missing({}, 'Internal work: probably no public links.'),
@@ -86,15 +91,15 @@ export const experience: readonly Experience[] = [
   {
     id: 'spotmies',
     organisation: fromSource('Spotmies LLP', [SRC.linkedinExperience, SRC.resume]),
-    role: conflict(
-      'MERN Stack Developer',
-      [SRC.linkedinExperience, SRC.linkedin, SRC.resume],
-      'LinkedIn experience: "Mern Stack Developer", Full-time; LinkedIn About: "Full-Stack Developer at Spotmies"; resume: "Full-Stack Developer Intern". Which title should the site show?',
+    role: confirmed(
+      'Full-Stack Developer',
+      [...A, SRC.resume2026, SRC.linkedin],
+      'Raju chose "Full stack developer" (2026-11-24). LinkedIn experience says "Mern Stack Developer".',
     ),
     period: conflict(
       { start: 'Dec 2025', end: 'Present' },
-      [SRC.linkedinExperience, SRC.resume],
-      'LinkedIn: Dec 2025 – Present (full-time). Resume: Dec 2025 – Jun 2026 (intern). Confirm.',
+      [SRC.linkedinExperience, SRC.resume2026],
+      'Still open: LinkedIn says Dec 2025 – Present (full-time); the current resume says Dec 2025 – Jun 2026 (intern). Are you still at Spotmies?',
     ),
     summary: fromSource(
       'Builds and ships full-stack features with React.js and Node.js, from API design to frontend integration: RESTful APIs used by both web and mobile apps, and production deployments on Vercel and Render.',
@@ -103,13 +108,15 @@ export const experience: readonly Experience[] = [
     ),
     responsibilities: fromSource(
       [
-        'Payment handling',
-        'Bug fixes',
-        'Cloud and database management',
+        'Integrated Redis for API response caching, session storage and rate limiting, cutting average API response time by about 20–40%',
+        'Raised test coverage from about 30% to 60% with JUnit/TestNG unit and integration tests and Postman API checks',
+        'Containerised services with Docker and automated builds and deployments with Jenkins and GitHub Actions',
+        'Payment handling, bug fixes, and cloud and database management',
         'Git and repository management across projects',
+        'Agile/Scrum: sprint planning, daily stand-ups and code reviews',
       ],
-      U,
-      `Raju: "payment handlings, bug fixes, cloud, DB management, everything through projects, git managing, everything handled". ${LATER}`,
+      [...U, SRC.resume2026, ...A],
+      `Raju's message and the current resume's Spotmies bullets; the metrics are the resume's own, published on Raju's word ("no proof required", 2026-11-24). ${LATER}`,
     ),
     lessons: fromSource(
       [
@@ -125,20 +132,20 @@ export const experience: readonly Experience[] = [
   {
     id: 'pit-solutions',
     organisation: fromSource('PIT Solutions', [SRC.resume, SRC.linkedinExperience]),
-    role: conflict(
-      'Full-Stack Developer Intern',
-      [SRC.linkedinExperience, SRC.resume],
-      'LinkedIn: "Full Stack Developer", Internship. Resume: "Frontend Development Intern". Which title?',
+    role: confirmed(
+      'Frontend Developer Intern',
+      [...A, SRC.resume2026, SRC.linkedinExperience],
+      'Raju chose "frontend developer" (2026-11-24); the resume and LinkedIn both say it was an internship.',
     ),
-    period: conflict(
-      { start: 'Dec 2022', end: 'Jun 2023' },
-      [SRC.linkedinExperience, SRC.resume],
-      'LinkedIn: Dec 2022 – Jun 2023 (7 months). Resume: Dec 2022 – May 2023. Confirm.',
+    period: fromSource(
+      { start: 'Dec 2022', end: 'May 2023' },
+      [SRC.resume2026, SRC.resume],
+      'The current resume. LinkedIn says Jun 2023.',
     ),
     summary: fromSource(
-      'Designed and built responsive client-facing dashboards with HTML, CSS, and JavaScript, working in Agile sprints with multidisciplinary teams.',
-      [SRC.resume],
-      'Rephrased from the resume. LinkedIn only says "Developed a full stack web application for my internship". Approve wording.',
+      'Built 5+ responsive frontend modules for client dashboards with React.js and JavaScript, integrating REST APIs and using Git for version control.',
+      [SRC.resume2026],
+      'From the current resume.',
     ),
     projects: [
       projectTemplate(

@@ -19,32 +19,49 @@ export const strengths: Fact<readonly string[]> = confirmed(
   [SRC.portfolio, SRC.resume, SRC.userP4Sc06],
 );
 
-const P = [SRC.portfolio];
+/** The current resume, then the old site. */
+const R = [SRC.resume2026, SRC.portfolio];
 
-/** Technology stack (SC09, Saturn ring bands), regrouped from Portfolio.jsx `techStack`. */
+/** Technology stack (SC09, Saturn ring bands): the current resume merged with Portfolio.jsx. */
 export const stack: readonly StackGroup[] = [
   {
     id: 'languages',
     label: 'Languages',
-    items: fromSource(['Java', 'Python', 'C/C++', 'TypeScript', 'JavaScript'], P),
+    items: fromSource(['Java', 'Python', 'TypeScript', 'JavaScript', 'C/C++', 'SQL'], R),
   },
   {
     id: 'frontend-mobile',
     label: 'Frontend & Mobile',
-    items: fromSource(['HTML5', 'CSS3', 'React', 'Vite', 'React Native', 'Expo'], P),
+    items: fromSource(
+      ['React', 'React Native', 'Expo', 'Tailwind CSS', 'HTML5', 'CSS3', 'Vite'],
+      R,
+    ),
   },
   {
     id: 'backend',
     label: 'Backend & APIs',
-    items: fromSource(['Node.js', 'Express.js', 'Django REST'], P),
+    items: fromSource(['Node.js', 'Express.js', 'FastAPI', 'Django REST', 'REST APIs'], R),
   },
   {
     id: 'data-cloud',
-    label: 'Data & Cloud',
+    label: 'Data, Cloud & DevOps',
     items: fromSource(
-      ['MySQL', 'PostgreSQL', 'MongoDB', 'Supabase', 'Vercel', 'Render', 'Docker'],
-      P,
-      'AWS appears in ResumeNew.jsx but in no project. Excluded unless you can support it.',
+      [
+        'PostgreSQL',
+        'MySQL',
+        'MongoDB',
+        'Redis',
+        'Supabase',
+        'AWS (EC2, S3, SNS, IAM)',
+        'Docker',
+        'Jenkins',
+        'GitHub Actions',
+        'Vercel',
+        'Render',
+        'Railway',
+      ],
+      [...R, SRC.userSpotmies],
+      'AWS is now backed by the Spotmies cloud work (SMS, SNS, IAM) and the current resume (EC2, S3).',
     ),
   },
   {
@@ -52,13 +69,15 @@ export const stack: readonly StackGroup[] = [
     label: 'AI & Automation',
     items: fromSource(
       [
-        'Machine learning (TensorFlow, TensorFlow.js)',
-        'YOLOv8',
         'LangChain / RAG',
-        'OpenRouter API',
+        'Vector databases',
+        'LLM APIs (OpenRouter)',
+        'YOLOv8',
+        'TensorFlow',
+        'scikit-learn',
         'n8n',
       ],
-      P,
+      R,
     ),
   },
 ];

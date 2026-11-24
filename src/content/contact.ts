@@ -1,4 +1,4 @@
-import { fromSource, missing } from './fact.ts';
+import { fromSource } from './fact.ts';
 import { SRC } from './sources.ts';
 import type { Contact } from './types.ts';
 
@@ -8,9 +8,10 @@ export const contact: Contact = {
     [SRC.resume, SRC.contact],
     'Confirm this is the recruiter-facing address (Q11).',
   ),
-  resumeUrl: missing(
+  resumeUrl: fromSource(
     '/resume.pdf',
-    'No current resume found (2026-11-24): Drive file 1Q5h… no longer exists, and the other two Drive links are college project reports. Provide the current PDF (Q5).',
+    [SRC.resume2026],
+    'The current resume Raju supplied (2026-11-24). It includes his phone number, so publishing it makes the number public.',
   ),
   links: [
     {

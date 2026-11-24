@@ -40,15 +40,16 @@ describe('content module', () => {
     }
   });
 
-  it('work-project templates stay wholly unpublished; no project claims public permission yet', () => {
+  it('work-project templates stay wholly unpublished; public permission only ever comes from Raju', () => {
     const all = content.experience.flatMap((x) => x.projects);
     for (const p of all) {
       // a template (no real name yet) never leaks a placeholder field
       if (p.name.status === 'missing')
         for (const f of [p.summary, p.contribution, p.stack, p.links])
           expect(f.status).toBe('missing');
-      // the employer's permission is Raju's to confirm, never assumed
-      expect(p.publicPermission.status).toBe('missing');
+      // the employer's permission is Raju's to grant: missing, or confirmed by him, never inferred
+      expect(['missing', 'confirmed']).toContain(p.publicPermission.status);
+      if (p.publicPermission.value) expect(p.publicPermission.status).toBe('confirmed');
     }
   });
 

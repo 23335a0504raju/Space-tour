@@ -1,4 +1,4 @@
-import { fromSource, unverified } from './fact.ts';
+import { confirmed, fromSource } from './fact.ts';
 import { SRC } from './sources.ts';
 import type { Fact } from './fact.ts';
 import type { Certification } from './types.ts';
@@ -12,16 +12,25 @@ export const certifications: Fact<readonly Certification[]> = fromSource(
     { name: 'Digital Business Skills', issuer: 'HP', year: '2025' },
     { name: 'GenAI Data Analytics Simulation', issuer: 'Tata iQ', year: '2025' },
     { name: 'AWS Solutions Architecture', issuer: 'Forage', year: '2024' },
-    { name: 'Cloud Computing (84%)', issuer: 'NPTEL', year: '2024' },
+    {
+      name: 'Cloud Computing: Distributed Systems & Reliability (84%)',
+      issuer: 'NPTEL',
+      year: '2024',
+    },
     { name: 'Python Essentials 1 & 2', issuer: 'Cisco', year: '2024' },
   ],
-  [SRC.resume, SRC.linkedinCertifications],
+  [SRC.resume2026, SRC.resume, SRC.linkedinCertifications],
   'Deloitte simulations: LinkedIn, issued Jul 2025 (credential ID za8Qenw9cDxXJhyoH) and Jun 2025 (yuiNqJkzirAWvQcZr). The others are from the resume and are not on LinkedIn. Credential URLs not in any source.',
 );
 
 /** Course completions (Udemy certificates posted on LinkedIn). Mission Brief only. */
 export const courses: Fact<readonly Certification[]> = fromSource(
   [
+    {
+      name: 'Master RAG: Retrieval-Augmented Generation',
+      issuer: 'Udemy / TCS',
+      year: '2026',
+    },
     {
       name: 'Software Engineering 101: Plan and Execute Better Software',
       issuer: 'Udemy',
@@ -35,8 +44,8 @@ export const courses: Fact<readonly Certification[]> = fromSource(
     { name: 'AI for Every Employee: Understanding and Using AI', issuer: 'Udemy', year: '2026' },
     { name: 'Complete Data Privacy (GDPR) Fundamentals', issuer: 'Udemy', year: '2026' },
   ],
-  [SRC.postCourses],
-  "Years from the posts' ages on 2026-11-24 (6 hours to 2 months old). The Agentic RAG course is not named in its post, so it is not listed.",
+  [SRC.postCourses, SRC.resume2026],
+  "Master RAG is on the current resume; the rest are Raju's LinkedIn certificate posts (years from their ages on 2026-11-24).",
 );
 
 /**
@@ -44,31 +53,31 @@ export const courses: Fact<readonly Certification[]> = fromSource(
  * ("+25% API speed", "99.9% uptime") are deliberately NOT included (decision B3-5).
  */
 export const achievements: readonly Fact<string>[] = [
-  unverified(
+  confirmed(
     'Hackathon finalist: built a blogging platform with authentication and role-based access in under 24 hours',
-    [SRC.portfolio],
-    'Not on LinkedIn (checked 2026-11-24). Which hackathon, and when? Is it the same event as the Fitness Tracker hackathon?',
+    [SRC.userAnswers, SRC.resume2026, SRC.portfolio],
+    'Raju, 2026-11-24: publish it, no proof required. Event name not given.',
   ),
-  unverified(
+  confirmed(
     'Solved 450+ problems on LeetCode and CodeChef',
-    [SRC.portfolio, SRC.resume, SRC.linkedin, SRC.linkedinFeatured],
-    'LinkedIn says 450+ too, but LeetCode shows 243 solved (2026-11-24) and no CodeChef profile is linked anywhere. Share the CodeChef profile, or lower the number.',
+    [SRC.userAnswers, SRC.resume2026, SRC.linkedin],
+    'Raju, 2026-11-24: publish it, no proof required (LeetCode alone shows 243).',
   ),
   fromSource(
     'Reduced the Stash Android APK from 218 MB to about 29 MB',
     [SRC.postStash, SRC.portfolio],
-    'Raju\'s Stash post: "My first Android build was a hefty 218 MB" … "the shareable APK dropped to ~29 MB" (ARM64-only, R8 shrinking and minification).',
+    'From the Stash post by Raju: "My first Android build was a hefty 218 MB" … "the shareable APK dropped to ~29 MB" (ARM64-only, R8 shrinking and minification).',
   ),
 ];
 
 export const learning: Fact<string> = fromSource(
-  'Agentic RAG with LangGraph: workflows that check what they retrieve, rewrite the question, call tools and route themselves, instead of a fixed retrieve-then-generate pipeline.',
-  [SRC.postAgenticRag, SRC.postCourses],
-  'From Raju\'s LinkedIn post "Exploring Agentic RAG with LangGraph" (about 2 months before 2026-11-24). Approve wording, or write it yourself (Q8).',
+  'Retrieval-augmented generation, from RAG pipelines to agentic RAG with LangGraph, and the software engineering underneath: architecture, design and modularity.',
+  [SRC.postAgenticRag, SRC.postCourses, SRC.resume2026, SRC.userAnswers],
+  'From the RAG and Software Engineering 101 certificates and posts, which he pointed to (2026-11-24). Approve wording.',
 );
 
-export const futureDirection: Fact<string> = fromSource(
-  'Building real-time backend systems with teams that value ownership, move fast, and care about what happens after merge.',
-  [SRC.linkedin],
-  'Combined from the LinkedIn About ("production-grade, real-time backend systems"; "teams that value ownership, move fast, and care about what happens after merge"). Approve wording, or write it yourself (Q8).',
+export const futureDirection: Fact<string> = confirmed(
+  'Becoming a full-stack, AI and Java developer.',
+  [SRC.userAnswers],
+  'Raju, 2026-11-24: "I am going to become full stack, AI and Java developer".',
 );

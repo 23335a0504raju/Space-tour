@@ -14,6 +14,11 @@ export const SRC = {
   userBatch1: 'Batch 1 brief (user message)',
   userBatch3: 'Batch 3 / P0 instruction (user message)',
   userP4Sc06: 'P4 SC06 gate: user chose all five proposed strengths (2026-11-17)',
+  /** The current resume Raju supplied (2026-11-24), shipped as public/resume.pdf. */
+  resume2026:
+    'Resume "Raju_Chowdavada_Full_stack.pdf" (supplied by Raju 2026-11-24; public/resume.pdf)',
+  /** Raju's answers to the open decisions, in session (2026-11-24). */
+  userAnswers: 'Raju, session 2026-11-24: answers to the ten open decisions',
   /** Raju's own account of his Spotmies work, in session (2026-11-24). */
   userSpotmies: 'Raju, session 2026-11-24: Spotmies projects and responsibilities',
   // LinkedIn, read-only, 2026-11-24 (Claude in Chrome; text copied verbatim, pasted by Raju)

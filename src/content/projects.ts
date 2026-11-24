@@ -176,14 +176,14 @@ export const projects: readonly Project[] = [
     ),
     role: fromSource('Lead Developer & ML Engineer', P),
     stack: fromSource(['React', 'Django REST', 'TensorFlow.js', 'Vercel', 'Render'], P),
-    features: unverified(
+    features: fromSource(
       [
-        'ML-based demand forecasting',
+        'Demand forecasting with Linear Regression and Random Forest models trained on Kaggle datasets',
         'Automated low-stock alerts',
         'Interactive data visualisations',
       ],
-      [SRC.portfolio, SRC.driveReports],
-      'The project report (Oct 2024) confirms "demand forecasting" in the Intelligent Stock Management Interface, but does not say it is machine learning. Check the repository.',
+      [SRC.resume2026, SRC.portfolio, SRC.driveReports],
+      'The current resume names the models and says Random Forest beat the baseline by about 20%. Alerts and visualisations are from the old site.',
     ),
     links: fromSource(
       {
