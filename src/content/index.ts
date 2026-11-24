@@ -1,5 +1,5 @@
 import { contact } from './contact.ts';
-import { achievements, certifications, futureDirection, learning } from './credentials.ts';
+import { achievements, certifications, courses, futureDirection, learning } from './credentials.ts';
 import { education } from './education.ts';
 import { experience } from './experience.ts';
 import { identity } from './identity.ts';
@@ -16,6 +16,7 @@ export const content: PortfolioContent = {
   stack,
   projects,
   certifications,
+  courses,
   achievements,
   learning,
   futureDirection,

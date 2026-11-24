@@ -32,19 +32,23 @@ describe('content module', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('includes the Pit Solutions and Spotmies internships, each with project templates', () => {
+  it('includes Spotmies and PIT Solutions, each with at least one project entry', () => {
     const orgs = content.experience.map((x) => x.organisation.value);
-    expect(orgs).toEqual(expect.arrayContaining(['Spotmies', 'Pit Solutions']));
+    expect(orgs).toEqual(expect.arrayContaining(['Spotmies LLP', 'PIT Solutions']));
     for (const job of content.experience) {
       expect(job.projects.length).toBeGreaterThan(0);
     }
   });
 
-  it('internship project templates stay unpublishable until filled in', () => {
-    const templates = content.experience.flatMap((x) => x.projects);
-    for (const t of templates) {
-      expect(t.name.status).toBe('missing');
-      expect(t.publicPermission.status).toBe('missing');
+  it('work-project templates stay wholly unpublished; no project claims public permission yet', () => {
+    const all = content.experience.flatMap((x) => x.projects);
+    for (const p of all) {
+      // a template (no real name yet) never leaks a placeholder field
+      if (p.name.status === 'missing')
+        for (const f of [p.summary, p.contribution, p.stack, p.links])
+          expect(f.status).toBe('missing');
+      // the employer's permission is Raju's to confirm, never assumed
+      expect(p.publicPermission.status).toBe('missing');
     }
   });
 

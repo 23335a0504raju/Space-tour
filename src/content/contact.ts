@@ -10,7 +10,7 @@ export const contact: Contact = {
   ),
   resumeUrl: missing(
     '/resume.pdf',
-    'Two different Google Drive resumes exist (ResumeNew.jsx vs Contact.jsx). Provide the current PDF (Q5).',
+    'No current resume found (2026-11-24): Drive file 1Q5h… no longer exists, and the other two Drive links are college project reports. Provide the current PDF (Q5).',
   ),
   links: [
     {
@@ -21,11 +21,11 @@ export const contact: Contact = {
     {
       id: 'linkedin',
       label: 'LinkedIn',
-      href: fromSource('https://www.linkedin.com/in/raju-chowdavada-06b734347', [
-        SRC.resume,
-        SRC.contact,
-        SRC.footer,
-      ]),
+      href: fromSource(
+        'https://www.linkedin.com/in/rajuchowdavada/',
+        [SRC.linkedin, SRC.resume, SRC.contact, SRC.footer],
+        'The old URL (/in/raju-chowdavada-06b734347) redirects here; this is the public profile URL.',
+      ),
     },
     {
       id: 'leetcode',

@@ -44,6 +44,10 @@ export interface Experience {
   readonly role: Fact<string>;
   readonly period: Fact<Period>;
   readonly summary: Fact<string>;
+  /** Day-to-day ownership across the role's projects (Brief only). */
+  readonly responsibilities?: Fact<readonly string[]>;
+  /** What the role taught, in Raju's own words (Brief only). */
+  readonly lessons?: Fact<readonly string[]>;
   readonly projects: readonly WorkProject[];
 }
 
@@ -105,6 +109,8 @@ export interface PortfolioContent {
   readonly stack: readonly StackGroup[];
   readonly projects: readonly Project[];
   readonly certifications: Fact<readonly Certification[]>;
+  /** Course completions (Mission Brief only). */
+  readonly courses: Fact<readonly Certification[]>;
   readonly achievements: readonly Fact<string>[];
   readonly learning: Fact<string>;
   readonly futureDirection: Fact<string>;

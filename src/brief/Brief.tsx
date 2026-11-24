@@ -12,7 +12,10 @@ const {
   stack,
   projects,
   certifications,
+  courses,
   achievements,
+  learning,
+  futureDirection,
 } = content;
 
 const DEV = import.meta.env.DEV;
@@ -85,12 +88,36 @@ function ExperienceEntry({ job }: { job: Experience }) {
       <p>
         <FactText fact={job.summary} />
       </p>
+      {job.responsibilities && shouldShow(job.responsibilities) && (
+        <>
+          <p className={styles.subhead}>Also owned</p>
+          <ul className={styles.bullets}>
+            {job.responsibilities.value.map((item) => (
+              <li key={item}>
+                <FactText fact={job.responsibilities!}>{item}</FactText>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {visibleProjects.length > 0 && (
         <>
           <p className={styles.subhead}>Projects</p>
           <ul className={styles.workProjects}>
             {visibleProjects.map((p) => (
               <WorkProjectCard key={p.id} project={p} />
+            ))}
+          </ul>
+        </>
+      )}
+      {job.lessons && shouldShow(job.lessons) && (
+        <>
+          <p className={styles.subhead}>What it taught me</p>
+          <ul className={styles.bullets}>
+            {job.lessons.value.map((item) => (
+              <li key={item}>
+                <FactText fact={job.lessons!}>{item}</FactText>
+              </li>
             ))}
           </ul>
         </>
@@ -150,6 +177,11 @@ export function Brief() {
         <p className={styles.summary}>
           <FactText fact={identity.summary} />
         </p>
+        {shouldShow(identity.availability) && (
+          <p className={styles.summary}>
+            <FactText fact={identity.availability} />
+          </p>
+        )}
         <nav aria-label="Sections" className={styles.toc}>
           <a href="#experience">Experience</a>
           <a href="#projects">Projects</a>
@@ -257,6 +289,20 @@ export function Brief() {
               </li>
             ))}
           </ul>
+          {shouldShow(courses) && (
+            <>
+              <h3 className={styles.subhead}>Courses</h3>
+              <ul className={styles.compactList}>
+                {courses.value.map((c) => (
+                  <li key={c.name}>
+                    <FactText fact={courses}>
+                      {c.name} · {c.issuer}, {c.year}
+                    </FactText>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {visibleAchievements.length > 0 && (
             <>
               <h3 id="achievements" className={styles.subhead}>
@@ -272,6 +318,24 @@ export function Brief() {
             </>
           )}
         </section>
+
+        {(shouldShow(learning) || shouldShow(futureDirection)) && (
+          <section id="direction" className={styles.section} aria-labelledby="direction-title">
+            <h2 id="direction-title">What comes next</h2>
+            {shouldShow(learning) && (
+              <p>
+                <strong>Learning now: </strong>
+                <FactText fact={learning} />
+              </p>
+            )}
+            {shouldShow(futureDirection) && (
+              <p>
+                <strong>Next: </strong>
+                <FactText fact={futureDirection} />
+              </p>
+            )}
+          </section>
+        )}
 
         <section id="contact" className={styles.section}>
           <ContactPanel id="brief-contact" />

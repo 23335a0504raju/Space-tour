@@ -75,7 +75,7 @@ test('journey: every rest point shows its content (screenshots for review)', asy
   const checks: Array<[string, number, string, RegExp]> = [
     ['sc13-transmission', 0.6, 'Contact', /Open channel/],
     ['sc08-jupiter', 0.25, 'SmartWay Traffic', /Creator & Lead Developer/],
-    ['sc04-crew-record', 0.35, 'Experience', /Spotmies[\s\S]*Pit Solutions/],
+    ['sc04-crew-record', 0.35, 'Experience', /Spotmies[\s\S]*Pit Solutions/i],
     ['sc04-crew-record', 0.7, 'Education', /MVGR College of Engineering/],
   ];
   for (const [id, r, label, text] of checks) {

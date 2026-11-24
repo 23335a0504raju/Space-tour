@@ -38,7 +38,7 @@ test.describe('P0 smoke', () => {
     await page.goto('/brief/');
     const experience = page.locator('#experience');
     await expect(experience).toContainText('Spotmies');
-    await expect(experience).toContainText('Pit Solutions');
+    await expect(experience).toContainText(/Pit Solutions/i);
     await expect(experience).not.toContainText('Template');
   });
 
