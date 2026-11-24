@@ -3,21 +3,57 @@ import type { ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ChapterImpl, ChapterSceneProps, JourneyFrame } from '../contract.ts';
+import { useJourneyStore } from '../../engine/store.ts';
 import { HelVela } from '../ship/HelVela.tsx';
-import { AREAS, areaShot, markScale, shipZ, skyMix } from './anime.ts';
+import { AREAS, areaShot, cloudSea, presence, shipZ, skyMix } from './anime.ts';
 import type { AreaId } from './anime.ts';
 import { PAINTED_CLOUDS, SUN_BEYOND } from './clouds.ts';
 import { ANIME_MODELS, AnimeModel } from './AnimeModel.tsx';
-import { Clouds, Island, LightRoad, Motes, RingedPlanet, SkyDome, Spire, Torii } from './parts.tsx';
+import { createHaze, horizonColor } from './haze.ts';
+import type { Haze } from './haze.ts';
+import {
+  DEATH_NOTE,
+  DROP,
+  FARMS,
+  FARM_SIZE,
+  FIELDS,
+  FIELD_TREES,
+  GROUND,
+  HILL,
+  ICHIRAKU,
+  KINNAIRD,
+  NARUTO_TOWER,
+  ROAD_TREES,
+  RURAL,
+  RURAL_SCALE,
+  RYUK,
+  STREET,
+  TORII_Z,
+  TOWN,
+  VILLAGE_HOUSES,
+  VILLAGE_ROOFS,
+  VILLAGE_TREES,
+  VILLAGE_WALLS,
+  mountainRing,
+} from './layout.ts';
+import { Clouds, LightRoad, Motes, RingedPlanet, SkyDome, Torii } from './parts.tsx';
+import { CloudSea, Fields, Ground, Houses, ModelPart, Mountains, Strip, Trees } from './world.tsx';
 
 /**
- * SC11 · The Anime-Inspired Universe: three themed areas crossed in one continuous flight
- * (FINAL_STORYLINE SC11; ANIME_UNIVERSE_FRAMEWORK, structure only). The worlds are generic stand-ins
- * built from flat-shaded primitives; the screen-space style pass (style 2) turns them into cel
- * colour with ink outlines. Spin and shimmer are ambient; everything else is a function of t.
+ * SC11 · The Anime-Inspired Universe: three whole worlds crossed in one continuous flight
+ * (FINAL_STORYLINE SC11). The ship flies through each one: down a village street, down the main
+ * street of a frontier town, along a blossom road through farmland (layout.ts). The screen-space
+ * style pass (style 2) turns everything into cel colour with ink outlines. Between worlds the ship
+ * climbs through a sea of cloud while one world sinks away and the next rises (anime.ts presence,
+ * cloudSea). Spin, bob and cloud drift are ambient; everything else is a function of t.
  */
 const ENGINE = { current: 0.45 };
 const SUN_DIR = new THREE.Vector3(0.5, 0.45, 0.7).normalize().multiplyScalar(100);
+/** The cloud sea's level (below every world's ground while that world is in place). */
+const SEA_LEVEL = -42;
+/** Haze band (m from the camera) while a world is fully present. */
+const HAZE_NEAR = 180;
+const HAZE_FAR = 1500;
 
 /** The SC10 cloud deck, sinking away as the ship climbs out of it (a pure function of t). */
 function CloudDeck({ frame, id }: { frame: JourneyFrame; id: string }) {
@@ -34,144 +70,187 @@ function CloudDeck({ frame, id }: { frame: JourneyFrame; id: string }) {
   );
 }
 
-/** Each area's landmarks, in the chapter frame (ship flies from z = 0 to z = -220). */
-function Landmarks({
-  area,
-  frame,
-  id,
-}: {
-  area: AreaId;
-  frame: JourneyFrame;
-  id: string;
-}): ReactNode {
-  if (area === 'discipline') {
-    return (
-      <>
-        {/* the SC10 sky continues: same clouds and sun, shifted into this frame */}
-        <CloudDeck frame={frame} id={id} />
-        <mesh position={[SUN_BEYOND[0], SUN_BEYOND[1], SUN_BEYOND[2] + 220]}>
-          <sphereGeometry args={[34, 24, 16]} />
-          <meshBasicMaterial color={new THREE.Color(2.2, 1.7, 1.2)} toneMapped={false} />
-        </mesh>
-        {/* a processional line of gates to fly through, then the mandala beside the flight line */}
-        {[-60, -215].map((z) => (
-          <Torii key={z} position={[0, -6, z]} scale={0.95} />
-        ))}
-        {/* Ichiraku Ramen, then Naruto and Sasuke training, each on its own floating island */}
-        <Island
-          position={[-50, -9, -122]}
-          radius={17}
-          grass="#f0b8a8"
-          rock="#8a5a6a"
-          tree={false}
-        />
-        <AnimeModel
-          url={ANIME_MODELS.ichiraku}
-          size={19}
-          fit="max"
-          position={[-50, -7.3, -122]}
-          rotationY={Math.PI / 3}
-          id={id}
-          frame={frame}
-        />
-        <Island
-          position={[-44, -4, -190]}
-          radius={15}
-          grass="#f6d2b0"
-          rock="#8a5a6a"
-          tree={false}
-        />
-        <AnimeModel
-          url={ANIME_MODELS.naruto}
-          size={13}
-          position={[-44, -2.5, -190]}
-          rotationY={Math.PI / 4}
-          id={id}
-          frame={frame}
-        />
-        <Island position={[50, -18, -160]} radius={26} grass="#f6d2b0" rock="#8a5a6a" />
-        <Motes count={160} box={[160, 60, 240]} center={[0, 8, -110]} color="#fff0c8" seed={4} />
-      </>
-    );
-  }
-  if (area === 'proof') {
-    return (
-      <>
-        {/* the city (Kinnaird House) on its island, Ryuk drifting over it, the Death Note floating */}
-        <Island position={[55, -8, -110]} radius={30} grass="#9fe0a8" rock="#6a7a98" tree={false} />
-        <AnimeModel
-          url={ANIME_MODELS.kinnaird}
-          size={34}
-          fit="max"
-          position={[55, -5.2, -110]}
-          rotationY={-Math.PI / 5}
-          id={id}
-          frame={frame}
-        />
-        <AnimeModel
-          url={ANIME_MODELS.ryuk}
-          size={20}
-          position={[26, 8, -92]}
-          rotationY={-Math.PI / 3}
-          bob={0.8}
-          id={id}
-          frame={frame}
-        />
-        <AnimeModel
-          url={ANIME_MODELS.deathNote}
-          size={7}
-          fit="max"
-          position={[10, 4, -62]}
-          spin={0.5}
-          bob={0.5}
-          id={id}
-          frame={frame}
-        />
-        <Island position={[88, 12, -160]} radius={20} grass="#c8e68a" rock="#6a7a98" />
-        <Spire position={[88, 14, -160]} height={30} color="#ffe9a8" />
-        <Island position={[34, 24, -60]} radius={12} grass="#9fe0a8" rock="#6a7a98" tree={false} />
-        <Island position={[-55, -18, -70]} radius={22} grass="#8fd18a" rock="#6a7a98" />
-        <Island position={[-48, 6, -175]} radius={16} grass="#c8e68a" rock="#6a7a98" tree={false} />
-        <Clouds
-          items={[
-            { p: [-30, -34, -40], s: 14 },
-            { p: [10, -40, -110], s: 20 },
-            { p: [60, -42, -190], s: 16 },
-            { p: [-70, -38, -150], s: 18 },
-          ]}
-        />
-        <Motes count={100} box={[170, 70, 240]} center={[10, 6, -110]} color="#ffffff" seed={9} />
-      </>
-    );
-  }
+// ── Discipline: the lantern village ──────────────────────────────────────────
+
+const DISCIPLINE_MOUNTAINS = mountainRing(5, 34, 820);
+function Discipline({ frame, id, haze }: WorldProps) {
+  const g = GROUND.discipline;
   return (
     <>
-      <LightRoad y={-14} from={-10} to={-230} step={9} color="#ffd23f" />
-      <Motes count={420} box={[300, 160, 320]} center={[0, 20, -120]} color="#ffffff" seed={13} />
-      {/* the farm below, Tanjiro and Nezuko on their island, the blossom katana turning in the air */}
-      <Island position={[44, -26, -170]} radius={18} grass="#b9a6ee" rock="#4a3a78" tree={false} />
+      <Ground y={g} color="#e9c7a0" haze={haze} />
+      <Strip y={g} halfWidth={STREET - 4} from={160} to={-900} color="#d9a77f" haze={haze} />
+      <Houses houses={VILLAGE_HOUSES} walls={VILLAGE_WALLS} roofs={VILLAGE_ROOFS} haze={haze} />
+      <Trees
+        items={VILLAGE_TREES}
+        crowns={['#7cc48a', '#f2a7b8', '#9ad27f', '#5fae7d']}
+        size={1.6}
+        haze={haze}
+      />
+      <Mountains items={DISCIPLINE_MOUNTAINS} y={g} color="#b77f8f" haze={haze} />
+      {/* the gates the ship flies through */}
+      {TORII_Z.map((z) => (
+        <Torii key={z} position={[0, g, z]} scale={1.6} />
+      ))}
+      {/* Ichiraku Ramen on the street, Naruto on the watch tower across from it */}
       <AnimeModel
-        url={ANIME_MODELS.farm}
-        size={32}
+        url={ANIME_MODELS.ichiraku}
+        size={ICHIRAKU.size}
         fit="max"
-        position={[44, -24.2, -170]}
+        position={[ICHIRAKU.x, g, ICHIRAKU.z]}
+        rotationY={Math.PI / 2}
+        haze={haze}
+        cull
         id={id}
         frame={frame}
       />
-      <Island position={[16, -10, -138]} radius={13} grass="#cbb8f4" rock="#4a3a78" tree={false} />
+      <mesh position={[NARUTO_TOWER.x, g + NARUTO_TOWER.h / 2, NARUTO_TOWER.z]}>
+        <cylinderGeometry args={[NARUTO_TOWER.r, NARUTO_TOWER.r * 1.15, NARUTO_TOWER.h, 10]} />
+        <meshStandardMaterial color="#efd2b0" roughness={1} flatShading />
+      </mesh>
+      <AnimeModel
+        url={ANIME_MODELS.naruto}
+        size={14}
+        position={[NARUTO_TOWER.x, g + NARUTO_TOWER.h, NARUTO_TOWER.z]}
+        rotationY={-Math.PI / 3}
+        haze={haze}
+        id={id}
+        frame={frame}
+      />
+      {/* paper lanterns drifting down the street */}
+      <Motes count={180} box={[44, 30, 900]} center={[0, g + 18, -350]} color="#ffd08a" seed={4} />
+    </>
+  );
+}
+
+// ── Proof: the frontier town ─────────────────────────────────────────────────
+
+const PROOF_MOUNTAINS = mountainRing(9, 30, 780);
+function Proof({ frame, id, haze }: WorldProps) {
+  const g = GROUND.proof;
+  return (
+    <>
+      {/* the desert floor beyond the town's own terrain (just below it, so the town wins) */}
+      <Ground y={g - 0.4} color="#d99c5e" haze={haze} />
+      <AnimeModel
+        url={ANIME_MODELS.town}
+        size={TOWN.scale}
+        fit="none"
+        position={TOWN.position}
+        haze={haze}
+        cull
+        id={id}
+        frame={frame}
+      />
+      {/* the street runs on past the town: the rural set lines it out to Kinnaird House */}
+      <Strip y={g} halfWidth={TOWN.street - 6} from={-330} to={-700} color="#b98a62" haze={haze} />
+      {RURAL.map((r) => (
+        <ModelPart
+          key={r.name}
+          url={ANIME_MODELS.rural}
+          name={r.name}
+          scale={RURAL_SCALE}
+          position={[r.x, g, r.z]}
+          rotationY={r.rotY}
+          haze={haze}
+        />
+      ))}
+      <AnimeModel
+        url={ANIME_MODELS.kinnaird}
+        size={KINNAIRD.size}
+        fit="max"
+        position={[KINNAIRD.x, g, KINNAIRD.z]}
+        haze={haze}
+        cull
+        id={id}
+        frame={frame}
+      />
+      <Mountains items={PROOF_MOUNTAINS} y={g} color="#c98a5a" haze={haze} />
+      {/* Ryuk watching from above the rooftops; the notebook drifting beside the ship */}
+      <AnimeModel
+        url={ANIME_MODELS.ryuk}
+        size={RYUK.size}
+        position={[RYUK.x, RYUK.y, RYUK.z]}
+        rotationY={-Math.PI / 2.4}
+        bob={0.8}
+        haze={haze}
+        id={id}
+        frame={frame}
+      />
+      <AnimeModel
+        url={ANIME_MODELS.deathNote}
+        size={DEATH_NOTE.size}
+        fit="max"
+        position={[DEATH_NOTE.x, DEATH_NOTE.y, DEATH_NOTE.z]}
+        spin={0.5}
+        bob={0.5}
+        id={id}
+        frame={frame}
+      />
+      <Motes count={120} box={[120, 50, 700]} center={[0, g + 25, -300]} color="#fff4dc" seed={9} />
+    </>
+  );
+}
+
+// ── Horizon: the blossom valley ──────────────────────────────────────────────
+
+const HORIZON_MOUNTAINS = mountainRing(13, 36, 800);
+function Horizon({ frame, id, haze }: WorldProps) {
+  const g = GROUND.horizon;
+  const low = useJourneyStore((s) => s.tier !== 'balanced');
+  const farms = low ? FARMS.filter((f) => !f.far) : FARMS;
+  return (
+    <>
+      <Ground y={g} color="#8ea477" haze={haze} />
+      <Strip y={g} halfWidth={8} from={160} to={-900} color="#d8b08a" haze={haze} />
+      <LightRoad y={g + 0.4} from={150} to={-880} step={11} color="#ffd23f" />
+      <Fields
+        items={FIELDS}
+        y={g}
+        colors={['#b9c97a', '#d8c07a', '#9cbf86', '#c7d9a0']}
+        haze={haze}
+      />
+      {farms.map((f) => (
+        <AnimeModel
+          key={`${f.x},${f.z}`}
+          url={ANIME_MODELS.farm}
+          size={FARM_SIZE}
+          fit="max"
+          position={[f.x, g, f.z]}
+          rotationY={f.rotY}
+          haze={haze}
+          cull
+          id={id}
+          frame={frame}
+        />
+      ))}
+      <Trees items={ROAD_TREES} crowns={['#f6a8c8', '#f8c0d6', '#ef93b8']} size={1.1} haze={haze} />
+      <Trees
+        items={FIELD_TREES}
+        crowns={['#f6a8c8', '#7fb07a', '#f8c0d6', '#94c27f']}
+        size={1.5}
+        haze={haze}
+      />
+      <Mountains items={HORIZON_MOUNTAINS} y={g} color="#6a5aa8" haze={haze} />
+      {/* the blossom hill: Tanjiro and Nezuko look out over the road */}
+      <mesh position={[HILL.x, g - HILL.radius + HILL.height, HILL.z]} scale={[1, 1, 1]}>
+        <sphereGeometry args={[HILL.radius, 16, 10]} />
+        <meshStandardMaterial color="#9cc08a" roughness={1} flatShading />
+      </mesh>
       <AnimeModel
         url={ANIME_MODELS.tanjiro}
-        size={14}
-        position={[10, -8.7, -138]}
-        rotationY={Math.PI / 5}
+        size={32}
+        position={[HILL.x - 5, g + HILL.height - 0.6, HILL.z + 2]}
+        rotationY={-0.35}
+        haze={haze}
         id={id}
         frame={frame}
       />
       <AnimeModel
         url={ANIME_MODELS.nezuko}
-        size={11}
-        position={[22, -8.7, -140]}
-        rotationY={Math.PI / 6}
+        size={26}
+        position={[HILL.x + 6, g + HILL.height - 0.8, HILL.z - 1]}
+        rotationY={-0.15}
+        haze={haze}
         id={id}
         frame={frame}
       />
@@ -179,15 +258,27 @@ function Landmarks({
         url={ANIME_MODELS.katana}
         size={13}
         fit="max"
-        position={[0, 6, -122]}
+        position={[-14, 14, -120]}
         spin={0.6}
         bob={0.6}
         id={id}
         frame={frame}
       />
-      <Island position={[-30, -30, -190]} radius={22} grass="#cbb8f4" rock="#4a3a78" />
+      <Motes count={300} box={[400, 140, 900]} center={[0, 30, -350]} color="#ffffff" seed={13} />
     </>
   );
+}
+
+interface WorldProps {
+  readonly frame: JourneyFrame;
+  readonly id: string;
+  readonly haze: Haze;
+}
+
+function World({ area, ...props }: WorldProps & { area: AreaId }): ReactNode {
+  if (area === 'discipline') return <Discipline {...props} />;
+  if (area === 'proof') return <Proof {...props} />;
+  return <Horizon {...props} />;
 }
 
 const SKY_COLORS = Object.fromEntries(
@@ -217,33 +308,49 @@ function makeArea(area: AreaId): ChapterImpl {
     const ship = useRef<THREE.Group>(null);
     const dome = useRef<THREE.Group>(null);
     const light = useRef<THREE.DirectionalLight>(null);
-    const marks = useRef<THREE.Group>(null);
+    const world = useRef<THREE.Group>(null);
     const fill = useRef<THREE.HemisphereLight>(null);
     const sunTarget = useMemo(() => new THREE.Object3D(), []);
+    const haze = useMemo(() => createHaze(HAZE_NEAR, HAZE_FAR), []);
+    const sun = useRef<THREE.Mesh>(null);
     const live = useMemo(
       () => ({ current: [0, 1, 2, 3].map(() => new THREE.Color()) as THREE.Color[] }),
       [],
     );
+    const sea = useMemo(
+      () => ({ opacity: { current: 0 }, tint: { current: new THREE.Color() }, z: { current: 0 } }),
+      [],
+    );
     useFrame(() => {
       if (frame.id !== id) return;
-      const z = shipZ(frame.t);
+      const t = frame.t;
+      const z = shipZ(t);
       ship.current?.position.set(0, 0, z);
       dome.current?.position.set(0, 0, z);
       light.current?.position.set(SUN_DIR.x, SUN_DIR.y, SUN_DIR.z + z);
       sunTarget.position.set(0, 0, z);
       // sky and light meet the neighbouring world halfway at each boundary (anime.ts)
-      const m = skyMix(area, frame.t);
+      const m = skyMix(area, t);
       for (let i = 0; i < 4; i += 1)
         live.current[i]!.copy(SKY_COLORS[m.a].sky[i]!).lerp(SKY_COLORS[m.b].sky[i]!, m.k);
       light.current?.color.copy(SKY_COLORS[m.a].light).lerp(SKY_COLORS[m.b].light, m.k);
       fill.current?.groundColor.copy(live.current[1]!);
-      // the world grows round the ship on the way in and shrinks away on the way out
-      const k = markScale(area, frame.t);
-      if (marks.current) {
-        marks.current.visible = k > 0.002;
-        marks.current.scale.setScalar(Math.max(k, 0.001));
-        marks.current.position.set(0, 0, z * (1 - k));
+      horizonColor(live.current, haze.color.value);
+      for (let i = 0; i < 4; i += 1) haze.sky.value[i]!.copy(live.current[i]!);
+      // the world rises into place round the ship, and sinks away below the cloud sea
+      const k = presence(t);
+      if (world.current) {
+        world.current.visible = k > 0.002;
+        world.current.position.y = -(1 - k) * DROP;
       }
+      // a leaving world also dissolves into the horizon (no inked ground line left in the sky)
+      haze.near.value = HAZE_NEAR * k;
+      haze.far.value = 40 + (HAZE_FAR - 40) * k;
+      // the painted sun of the first world leaves with it
+      if (sun.current) sun.current.scale.setScalar(t < 0.5 ? 1 : Math.max(k, 0.001));
+      sea.opacity.current = cloudSea(area, t);
+      sea.tint.current.copy(live.current[1]!);
+      sea.z.current = z;
     });
     return (
       <group>
@@ -253,9 +360,26 @@ function makeArea(area: AreaId): ChapterImpl {
         <directionalLight ref={light} target={sunTarget} color={def.light} intensity={2.6} />
         <primitive object={sunTarget} />
         <hemisphereLight ref={fill} args={['#ffffff', def.sky[1], 1.1]} />
-        <group ref={marks}>
-          <Landmarks area={area} frame={frame} id={id} />
+        {area === 'discipline' && (
+          <>
+            {/* the SC10 sky continues: same clouds and sun, shifted into this frame */}
+            <CloudDeck frame={frame} id={id} />
+            <mesh ref={sun} position={[SUN_BEYOND[0], SUN_BEYOND[1], SUN_BEYOND[2] + 220]}>
+              <sphereGeometry args={[34, 24, 16]} />
+              <meshBasicMaterial color={new THREE.Color(2.2, 1.7, 1.2)} toneMapped={false} />
+            </mesh>
+          </>
+        )}
+        <group ref={world} visible={false}>
+          <World area={area} frame={frame} id={id} haze={haze} />
         </group>
+        <CloudSea
+          level={SEA_LEVEL}
+          opacity={sea.opacity}
+          tint={sea.tint}
+          haze={haze}
+          follow={sea.z}
+        />
         {area === 'horizon' && <HorizonPlanets />}
         <HelVela ref={ship} engine={ENGINE} rotation={[0, -Math.PI / 2, 0]} />
       </group>

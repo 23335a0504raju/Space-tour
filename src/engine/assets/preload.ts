@@ -40,6 +40,8 @@ export const JOURNEY_ASSETS: readonly string[] = [
   '/assets/models/anime_nezuko.glb',
   '/assets/models/anime_katana.glb',
   '/assets/models/anime_farm.glb',
+  '/assets/models/anime_town.glb',
+  '/assets/models/anime_rural.glb',
   '/assets/textures/earth_day_2k.ktx2',
   '/assets/textures/earth_night_2k.ktx2',
   '/assets/textures/moon_1k.ktx2',

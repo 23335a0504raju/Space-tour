@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { gltfExtender } from '../../engine/assets/loaders.ts';
 import type { JourneyFrame } from '../contract.ts';
+import { hazed } from './haze.ts';
+import type { Haze } from './haze.ts';
 
 /**
  * One anime-world model (SC11), fitted by measurement: the Sketchfab exports come in every scale
@@ -23,13 +25,18 @@ export const ANIME_MODELS = {
   nezuko: '/assets/models/anime_nezuko.glb',
   katana: '/assets/models/anime_katana.glb',
   farm: '/assets/models/anime_farm.glb',
+  town: '/assets/models/anime_town.glb',
+  rural: '/assets/models/anime_rural.glb',
 } as const;
 
 interface Props {
   readonly url: string;
-  /** metres: the model's height, or its longest side with fit="max" */
+  /**
+   * metres: the model's height, or its longest side with fit="max"; with fit="none" it is a plain
+   * scale factor and the model keeps its own origin (a measured placement, layout.ts TOWN)
+   */
   readonly size: number;
-  readonly fit?: 'height' | 'max';
+  readonly fit?: 'height' | 'max' | 'none';
   readonly position: readonly [number, number, number];
   readonly rotationY?: number;
   /** slow spin about the vertical (rad/s) and a gentle bob (m) */
@@ -37,6 +44,10 @@ interface Props {
   readonly bob?: number;
   /** play the model's `Anim_*` clips on a loop */
   readonly animate?: boolean;
+  /** fade into this world's horizon (haze.ts) */
+  readonly haze?: Haze;
+  /** static props: let three cull them (skinned models stay unculled: their bounds lie) */
+  readonly cull?: boolean;
   readonly id: string;
   readonly frame: JourneyFrame;
 }
@@ -54,6 +65,8 @@ export function AnimeModel({
   spin = 0,
   bob = 0,
   animate = false,
+  haze,
+  cull = false,
   id,
   frame,
 }: Props) {
@@ -66,7 +79,11 @@ export function AnimeModel({
       if (!mesh.isMesh) return;
       // normals were dropped for welding and simplifying (scripts/optimize-anime.ts)
       if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
-      mesh.frustumCulled = false;
+      mesh.frustumCulled = cull && !(mesh as THREE.SkinnedMesh).isSkinnedMesh;
+      if (haze)
+        mesh.material = Array.isArray(mesh.material)
+          ? mesh.material.map((m) => hazed(m, haze))
+          : hazed(mesh.material, haze);
     });
     root.updateMatrixWorld(true);
     root.traverse((o) => {
@@ -76,6 +93,12 @@ export function AnimeModel({
         skinned.computeBoundingBox();
       }
     });
+    if (fit === 'none') {
+      root.scale.multiplyScalar(size);
+      const holder = new THREE.Group();
+      holder.add(root);
+      return { holder, root, clips: [] as THREE.AnimationClip[] };
+    }
     box.setFromObject(root);
     box.getSize(dims);
     box.getCenter(centre);
@@ -87,7 +110,7 @@ export function AnimeModel({
     root.scale.multiplyScalar(scale);
     const clips = gltf.animations.filter((a) => a.name.includes('Anim_'));
     return { holder, root, clips };
-  }, [gltf, size, fit]);
+  }, [gltf, size, fit, haze, cull]);
 
   const mixer = useMemo(() => {
     if (!animate || built.clips.length === 0) return null;

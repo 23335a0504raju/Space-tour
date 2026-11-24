@@ -20,6 +20,10 @@ const SPIKES = {
     title: 'S4 · Performance baseline (run on laptop + phone)',
     load: () => import('./S4PerfBaseline.tsx'),
   },
+  s5: {
+    title: 'S5 · Scroll-scrubbed image sequence (video instead of 3D?)',
+    load: () => import('./S5ImageSequence.tsx'),
+  },
 } as const;
 
 type SpikeId = keyof typeof SPIKES;

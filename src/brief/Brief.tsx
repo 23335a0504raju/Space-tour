@@ -365,6 +365,20 @@ export function Brief() {
             by <a href="https://sketchfab.com/Edwin3D">EdwinRC</a>,{' '}
             <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
           </li>
+          <li key="https://sketchfab.com/3d-models/west-street-f5e530d7fe6b47f58c35fdf2a90cfb21">
+            <a href="https://sketchfab.com/3d-models/west-street-f5e530d7fe6b47f58c35fdf2a90cfb21">
+              “West street”
+            </a>{' '}
+            by <a href="https://sketchfab.com/Pasha.">Pasha</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/rural-buildings-set-low-poly-models-51ab7e74bac347a89725f1d22b928edf">
+            <a href="https://sketchfab.com/3d-models/rural-buildings-set-low-poly-models-51ab7e74bac347a89725f1d22b928edf">
+              “Rural Buildings Set - Low Poly models”
+            </a>{' '}
+            by <a href="https://sketchfab.com/DanielZhabotinsky">Daniel Zhabotinsky</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
         </ul>
       </footer>
     </>

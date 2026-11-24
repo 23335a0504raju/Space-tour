@@ -64,6 +64,7 @@ function useIndicator(active: HeaderItem | null) {
  */
 export function App() {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
   const navigate = useJourneyStore((s) => s.navigate);
   // discrete: changes once per chapter, never per frame
   const active = useJourneyStore((s) => sections[sectionIndexFor(s.activeIndex)]?.header ?? null);
@@ -101,6 +102,7 @@ export function App() {
           </span>
         </h1>
         <button
+          ref={menuToggleRef}
           type="button"
           className={styles.menuToggle}
           aria-expanded={menuOpen}
@@ -174,6 +176,16 @@ export function App() {
         ref={dialogRef}
         className={styles.dialog}
         aria-label="Contact"
+        onClose={() => {
+          // The browser returns focus to the opener. On phones that is the Contact link inside the
+          // menu, which closed as the sheet opened (it turns visibility: hidden after its fade), so
+          // focus would end on an invisible control or fall to <body>. Hand it to the Menu toggle,
+          // the visible control that leads back to Contact.
+          const toggle = menuToggleRef.current;
+          if (!toggle || toggle.offsetParent === null) return;
+          const at = document.activeElement;
+          if (at === document.body || at?.closest('#primary-nav')) toggle.focus();
+        }}
         onClick={(e) => {
           // A click on the backdrop (the dialog element itself) closes it.
           if (e.target === e.currentTarget) e.currentTarget.close();

@@ -20,13 +20,16 @@ test.describe('P0 smoke', () => {
 
   test('contact sheet opens, closes with Escape, and returns focus', async ({ page }) => {
     await page.goto('/?gate=off');
+    const menu = page.getByRole('button', { name: 'Menu' });
+    const phone = await menu.isVisible();
     await openNav(page);
     const trigger = page.getByRole('button', { name: 'Contact' });
     await trigger.click();
     await expect(page.getByRole('dialog', { name: 'Contact' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: 'Contact' })).toBeHidden();
-    await expect(trigger).toBeFocused();
+    // phones: the menu closed behind the sheet, so focus goes to the Menu toggle that reopens it
+    await expect(phone ? menu : trigger).toBeFocused();
   });
 
   test('Mission Brief lists both internships and hides project templates in production', async ({
