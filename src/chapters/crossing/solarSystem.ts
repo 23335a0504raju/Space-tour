@@ -15,7 +15,8 @@ import { LIGHT_10 } from '../handoff.ts';
 export const SUN_DIR = new THREE.Vector3(...LIGHT_10.direction).normalize();
 export const SUN_DISTANCE = 1650;
 export const SUN_POSITION = SUN_DIR.clone().multiplyScalar(SUN_DISTANCE);
-export const SUN_RADIUS = 24;
+/** Larger than to scale (as the planets are), so its surface reads in the look back. */
+export const SUN_RADIUS = 60;
 
 /** The ecliptic through the Sun's direction: a(0) points at the Sun, a(90°) to its side. */
 const SIDE = new THREE.Vector3().crossVectors(SUN_DIR, new THREE.Vector3(0, 1, 0)).normalize();

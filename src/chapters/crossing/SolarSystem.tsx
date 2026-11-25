@@ -1,9 +1,11 @@
-import { useLayoutEffect, useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { textureContext } from '../../engine/assets/canvas2d.ts';
-import { useLoader, useThree } from '@react-three/fiber';
+import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getKTX2Loader } from '../../engine/assets/loaders.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
+import { useJourneyStore } from '../../engine/store.ts';
+import { createCoronaMaterial, createSunMaterial } from '../../shaders/sun.ts';
 import { SaturnSystem } from '../saturn/Saturn.tsx';
 import { SATURN } from '../saturn/saturn.ts';
 import {
@@ -173,46 +175,50 @@ function glowTexture(size: number, stops: readonly [number, string][]): THREE.Ca
   return t;
 }
 
-/** The Sun: a white-hot disc, a warm corona and a faint horizontal flare (bloom does the rest). */
+/** Corona quad half-size, in Sun radii (flames and prominences reach well past the limb). */
+const CORONA_EXTENT = 1.9;
+
+/**
+ * The Sun as a body (Raju's reference, 2026-11-25): a boiling red-orange photosphere with bright
+ * active regions and dark filaments (src/shaders/sun.ts), a ragged flame fringe with prominences
+ * on a camera-facing quad, and a soft warm glow. Surface motion is ambient (clock time).
+ */
 function Sun() {
-  const { corona, flare } = useMemo(
+  const low = useJourneyStore((s) => s.tier !== 'balanced');
+  const { surface, corona, glow } = useMemo(
     () => ({
-      corona: glowTexture(256, [
-        [0, 'rgba(255,252,244,1)'],
-        [0.08, 'rgba(255,244,222,0.7)'],
-        [0.22, 'rgba(255,214,160,0.16)'],
-        [0.5, 'rgba(255,190,120,0.04)'],
-        [1, 'rgba(255,170,90,0)'],
-      ]),
-      flare: glowTexture(256, [
-        [0, 'rgba(255,240,215,0.9)'],
-        [0.5, 'rgba(255,220,170,0.12)'],
-        [1, 'rgba(255,200,140,0)'],
+      surface: createSunMaterial(low),
+      corona: createCoronaMaterial(low, CORONA_EXTENT),
+      glow: glowTexture(256, [
+        [0, 'rgba(255,110,30,0.3)'],
+        [0.25, 'rgba(255,80,15,0.1)'],
+        [0.55, 'rgba(255,60,10,0.025)'],
+        [1, 'rgba(255,50,10,0)'],
       ]),
     }),
-    [],
+    [low],
   );
-  useDisposeOnUnmount(corona, flare);
+  useDisposeOnUnmount(surface, corona, glow);
+  const fringe = useRef<THREE.Mesh>(null);
+  useFrame(({ clock, camera }) => {
+    const t = clock.elapsedTime;
+    surface.uniforms['uTime']!.value = t;
+    corona.uniforms['uTime']!.value = t;
+    // the fringe faces the camera's position (not its view direction: off-axis the disc and the
+    // flames drifted apart into a crescent)
+    fringe.current?.lookAt(camera.position);
+  });
   return (
     <group position={SUN_POSITION}>
-      <mesh>
-        <sphereGeometry args={[SUN_RADIUS, 32, 16]} />
-        <meshBasicMaterial color={new THREE.Color(9, 7.6, 6)} toneMapped={false} />
+      <mesh material={surface}>
+        <sphereGeometry args={[SUN_RADIUS, low ? 48 : 96, low ? 32 : 64]} />
       </mesh>
-      <sprite scale={[SUN_RADIUS * 11, SUN_RADIUS * 11, 1]}>
+      <mesh ref={fringe} material={corona}>
+        <planeGeometry args={[SUN_RADIUS * CORONA_EXTENT * 2, SUN_RADIUS * CORONA_EXTENT * 2]} />
+      </mesh>
+      <sprite scale={[SUN_RADIUS * 9, SUN_RADIUS * 9, 1]}>
         <spriteMaterial
-          map={corona}
-          color={new THREE.Color(1.7, 1.55, 1.4)}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          toneMapped={false}
-        />
-      </sprite>
-      <sprite scale={[SUN_RADIUS * 40, SUN_RADIUS * 1.6, 1]}>
-        <spriteMaterial
-          map={flare}
-          color={new THREE.Color(1.6, 1.4, 1.2)}
+          map={glow}
           transparent
           depthWrite={false}
           blending={THREE.AdditiveBlending}
@@ -232,6 +238,28 @@ const RIMS: Partial<Record<PlanetKind, readonly [string, number]>> = {
   neptune: ['#7aa8ff', 0.8],
 };
 
+/** Where the Sun's disc is on screen (drawing-buffer pixels), written each frame by OrbitFade. */
+const sunOnScreen = {
+  px: { value: new THREE.Vector2(-1e4, -1e4) },
+  r: { value: 0 },
+};
+const sunNdc = new THREE.Vector3();
+
+/** Projects the Sun's centre and radius to the screen for the orbit lines' fade. */
+function OrbitFade() {
+  useFrame(({ camera, gl }) => {
+    const size = gl.getDrawingBufferSize(sunScratch);
+    sunNdc.copy(SUN_POSITION).project(camera);
+    sunOnScreen.px.value.set(((sunNdc.x + 1) / 2) * size.x, ((sunNdc.y + 1) / 2) * size.y);
+    const dist = camera.position.distanceTo(SUN_POSITION);
+    const fov = THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov ?? 45);
+    sunOnScreen.r.value =
+      sunNdc.z < 1 ? (SUN_RADIUS / (dist * Math.tan(fov / 2))) * (size.y / 2) : 0;
+  });
+  return null;
+}
+const sunScratch = new THREE.Vector2();
+
 /** Thin orbit lines round the Sun, one per planet (an orrery's guides, faint and additive). */
 function Orbits() {
   const { lines, material } = useMemo(() => {
@@ -242,6 +270,18 @@ function Orbits() {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
+    // edge-on, every orbit passes in front of the Sun: fade the lines where they cross its disc
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms['uSunPx'] = sunOnScreen.px;
+      shader.uniforms['uSunR'] = sunOnScreen.r;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('void main() {', 'uniform vec2 uSunPx; uniform float uSunR;\nvoid main() {')
+        .replace(
+          '#include <opaque_fragment>',
+          'diffuseColor.a *= smoothstep(uSunR * 1.15, uSunR * 2.2, distance(gl_FragCoord.xy, uSunPx));\n#include <opaque_fragment>',
+        );
+    };
+    material.customProgramCacheKey = () => 'orbits-sun-fade';
     const lines = PLANETS.map((p) => {
       const g = new THREE.BufferGeometry().setFromPoints(orbitPoints(p));
       const line = new THREE.Line(g, material);
@@ -293,6 +333,7 @@ export function SolarSystem() {
     <group>
       <Sun />
       <Orbits />
+      <OrbitFade />
       {placed.map((p) => {
         if (p.kind === 'saturn') {
           return (
