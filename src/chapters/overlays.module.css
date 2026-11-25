@@ -36,6 +36,21 @@
   overscroll-behavior: contain;
 }
 
+/*
+ * Load-time prepaint (src/ui/prepaint.ts): two frames at 1 % so Chrome rasterises every card, and
+ * compiles its GPU pipelines, before the journey shows it. Beats the inline styles the Director
+ * and the reveal timeline write; removing the class hands them back. Not 0: a fully transparent
+ * layer is skipped, which would warm nothing.
+ */
+.prepaint {
+  visibility: visible !important;
+  opacity: 0.01 !important;
+}
+
+.prepaint * {
+  opacity: 1 !important;
+}
+
 /* a short gold hairline on the top edge: the card's only accent */
 .panel:not(.editorial)::after {
   content: '';
@@ -664,5 +679,97 @@
 
   .rings dd {
     font-size: 0.8125rem;
+  }
+}
+
+/* ── The final card (SC13 contact, after the user's "Lunar Gravity" reference) ─────────────────
+ * One wide card: the copy on the left over a scrim that fades out to the right, and an empty
+ * right half where the Moon and its ring hang in the 3D scene (LunarMoon places them by this
+ * box). No frosting: the Moon must stay sharp behind the card. */
+.card {
+  /* centred in the band between the header (with its progress line) and the bottom bar */
+  inset: 7rem 0 5.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 50%) minmax(0, 1fr);
+  width: min(68rem, calc(100vw - 2 * var(--gutter)));
+  max-width: none;
+  height: min(40rem, calc(100svh - 12.5rem));
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  background: linear-gradient(
+    90deg,
+    rgb(5 6 10 / 97%) 0%,
+    rgb(5 6 10 / 90%) 36%,
+    rgb(5 6 10 / 40%) 54%,
+    rgb(5 6 10 / 0%) 70%
+  );
+  border: 1px solid rgb(233 231 225 / 8%);
+  border-radius: 2rem;
+  box-shadow: 0 30px 100px rgb(0 0 0 / 40%);
+}
+
+:root[data-tier='balanced'] .panel.card {
+  backdrop-filter: none;
+}
+
+/* The copy column is a size container: the contact panel scales its type and spacing to the room
+ * it really has (ContactPanel.module.css, .cardMode), so the card fits any window without a
+ * scrollbar. Overflow stays scrollable as a last resort, with the bar hidden. */
+.cardCopy {
+  grid-area: 1 / 1;
+  container: card / size;
+  display: grid;
+  align-content: safe center;
+  justify-items: start;
+  gap: clamp(0.5rem, 2.2svh, 1.25rem);
+  min-height: 0;
+  padding: clamp(1.25rem, 5svh, 3.5rem) var(--space-4) clamp(1.25rem, 5svh, 3.5rem)
+    clamp(1.5rem, 0.5rem + 3vw, 4rem);
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.cardCopy::-webkit-scrollbar {
+  display: none;
+}
+
+/* Replay is the quiet, secondary action here: the contact buttons lead. */
+.cardCopy .bay {
+  min-height: 2.5rem;
+  padding: 0 var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background: transparent;
+  border-color: var(--color-rule);
+}
+
+.cardCopy .bay:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.cardMoon {
+  grid-area: 1 / 2;
+  pointer-events: none;
+}
+
+/* narrow screens: the copy alone, on a solid scrim (the Moon column is dropped) */
+@media (max-width: 760px) {
+  .card {
+    grid-template-columns: minmax(0, 1fr);
+    height: calc(100svh - 11rem);
+    background: rgb(5 6 10 / 92%);
+    border-radius: 1.25rem;
+  }
+
+  .cardMoon {
+    display: none;
+  }
+
+  .cardCopy {
+    padding: var(--space-6);
   }
 }

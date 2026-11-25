@@ -3,6 +3,7 @@ import { content } from '../content/index.ts';
 import type { Project } from '../content/index.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
+import { CARD_REST, MOON_ANCHOR } from './homecoming/homecoming.ts';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
 import { PROJECT_MEDIA } from '../ui/projectMedia.ts';
 import styles from './overlays.module.css';
@@ -17,7 +18,7 @@ export interface OverlayDef {
   readonly rest: number;
   readonly placement: 'center' | 'left' | 'right' | 'bottom';
   /** 'editorial': large type straight over the scene on a soft vignette, no panel box. */
-  readonly variant?: 'editorial' | 'showcase';
+  readonly variant?: 'editorial' | 'showcase' | 'card';
   /** Half-width of the readable band around the rest point, in local t (default 0.12). */
   readonly band?: number;
   readonly label: string;
@@ -411,24 +412,30 @@ const allOverlayDefs: readonly OverlayDef[] = [
   {
     key: 'contact',
     chapterId: 'sc13-transmission',
-    rest: 0.6,
-    placement: 'left',
+    rest: CARD_REST,
+    placement: 'center',
+    // the final card (after the user's Lunar Gravity reference): copy on the left over a fading
+    // scrim, the Moon and its ring in the empty right half (LunarMoon places it there)
+    variant: 'card',
     label: 'Contact',
     holdToEnd: true,
     render: () => (
       <>
-        <ContactPanel id="final-transmission" />
-        <button
-          type="button"
-          className={styles.bay}
-          onClick={() => {
-            const go = useJourneyStore.getState().navigate;
-            if (go) go('sc02-room');
-            else window.scrollTo({ top: 0, behavior: 'instant' });
-          }}
-        >
-          Replay mission
-        </button>
+        <div className={styles.cardMoon} {...{ [MOON_ANCHOR]: '' }} aria-hidden="true" />
+        <div className={styles.cardCopy}>
+          <ContactPanel id="final-transmission" display />
+          <button
+            type="button"
+            className={styles.bay}
+            onClick={() => {
+              const go = useJourneyStore.getState().navigate;
+              if (go) go('sc02-room');
+              else window.scrollTo({ top: 0, behavior: 'instant' });
+            }}
+          >
+            Replay mission
+          </button>
+        </div>
       </>
     ),
   },

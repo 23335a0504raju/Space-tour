@@ -17,6 +17,9 @@ const Journey = lazy(() =>
 
 const { identity, contact } = content;
 
+/** Contact in the header goes to the end of the journey: the final card. */
+const CONTACT_CHAPTER = 'sc13-transmission';
+
 /** Section links (Contact opens the sheet instead). `brief` is the no-journey fallback. */
 const NAV: ReadonlyArray<{ item: HeaderItem; label: string; brief: string }> = [
   { item: 'about', label: 'About', brief: '/brief/' },
@@ -143,7 +146,9 @@ export function App() {
               aria-current={active === 'contact' ? 'location' : undefined}
               onClick={() => {
                 setMenuOpen(false);
-                dialogRef.current?.showModal();
+                // the journey's own ending (the SC13 contact card); the sheet only without the journey
+                if (navigate) navigate(CONTACT_CHAPTER);
+                else dialogRef.current?.showModal();
               }}
             >
               Contact

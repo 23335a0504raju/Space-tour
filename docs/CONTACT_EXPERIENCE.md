@@ -19,6 +19,7 @@ The overlay and SC13 use **the same content component**, so they can never disag
 - **Setting:** the ship in high orbit, Earth below at sunrise (a bookend with the opening window view).
 - **Action:** the astronaut steps onto the hull or an exterior platform and deploys a beacon (a cut covers the planting). The beacon pulses, the **mission emblem completes** its final segment, and the camera settles into a calm, wide hold.
 - **Layout:** the contact panel sits on one side (left on desktop, bottom sheet on mobile). The 3D scene stays visible but secondary, darkened behind the panel by a scrim for contrast.
+- **Final card (2026-11-25, after the user's "Lunar Gravity" reference):** after the beacon, the camera lifts off the deck into open sky toward the Moon (`LIFT` in `homecoming.ts`). The contact panel becomes one wide card (`variant: 'card'`): the name as a large two-line title and the actions on the left over a scrim that fades to the right; the Moon (`moon_1k.ktx2`) with a dust ring and rock belt hangs in the card's empty right half (`LunarMoon.tsx`, placed from the card's layout box for the final camera). The ring forms with scroll (story state); drift is ambient. Low tier: 24k grains and no rock push (60k on Balanced). Rest point 0.9.
 - **No auto-advance and no further scroll.** The page ends; the visitor can stay as long as they like.
 
 ## 4. Contact panel content (all from source; see `PORTFOLIO_CONTENT_MAPPING.md`)

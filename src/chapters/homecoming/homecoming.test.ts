@@ -6,7 +6,11 @@ import {
   astronautX,
   astronautYaw,
   beaconRise,
+  CARD_REST,
   homecomingShot,
+  LIFT,
+  ringForm,
+  rocksIn,
   walkWeight,
   walkedDistance,
 } from './homecoming.ts';
@@ -41,5 +45,20 @@ describe('SC13 homecoming', () => {
     homecomingShot(0.9, b);
     homecomingShot(0.5, b);
     expect(b.position.toArray()).toEqual(a.position.toArray());
+  });
+  it('lifts into open sky, then forms the ring, which is whole by the card', () => {
+    expect(ringForm(LIFT.start)).toBe(0);
+    expect(rocksIn(LIFT.start)).toBe(0);
+    let prev = -1;
+    for (let t = 0; t <= 1; t += 0.02) {
+      expect(ringForm(t)).toBeGreaterThanOrEqual(prev);
+      prev = ringForm(t);
+    }
+    expect(ringForm(CARD_REST)).toBe(1);
+    expect(rocksIn(CARD_REST + 0.03)).toBe(1);
+    // the final view looks up, away from the deck (the hull leaves the frame)
+    const end = createShotState();
+    homecomingShot(1, end);
+    expect(end.target.y - end.position.y).toBeGreaterThan(10);
   });
 });

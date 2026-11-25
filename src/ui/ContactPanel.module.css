@@ -129,3 +129,79 @@
   letter-spacing: 0.06em;
   color: var(--color-muted);
 }
+
+/* The SC13 card's title: the name large over two lines, the last name fading out (reference). */
+.display {
+  font-family: var(--font-display);
+  font-size: clamp(2.75rem, 1.4rem + 3.2vw, 4.75rem);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
+}
+
+.first,
+.last {
+  display: block;
+}
+
+.first {
+  color: var(--color-text);
+}
+
+.last {
+  padding-bottom: 0.08em;
+  white-space: nowrap; /* the full stop stays with the name */
+  color: transparent;
+  background: linear-gradient(180deg, #fff 0%, #a1a1aa 55%, #3f3f46 100%);
+  background-clip: text;
+}
+
+/* ── Inside the SC13 card: sized by the card's copy column (container "card"), so it always fits.
+ * cqi follows the column's width, cqh its height. */
+.cardMode {
+  gap: clamp(0.375rem, 2.3cqh, 1rem);
+}
+
+/* "Chowdavada." is about 6.4 em wide: 15 cqi keeps it on one line; 11 cqh keeps two lines short */
+.cardMode .display {
+  font-size: min(15cqi, 11cqh, 4.75rem);
+}
+
+.cardMode .role,
+.cardMode .availability {
+  font-size: clamp(0.8125rem, 2.7cqh, 1.0625rem);
+  line-height: 1.45;
+}
+
+.cardMode .role {
+  margin-top: 0;
+}
+
+.cardMode .primary {
+  gap: var(--space-2) var(--space-3);
+  margin-top: clamp(0rem, 1cqh, var(--space-2));
+}
+
+.cardMode .button,
+.cardMode .ghost {
+  min-height: clamp(2.5rem, 8cqh, var(--target-min));
+  padding-inline: clamp(0.875rem, 3cqi, 1.5rem);
+  font-size: clamp(0.8125rem, 2.6cqh, 0.9375rem);
+}
+
+.cardMode .links {
+  padding-top: 0;
+}
+
+.cardMode .links a {
+  min-height: clamp(2rem, 7cqh, var(--target-min));
+}
+
+/* short cards: the decorative kicker and the location line step aside */
+@container card (max-height: 470px) {
+  .cardMode .kicker,
+  .cardMode .location {
+    display: none;
+  }
+}

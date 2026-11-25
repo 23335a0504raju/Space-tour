@@ -12,6 +12,7 @@ import { Starfield } from '../greybox/parts.tsx';
 import { TRAVEL_STARS } from '../handoff.ts';
 import { TRAVEL_SKY } from '../space/skyFrame.ts';
 import { HelVela } from '../ship/HelVela.tsx';
+import { LunarMoon } from './LunarMoon.tsx';
 import {
   BEACON,
   DECK,
@@ -191,6 +192,10 @@ function HomecomingScene({ id, frame }: ChapterSceneProps) {
 
       <Suspense fallback={null}>
         <Astronaut chapterId={id} frame={frame} drive={drive} variant="eva" />
+      </Suspense>
+      {/* the final transmission: the Moon beside the contact card */}
+      <Suspense fallback={null}>
+        <LunarMoon id={id} frame={frame} />
       </Suspense>
     </group>
   );

@@ -39,11 +39,34 @@ export const astronautYaw = (t: number) => Math.PI / 2 - span(t, 0.3, 0.46) * (M
 /** The beacon rises out of the deck, then stays; its pulse is ambient. */
 export const beaconRise = (t: number) => span(t, 0.46, 0.6);
 
+/**
+ * Final transmission (the contact card): the camera lifts off the deck into open sky, where the
+ * Moon hangs beside the card; its ring of dust sweeps into being, then the rock belt arrives.
+ */
+export const LIFT = { start: 0.58, end: 0.84 } as const;
+/** The card's empty right half, where the Moon must appear (LunarMoon reads its layout box). */
+export const MOON_ANCHOR = 'data-moon-anchor';
+/** The card's rest point (registry and overlay). */
+export const CARD_REST = 0.9;
+export const ringForm = (t: number) => span(t, 0.64, 0.9);
+export const rocksIn = (t: number) => span(t, 0.72, 0.92);
+
+/** The deck view the lift starts from, and the open-sky view it ends in. */
+const DECK_VIEW = { position: [-9, 5.2, 11], target: [-5.6, 4.1, 0], fov: 42 } as const;
+const SKY_VIEW = { position: [-10.5, 6.4, 13], target: [-3, 21, -20], fov: 42 } as const;
+/** Where the camera rests at the end of the journey (the Moon is placed for this view). */
+export const FINAL_VIEW = {
+  position: [-10.6, 6.5, 13.3],
+  target: [-3, 21.2, -20],
+  fov: 42,
+} as const;
+
 const keys: ShotKey[] = [
   { t: 0, position: [-14, 10, 60], target: [0, 0, 0], fov: 48 },
   { t: 0.25, position: [-12, 6, 28], target: [-6, 3.6, 0], fov: 46 },
-  { t: 0.6, position: [-9, 5.2, 11], target: [-5.6, 4.1, 0], fov: 42 },
-  { t: 1, position: [-8.6, 5.3, 12], target: [-5.3, 4.1, 0], fov: 42 },
+  { t: LIFT.start, ...DECK_VIEW },
+  { t: LIFT.end, ...SKY_VIEW },
+  { t: 1, ...FINAL_VIEW },
 ];
 
 /**
