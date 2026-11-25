@@ -8,6 +8,7 @@ import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { applyHaze, hazed as hazedClone } from './haze.ts';
 import type { Haze } from './haze.ts';
 import type { Block } from './layout.ts';
+import { PaintedPuffs, foliagePalette } from './parts.tsx';
 
 /**
  * Landscape pieces for the SC11 worlds: ground, cloud sea, mountains, instanced houses, trees and
@@ -20,6 +21,118 @@ const flatStd = (haze: Haze, color = '#ffffff') =>
     new THREE.MeshStandardMaterial({ color, roughness: 1, metalness: 0, flatShading: true }),
     haze,
   );
+
+/**
+ * Painted detail for the instanced village (Houses): Japanese town facades on the walls (a stone
+ * base, timber posts between bays, a beam under the eaves, shoji windows on every floor, a
+ * sliding door on some ground floors) and tile rows on the roofs. Drawn in the shader from the
+ * instance's own size, so the whole village stays four draw calls. Detail fades out with distance
+ * (far facades would only turn into ink noise). Chained after the haze patch.
+ */
+function paintVillage<M extends THREE.Material>(mat: M, kind: 'wall' | 'roof' | 'tower'): M {
+  const hazeCompile = mat.onBeforeCompile;
+  mat.onBeforeCompile = (shader, renderer) => {
+    hazeCompile.call(mat, shader, renderer);
+    shader.vertexShader =
+      'varying vec3 vLoc; varying vec3 vSize; varying vec3 vObjN; varying float vSeedH; varying float vDepth;\n' +
+      shader.vertexShader.replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+  vSize = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
+  vLoc = position * vSize;
+  vObjN = normal;
+  vSeedH = fract(sin(dot(instanceMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);
+  vDepth = -mvPosition.z;`,
+      );
+    shader.fragmentShader =
+      'varying vec3 vLoc; varying vec3 vSize; varying vec3 vObjN; varying float vSeedH; varying float vDepth;\n' +
+      shader.fragmentShader.replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+  {
+    ${kind === 'tower' ? '#define VILLAGE_TOWER' : ''}
+    float near = 1.0 - smoothstep(140.0, 320.0, vDepth);
+    vec3 base = diffuseColor.rgb;
+    ${kind === 'roof' ? ROOF_GLSL : WALL_GLSL}
+  }`,
+      );
+  };
+  mat.customProgramCacheKey = () => 'sc11-haze-village-' + kind;
+  mat.needsUpdate = true;
+  return mat;
+}
+
+const WALL_GLSL = /* glsl */ `
+    // which face: u runs along it, v is the height above the ground
+    float u;
+    float span;
+    if (abs(vObjN.y) > 0.5) {
+      u = 0.0; span = 0.0;
+    } else {
+#ifdef VILLAGE_TOWER
+      // around the drum
+      u = atan(vLoc.z, vLoc.x) * vSize.x * 0.5; span = 3.14159 * vSize.x;
+#else
+      if (abs(vObjN.x) > 0.5) { u = vLoc.z; span = vSize.z; } else { u = vLoc.x; span = vSize.x; }
+#endif
+    }
+    float v = vLoc.y + vSize.y * 0.5;
+    if (span > 0.0) {
+      vec3 col = base;
+      // plaster: a faint vertical wash, lighter high up
+      col *= 0.94 + 0.08 * smoothstep(0.0, vSize.y, v);
+      // stone base
+      float stone = 1.0 - step(0.9, v);
+      col = mix(col, vec3(0.52, 0.5, 0.5), stone);
+      // bays of ~3.4 m: timber posts between them
+      float bays = max(1.0, floor(span / 5.5 + 0.5));
+      float bw = span / bays;
+      float bu = fract((u + span * 0.5) / bw);
+      float post = 1.0 - step(0.07, min(bu, 1.0 - bu) * bw);
+      // floors of 4.2 m: a beam at each floor and one under the eaves
+      float fl = 5.0;
+      float fv = fract(v / fl);
+      float beam = (1.0 - step(0.06, fv)) * step(fl * 0.9, v) + step(vSize.y - 0.55, v);
+      vec3 timber = vec3(0.33, 0.22, 0.17);
+      col = mix(col, timber, max(post, beam) * (1.0 - stone));
+      // shoji windows in each bay, one per floor (the ground floor of some bays is a door)
+      float cu = (bu - 0.5) * bw;
+      float cv = (fv - 0.5) * fl;
+      float floorIx = floor(v / fl);
+      float isTop = step(vSize.y - 1.2, (floorIx + 1.0) * fl);
+      float bayIx = floor((u + span * 0.5) / bw);
+      float door = step(floorIx, 0.5) * step(0.6, fract(sin(bayIx * 7.1 + vSeedH * 31.0) * 917.3));
+      vec2 half_ = door > 0.5 ? vec2(bw * 0.3, fl * 0.38) : vec2(bw * 0.3, fl * 0.22);
+      // not every bay has a window on every floor: some plaster stays blank
+      float skip = step(0.62, fract(sin((bayIx + floorIx * 13.0) * 3.7 + vSeedH * 57.0) * 4131.7)) * (1.0 - door);
+      float cvo = door > 0.5 ? cv + fl * 0.1 : cv - fl * 0.06;
+      float inWin = step(abs(cu), half_.x) * step(abs(cvo), half_.y) * (1.0 - isTop * step(vSize.y - 0.7, v));
+      inWin *= step(0.9, v) * (1.0 - skip);
+      // paper with a lattice; doors are darker wood with a lattice too
+      // one cross bar per pane, not a fine lattice (that only turned into ink noise)
+      float grid = 1.0 - step(0.08, min(abs(cu), abs(cvo)));
+      vec3 paper = door > 0.5 ? vec3(0.42, 0.3, 0.22) : vec3(0.97, 0.9, 0.74);
+      vec3 win = mix(paper, timber, grid * 0.85);
+      // a frame round each opening
+      float frame = step(abs(cu), half_.x + 0.12) * step(abs(cvo), half_.y + 0.12) * (1.0 - step(abs(cu), half_.x) * step(abs(cvo), half_.y));
+      col = mix(col, timber, frame * step(0.9, v) * (1.0 - skip) * (1.0 - isTop * step(vSize.y - 0.7, v)));
+      col = mix(col, win, inWin);
+      // contact shadow at the foot of the wall
+      col *= 0.82 + 0.18 * smoothstep(0.0, 1.6, v);
+      diffuseColor.rgb = mix(base, col, near);
+    }
+`;
+
+const ROOF_GLSL = /* glsl */ `
+    // tile rows across the slope, a darker eave band at the bottom edge
+    float v = vLoc.y + vSize.y * 0.5;
+    float rows = abs(fract(v / 0.7) - 0.5);
+    vec3 col = base * (0.88 + 0.12 * smoothstep(0.0, 0.18, rows));
+    // the ridge catches light
+    col *= 1.0 + 0.12 * smoothstep(vSize.y * 0.75, vSize.y, v);
+    col = mix(col, base * 0.55, 1.0 - step(0.45, v));
+    diffuseColor.rgb = mix(base, col, near);
+`;
 
 /** A ground plane far wider than the view; the haze dissolves it before its edge. */
 export function Ground({ y, color, haze }: { y: number; color: string; haze: Haze }) {
@@ -225,7 +338,10 @@ export function Houses({
   haze: Haze;
 }) {
   const mat = useMemo(() => flatStd(haze), [haze]);
-  useDisposeOnUnmount(mat);
+  const wallMat = useMemo(() => paintVillage(flatStd(haze), 'wall'), [haze]);
+  const roofMat = useMemo(() => paintVillage(flatStd(haze), 'roof'), [haze]);
+  const towerMat = useMemo(() => paintVillage(flatStd(haze), 'tower'), [haze]);
+  useDisposeOnUnmount(mat, wallMat, roofMat, towerMat);
   const sets = useMemo(() => {
     const box = houses.filter((h) => !h.tower);
     const tow = houses.filter((h) => h.tower);
@@ -253,7 +369,7 @@ export function Houses({
       const rh = Math.min(h.w, h.d) * 0.45;
       q.setFromAxisAngle(yAxis, Math.PI / 4);
       // a 4-sided cone turned 45° is a hipped roof; scale it to overhang the walls
-      m.compose(v.set(h.x, h.y + h.h + rh / 2, h.z), q, s.set(h.w * 0.82, rh, h.d * 0.82));
+      m.compose(v.set(h.x, h.y + h.h + rh / 2, h.z), q, s.set(h.w * 0.98, rh, h.d * 0.98));
       c.copy(roofCols[h.roof]!);
       return true;
     },
@@ -287,13 +403,13 @@ export function Houses({
   useInstances(cap, sets.tow.length, fCap);
   return (
     <>
-      <instancedMesh ref={body} args={[undefined, mat, sets.box.length]}>
+      <instancedMesh ref={body} args={[undefined, wallMat, sets.box.length]}>
         <boxGeometry args={[1, 1, 1]} />
       </instancedMesh>
-      <instancedMesh ref={roof} args={[undefined, mat, sets.box.length]}>
+      <instancedMesh ref={roof} args={[undefined, roofMat, sets.box.length]}>
         <coneGeometry args={[Math.SQRT1_2 * 1.25, 1, 4]} />
       </instancedMesh>
-      <instancedMesh ref={tower} args={[undefined, mat, sets.tow.length]}>
+      <instancedMesh ref={tower} args={[undefined, towerMat, sets.tow.length]}>
         <cylinderGeometry args={[0.5, 0.5, 1, 10]} />
       </instancedMesh>
       <instancedMesh ref={cap} args={[undefined, mat, sets.tow.length]}>
@@ -310,12 +426,15 @@ export function Trees({
   trunk = '#6b4a3a',
   size = 1,
   haze,
+  painted = false,
 }: {
   items: ReadonlyArray<{ x: number; y: number; z: number; s: number }>;
   crowns: readonly string[];
   trunk?: string;
   size?: number;
   haze: Haze;
+  /** painted foliage crowns (PaintedPuffs, up to four crown colours) instead of faceted ones */
+  painted?: boolean;
 }) {
   const mat = useMemo(() => flatStd(haze), [haze]);
   useDisposeOnUnmount(mat);
@@ -327,11 +446,17 @@ export function Trees({
     () => (i: number, m: THREE.Matrix4, col: THREE.Color) => {
       const it = items[i]!;
       const k = it.s * size;
-      m.compose(v.set(it.x, it.y + 5 * k, it.z), q.identity(), s.set(1.4 * k, 10 * k, 1.4 * k));
+      // painted crowns sit low: a short trunk (long ones read as sticks under distant crowns)
+      const h = painted ? 5 : 10;
+      m.compose(
+        v.set(it.x, it.y + (h / 2) * k, it.z),
+        q.identity(),
+        s.set(1.4 * k, h * k, 1.4 * k),
+      );
       col.copy(trunkCol);
       return true;
     },
-    [items, size, trunkCol],
+    [items, size, trunkCol, painted],
   );
   const fC = useMemo(
     () => (i: number, m: THREE.Matrix4, col: THREE.Color) => {
@@ -345,15 +470,43 @@ export function Trees({
     [items, size, crownCols],
   );
   useInstances(t, items.length, fT);
-  useInstances(c, items.length, fC);
+  useInstances(c, painted ? 0 : items.length, fC);
+  const palettes = useMemo(() => crowns.slice(0, 4).map(foliagePalette), [crowns]);
+  // three crowns per tree: a tall middle one and two lower shoulders, so a tree reads as a tree
+  const puffs = useMemo(
+    () =>
+      items.flatMap((it, i) => {
+        const k = it.s * size;
+        const pal = i % Math.min(4, crowns.length);
+        const side = i % 2 ? 1 : -1;
+        return [
+          {
+            p: [it.x - side * 2.4 * k, it.y + 6.6 * k, it.z + 0.8 * k] as const,
+            s: 2.7 * k,
+            k: pal,
+          },
+          {
+            p: [it.x + side * 2.6 * k, it.y + 7.2 * k, it.z - 0.8 * k] as const,
+            s: 2.5 * k,
+            k: pal,
+          },
+          { p: [it.x, it.y + 9.2 * k, it.z] as const, s: 3.5 * k, k: pal },
+        ];
+      }),
+    [items, size, crowns.length],
+  );
   return (
     <>
       <instancedMesh ref={t} args={[undefined, mat, items.length]}>
         <cylinderGeometry args={[0.35, 0.5, 1, 5]} />
       </instancedMesh>
-      <instancedMesh ref={c} args={[undefined, mat, items.length]}>
-        <icosahedronGeometry args={[1, 0]} />
-      </instancedMesh>
+      {painted ? (
+        <PaintedPuffs items={puffs} palettes={palettes} haze={haze} />
+      ) : (
+        <instancedMesh ref={c} args={[undefined, mat, items.length]}>
+          <icosahedronGeometry args={[1, 0]} />
+        </instancedMesh>
+      )}
     </>
   );
 }

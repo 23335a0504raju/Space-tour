@@ -17,6 +17,12 @@ export interface AreaDef {
   /** Sky gradient, horizon → zenith (flattened into painted bands by the style pass). */
   readonly sky: readonly [string, string, string, string];
   readonly light: string;
+  /**
+   * The sky and light the world opens with, blending into `sky`/`light` over its first stretch
+   * (entrySky below): SC11-A opens on SC10's sunset palette and turns to day as the deck sinks.
+   */
+  readonly entrySky?: readonly [string, string, string, string];
+  readonly entryLight?: string;
   readonly keys: readonly ShotKey[];
 }
 
@@ -25,8 +31,12 @@ const keys = (list: ShotKey[]): readonly ShotKey[] => list;
 export const AREAS: Readonly<Record<AreaId, AreaDef>> = {
   discipline: {
     id: 'discipline',
-    sky: ['#ffd6b8', '#f7a9a0', '#c96f8f', '#5a3a78'],
-    light: '#ffe2c8',
+    // a clear anime day (painted, smooth): pale haze at the horizon, deep blue overhead
+    sky: ['#cfe4f4', '#86bdee', '#3b86dc', '#1b50c0'],
+    light: '#fff4e2',
+    // SC10's last frame is this sunset, so the crossing joins with no cut
+    entrySky: ['#ffd6b8', '#f7a9a0', '#c96f8f', '#5a3a78'],
+    entryLight: '#ffe2c8',
     keys: keys([
       // the first frame matches SC10's last frame, so the crossing flows straight in (no cut)
       { t: 0, position: [-22, 9, 52], target: [0, 3, -30], fov: 50 },
@@ -99,6 +109,9 @@ export function skyMix(area: AreaId, t: number): { a: AreaId; b: AreaId; k: numb
   if (next && t > 0.8) return { a: area, b: next, k: 0.5 * smooth((t - 0.8) / 0.2) };
   return { a: area, b: area, k: 0 };
 }
+
+/** How far a world has turned from its entry sky to its own, 0..1 (as SC11-A's deck sinks). */
+export const entrySky = (t: number) => smooth((t - 0.06) / 0.34);
 
 /**
  * How present a world is, 0..1: a world rises up into place round the ship as it enters and sinks

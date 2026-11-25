@@ -5,7 +5,7 @@ import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield, seeded } from '../greybox/parts.tsx';
 import { PAINTED_CLOUDS, SUN_BEYOND } from '../anime/clouds.ts';
-import { Clouds } from '../anime/parts.tsx';
+import { Clouds, PaintedSun } from '../anime/parts.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
 import { SolarSystem } from './SolarSystem.tsx';
 import { LIGHT_10, TRAVEL_STARS, smooth } from '../handoff.ts';
@@ -110,10 +110,7 @@ function CrossingScene({ id, frame }: ChapterSceneProps) {
 
       {/* the world beyond: a big warm sun and painted clouds */}
       <group ref={beyond} visible={false}>
-        <mesh position={[...SUN_BEYOND]}>
-          <sphereGeometry args={[34, 24, 16]} />
-          <meshBasicMaterial color={new THREE.Color(2.2, 1.7, 1.2)} toneMapped={false} />
-        </mesh>
+        <PaintedSun radius={34} position={SUN_BEYOND} halo={false} />
         <Clouds items={PAINTED_CLOUDS} />
       </group>
 

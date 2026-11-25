@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { ChapterImpl, ChapterSceneProps, JourneyFrame } from '../contract.ts';
 import { useJourneyStore } from '../../engine/store.ts';
 import { HelVela } from '../ship/HelVela.tsx';
-import { AREAS, areaShot, cloudSea, presence, shipZ, skyMix } from './anime.ts';
+import { AREAS, areaShot, cloudSea, entrySky, presence, shipZ, skyMix } from './anime.ts';
 import type { AreaId } from './anime.ts';
 import { PAINTED_CLOUDS, SUN_BEYOND } from './clouds.ts';
 import { ANIME_MODELS, AnimeModel } from './AnimeModel.tsx';
@@ -34,10 +34,18 @@ import {
   VILLAGE_ROOFS,
   VILLAGE_TREES,
   VILLAGE_WALLS,
-  mountainRing,
 } from './layout.ts';
-import { Clouds, LightRoad, Motes, RingedPlanet, SkyDome, Torii } from './parts.tsx';
-import { CloudSea, Fields, Ground, Houses, ModelPart, Mountains, Strip, Trees } from './world.tsx';
+import {
+  Clouds,
+  PaintedSun,
+  PaintedRange,
+  LightRoad,
+  Motes,
+  RingedPlanet,
+  SkyDome,
+  Torii,
+} from './parts.tsx';
+import { CloudSea, Fields, Ground, Houses, ModelPart, Strip, Trees } from './world.tsx';
 
 /**
  * SC11 · The Anime-Inspired Universe: three whole worlds crossed in one continuous flight
@@ -58,35 +66,85 @@ const HAZE_FAR = 1500;
 /** The SC10 cloud deck, sinking away as the ship climbs out of it (a pure function of t). */
 function CloudDeck({ frame, id }: { frame: JourneyFrame; id: string }) {
   const g = useRef<THREE.Group>(null);
+  // the deck dissolves as it sinks (its tops used to poke up through the village street)
+  const opacity = useMemo(() => ({ current: 1 }), []);
   useFrame(() => {
     if (frame.id !== id || !g.current) return;
     const k = Math.min(1, Math.max(0, (frame.t - 0.08) / 0.32));
     g.current.position.set(0, -110 * k * k * (3 - 2 * k), 220);
+    const f = Math.min(1, Math.max(0, (frame.t - 0.08) / 0.12));
+    opacity.current = 1 - f * f * (3 - 2 * f);
   });
   return (
     <group ref={g} position={[0, 0, 220]}>
-      <Clouds items={PAINTED_CLOUDS} />
+      <Clouds items={PAINTED_CLOUDS} opacity={opacity} />
     </group>
   );
 }
 
 // ── Discipline: the lantern village ──────────────────────────────────────────
 
-const DISCIPLINE_MOUNTAINS = mountainRing(5, 34, 820);
+/** Keeps its children level with the ship (things on the horizon: painted ranges). */
+function FollowShip({
+  frame,
+  id,
+  children,
+}: {
+  frame: JourneyFrame;
+  id: string;
+  children: ReactNode;
+}) {
+  const g = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (frame.id === id && g.current) g.current.position.z = shipZ(frame.t);
+  });
+  return <group ref={g}>{children}</group>;
+}
+
 function Discipline({ frame, id, haze }: WorldProps) {
   const g = GROUND.discipline;
   return (
     <>
+      {/* painted ranges on the horizon: a pale far range and a nearer forested one */}
+      <FollowShip frame={frame} id={id}>
+        <PaintedRange
+          radius={1000}
+          y={g - 90}
+          height={440}
+          lit="#a3c0ea"
+          shadow="#6a8cc8"
+          haze={haze}
+          seed={3}
+          freq={2.0}
+          low={0.32}
+          high={0.95}
+          aerial={0.18}
+        />
+        <PaintedRange
+          radius={760}
+          y={g - 60}
+          height={250}
+          lit="#74b277"
+          shadow="#3d6f69"
+          haze={haze}
+          seed={9}
+          freq={3.2}
+          low={0.18}
+          high={0.72}
+          aerial={0.04}
+          soft={2}
+        />
+      </FollowShip>
       <Ground y={g} color="#e9c7a0" haze={haze} />
       <Strip y={g} halfWidth={STREET - 4} from={160} to={-900} color="#d9a77f" haze={haze} />
       <Houses houses={VILLAGE_HOUSES} walls={VILLAGE_WALLS} roofs={VILLAGE_ROOFS} haze={haze} />
       <Trees
         items={VILLAGE_TREES}
-        crowns={['#7cc48a', '#f2a7b8', '#9ad27f', '#5fae7d']}
+        crowns={['#6fbf6a', '#f2a7b8', '#9ad27f', '#4f9e62']}
         size={1.6}
         haze={haze}
+        painted
       />
-      <Mountains items={DISCIPLINE_MOUNTAINS} y={g} color="#b77f8f" haze={haze} />
       {/* the gates the ship flies through */}
       {TORII_Z.map((z) => (
         <Torii key={z} position={[0, g, z]} scale={1.6} />
@@ -124,7 +182,6 @@ function Discipline({ frame, id, haze }: WorldProps) {
 
 // ── Proof: the frontier town ─────────────────────────────────────────────────
 
-const PROOF_MOUNTAINS = mountainRing(9, 30, 780);
 function Proof({ frame, id, haze }: WorldProps) {
   const g = GROUND.proof;
   return (
@@ -164,7 +221,36 @@ function Proof({ frame, id, haze }: WorldProps) {
         id={id}
         frame={frame}
       />
-      <Mountains items={PROOF_MOUNTAINS} y={g} color="#c98a5a" haze={haze} />
+      {/* painted ranges: warm sandstone buttes far off, sage hills nearer */}
+      <FollowShip frame={frame} id={id}>
+        <PaintedRange
+          radius={1000}
+          y={g - 100}
+          height={420}
+          lit="#dba57c"
+          shadow="#a2705f"
+          haze={haze}
+          seed={11}
+          freq={2.6}
+          low={0.3}
+          high={0.82}
+          aerial={0.25}
+        />
+        <PaintedRange
+          radius={760}
+          y={g - 70}
+          height={230}
+          lit="#b8b27c"
+          shadow="#7b7a60"
+          haze={haze}
+          seed={17}
+          freq={3.4}
+          low={0.16}
+          high={0.55}
+          aerial={0.06}
+          soft={2}
+        />
+      </FollowShip>
       {/* Ryuk watching from above the rooftops; the notebook drifting beside the ship */}
       <AnimeModel
         url={ANIME_MODELS.ryuk}
@@ -193,7 +279,6 @@ function Proof({ frame, id, haze }: WorldProps) {
 
 // ── Horizon: the blossom valley ──────────────────────────────────────────────
 
-const HORIZON_MOUNTAINS = mountainRing(13, 36, 800);
 function Horizon({ frame, id, haze }: WorldProps) {
   const g = GROUND.horizon;
   const low = useJourneyStore((s) => s.tier !== 'balanced');
@@ -223,14 +308,50 @@ function Horizon({ frame, id, haze }: WorldProps) {
           frame={frame}
         />
       ))}
-      <Trees items={ROAD_TREES} crowns={['#f6a8c8', '#f8c0d6', '#ef93b8']} size={1.1} haze={haze} />
+      <Trees
+        items={ROAD_TREES}
+        crowns={['#f6a8c8', '#f8c0d6', '#ef93b8']}
+        size={1.1}
+        haze={haze}
+        painted
+      />
       <Trees
         items={FIELD_TREES}
         crowns={['#f6a8c8', '#7fb07a', '#f8c0d6', '#94c27f']}
         size={1.5}
         haze={haze}
+        painted
       />
-      <Mountains items={HORIZON_MOUNTAINS} y={g} color="#6a5aa8" haze={haze} />
+      {/* painted ranges at dusk: blue-violet peaks far off, green hills nearer */}
+      <FollowShip frame={frame} id={id}>
+        <PaintedRange
+          radius={1000}
+          y={g - 90}
+          height={450}
+          lit="#958bd8"
+          shadow="#5c4e9c"
+          haze={haze}
+          seed={23}
+          freq={2.2}
+          low={0.3}
+          high={0.95}
+          aerial={0.22}
+        />
+        <PaintedRange
+          radius={760}
+          y={g - 60}
+          height={240}
+          lit="#6f9c74"
+          shadow="#3e5e5d"
+          haze={haze}
+          seed={29}
+          freq={3}
+          low={0.15}
+          high={0.6}
+          aerial={0.05}
+          soft={2}
+        />
+      </FollowShip>
       {/* the blossom hill: Tanjiro and Nezuko look out over the road */}
       <mesh position={[HILL.x, g - HILL.radius + HILL.height, HILL.z]} scale={[1, 1, 1]}>
         <sphereGeometry args={[HILL.radius, 16, 10]} />
@@ -284,9 +405,18 @@ function World({ area, ...props }: WorldProps & { area: AreaId }): ReactNode {
 const SKY_COLORS = Object.fromEntries(
   (Object.keys(AREAS) as AreaId[]).map((a) => [
     a,
-    { sky: AREAS[a].sky.map((c) => new THREE.Color(c)), light: new THREE.Color(AREAS[a].light) },
+    {
+      sky: AREAS[a].sky.map((c) => new THREE.Color(c)),
+      light: new THREE.Color(AREAS[a].light),
+      entrySky: AREAS[a].entrySky?.map((c) => new THREE.Color(c)),
+      entryLight: AREAS[a].entryLight ? new THREE.Color(AREAS[a].entryLight) : undefined,
+    },
   ]),
-) as Record<AreaId, { sky: THREE.Color[]; light: THREE.Color }>;
+) as Record<
+  AreaId,
+  { sky: THREE.Color[]; light: THREE.Color; entrySky?: THREE.Color[]; entryLight?: THREE.Color }
+>;
+const tmpColor = new THREE.Color();
 
 /** The ringed planets of the horizon (SC12 opens with the big one at the same place, handoff). */
 export const HORIZON_PLANETS = {
@@ -312,7 +442,7 @@ function makeArea(area: AreaId): ChapterImpl {
     const fill = useRef<THREE.HemisphereLight>(null);
     const sunTarget = useMemo(() => new THREE.Object3D(), []);
     const haze = useMemo(() => createHaze(HAZE_NEAR, HAZE_FAR), []);
-    const sun = useRef<THREE.Mesh>(null);
+    const sun = useRef<THREE.Group>(null);
     const live = useMemo(
       () => ({ current: [0, 1, 2, 3].map(() => new THREE.Color()) as THREE.Color[] }),
       [],
@@ -334,6 +464,14 @@ function makeArea(area: AreaId): ChapterImpl {
       for (let i = 0; i < 4; i += 1)
         live.current[i]!.copy(SKY_COLORS[m.a].sky[i]!).lerp(SKY_COLORS[m.b].sky[i]!, m.k);
       light.current?.color.copy(SKY_COLORS[m.a].light).lerp(SKY_COLORS[m.b].light, m.k);
+      // a world that opens on its neighbour's palette turns to its own (SC11-A: sunset to day)
+      const entry = SKY_COLORS[area];
+      if (entry.entrySky && entry.entryLight) {
+        const e = entrySky(t);
+        for (let i = 0; i < 4; i += 1)
+          live.current[i]!.copy(tmpColor.copy(entry.entrySky[i]!).lerp(live.current[i]!, e));
+        light.current?.color.copy(tmpColor.copy(entry.entryLight).lerp(light.current.color, e));
+      }
       fill.current?.groundColor.copy(live.current[1]!);
       horizonColor(live.current, haze.color.value);
       for (let i = 0; i < 4; i += 1) haze.sky.value[i]!.copy(live.current[i]!);
@@ -347,7 +485,11 @@ function makeArea(area: AreaId): ChapterImpl {
       haze.near.value = HAZE_NEAR * k;
       haze.far.value = 40 + (HAZE_FAR - 40) * k;
       // the painted sun of the first world leaves with it
-      if (sun.current) sun.current.scale.setScalar(t < 0.5 ? 1 : Math.max(k, 0.001));
+      if (sun.current) {
+        sun.current.scale.setScalar(t < 0.5 ? 1 : Math.max(k, 0.001));
+        // at infinity: it travels with the ship (at t = 0 it sits exactly where SC10 left it)
+        sun.current.position.z = SUN_BEYOND[2] + 220 + z;
+      }
       sea.opacity.current = cloudSea(area, t);
       sea.tint.current.copy(live.current[1]!);
       sea.z.current = z;
@@ -355,7 +497,7 @@ function makeArea(area: AreaId): ChapterImpl {
     return (
       <group>
         <group ref={dome}>
-          <SkyDome colors={def.sky} live={live} />
+          <SkyDome colors={def.sky} live={live} painted />
         </group>
         <directionalLight ref={light} target={sunTarget} color={def.light} intensity={2.6} />
         <primitive object={sunTarget} />
@@ -364,10 +506,11 @@ function makeArea(area: AreaId): ChapterImpl {
           <>
             {/* the SC10 sky continues: same clouds and sun, shifted into this frame */}
             <CloudDeck frame={frame} id={id} />
-            <mesh ref={sun} position={[SUN_BEYOND[0], SUN_BEYOND[1], SUN_BEYOND[2] + 220]}>
-              <sphereGeometry args={[34, 24, 16]} />
-              <meshBasicMaterial color={new THREE.Color(2.2, 1.7, 1.2)} toneMapped={false} />
-            </mesh>
+            <PaintedSun
+              ref={sun}
+              radius={34}
+              position={[SUN_BEYOND[0], SUN_BEYOND[1], SUN_BEYOND[2] + 220]}
+            />
           </>
         )}
         <group ref={world} visible={false}>

@@ -7,7 +7,7 @@ import { useJourneyStore } from '../../engine/store.ts';
 import { createLimbAtmosphereMaterial, createEarthMaterial } from '../../shaders/earth.ts';
 import { AREAS } from '../anime/anime.ts';
 import { PAINTED_CLOUDS, SUN_BEYOND } from '../anime/clouds.ts';
-import { Clouds, RingedPlanet, SkyDome } from '../anime/parts.tsx';
+import { Clouds, PaintedSun, RingedPlanet, SkyDome } from '../anime/parts.tsx';
 import { HORIZON_PLANETS } from '../anime/areas.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield } from '../greybox/parts.tsx';
@@ -106,10 +106,7 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
         <group position={[0, 0, 400]}>
           <Clouds items={PAINTED_CLOUDS} sun={RETURN_SUN} />
         </group>
-        <mesh position={[SUN_BEYOND[0] * -1, SUN_BEYOND[1], -460]}>
-          <sphereGeometry args={[34, 24, 16]} />
-          <meshBasicMaterial color={new THREE.Color(2.2, 1.7, 1.2)} toneMapped={false} />
-        </mesh>
+        <PaintedSun radius={34} position={[SUN_BEYOND[0] * -1, SUN_BEYOND[1], -460]} />
       </group>
 
       {/* the big ringed planet of SC11c, still ahead (its place relative to the ship) */}
