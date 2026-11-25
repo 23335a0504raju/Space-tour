@@ -27,8 +27,7 @@ export const CRITICAL_ASSETS: readonly string[] = [
 /**
  * Every file the journey loads, fetched once from the start gate on (FIX_LIST 8), in journey order:
  * the first scenes' files, then the rest in the background. Kept in sync with the code by
- * preload.test.ts. Not listed on purpose: earth_day_4k.ktx2 (fetched by the NASA script, not used
- * by any chapter).
+ * preload.test.ts.
  */
 export const JOURNEY_ASSETS: readonly string[] = [
   ...CRITICAL_ASSETS,
@@ -58,6 +57,12 @@ export const JOURNEY_ASSETS: readonly string[] = [
   '/assets/textures/moon_1k.ktx2',
   '/assets/textures/mars_2k.ktx2',
   '/assets/textures/jupiter_2k.ktx2',
+  // SC10's look back (Solar System Scope maps, A051-A053)
+  '/assets/textures/venus_1k.ktx2',
+  '/assets/textures/uranus_1k.ktx2',
+  '/assets/textures/neptune_1k.ktx2',
+  // the closest views of Earth (SC12, SC13; Balanced)
+  '/assets/textures/earth_day_4k.ktx2',
   // Project Bay images (plain <img>: these only warm the HTTP cache)
   '/assets/projects/smartway-traffic.webp',
   '/assets/projects/documentdb.webp',

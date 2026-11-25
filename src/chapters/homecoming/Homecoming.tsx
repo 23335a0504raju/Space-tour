@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { getKTX2Loader } from '../../engine/assets/loaders.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { useJourneyStore } from '../../engine/store.ts';
-import { createAtmosphereMaterial, createEarthMaterial } from '../../shaders/earth.ts';
+import { createEarthMaterial, createLimbAtmosphereMaterial } from '../../shaders/earth.ts';
 import { Astronaut } from '../astronaut/Astronaut.tsx';
 import type { Drive } from '../astronaut/Astronaut.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
@@ -31,6 +31,8 @@ import {
 /** SC13 · Homecoming & Final Transmission (FINAL_STORYLINE SC13). Earth maps: NASA (A021, A022). */
 const TEX = {
   day: '/assets/textures/earth_day_2k.ktx2',
+  // the closest view of Earth: the 4K map on Balanced (A021), as SC12 at the join
+  dayHi: '/assets/textures/earth_day_4k.ktx2',
   night: '/assets/textures/earth_night_2k.ktx2',
 } as const;
 const ENGINE = { current: 0.1 };
@@ -66,7 +68,7 @@ const SKY_13 = new THREE.Quaternion()
 function HomecomingScene({ id, frame }: ChapterSceneProps) {
   const gl = useThree((s) => s.gl);
   const low = useJourneyStore((s) => s.tier !== 'balanced');
-  const [dayMap, nightMap] = useLoader(getKTX2Loader(gl), [TEX.day, TEX.night]);
+  const [dayMap, nightMap] = useLoader(getKTX2Loader(gl), [low ? TEX.day : TEX.dayHi, TEX.night]);
   if (!dayMap || !nightMap) throw new Error('SC13: textures missing');
   useLayoutEffect(() => {
     for (const t of [dayMap, nightMap]) {
@@ -75,8 +77,10 @@ function HomecomingScene({ id, frame }: ChapterSceneProps) {
     }
   }, [dayMap, nightMap]);
   const { earth, atmosphere } = useMemo(() => {
-    const e = createEarthMaterial(dayMap, nightMap, low);
-    const a = createAtmosphereMaterial();
+    const e = createEarthMaterial(dayMap, nightMap, low, { closeup: true });
+    // SC06's thin limb atmosphere (the old broad shell drew a translucent ring over the planet);
+    // its centre and radius follow the globe through the handoff (useFrame)
+    const a = createLimbAtmosphereMaterial(EARTH.radius, new THREE.Vector3(...EARTH.position));
     (e.uniforms['uSun']?.value as THREE.Vector3).copy(SUN_DIR);
     (a.uniforms['uSun']?.value as THREE.Vector3).copy(SUN_DIR);
     return { earth: e, atmosphere: a };
@@ -109,6 +113,9 @@ function HomecomingScene({ id, frame }: ChapterSceneProps) {
       globe.current.quaternion.copy(ROT_13).slerp(ROT_12, w);
       shell.current.position.copy(tmp.pos);
       shell.current.scale.setScalar(r / EARTH.radius);
+      (atmosphere.uniforms['uCentre']!.value as THREE.Vector3).copy(tmp.pos);
+      atmosphere.uniforms['uRadius']!.value = r;
+      atmosphere.uniforms['uH']!.value = r * 0.0075;
       tmp.sun
         .copy(SUN_DIR)
         .lerp(tmp.from.set(...HANDOFF.sun).normalize(), w)

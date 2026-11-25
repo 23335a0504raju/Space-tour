@@ -40,6 +40,8 @@ const RETURN_SUN = [-SUN_BEYOND[0], SUN_BEYOND[1], -300] as const;
  */
 const TEX = {
   day: '/assets/textures/earth_day_2k.ktx2',
+  // the closest views of Earth (here and SC13) use the 4K map on Balanced (A021)
+  dayHi: '/assets/textures/earth_day_4k.ktx2',
   night: '/assets/textures/earth_night_2k.ktx2',
   moon: '/assets/textures/moon_1k.ktx2',
 } as const;
@@ -50,7 +52,7 @@ const SKY = AREAS.horizon.sky;
 function ReturnScene({ id, frame }: ChapterSceneProps) {
   const gl = useThree((s) => s.gl);
   const low = useJourneyStore((s) => s.tier !== 'balanced');
-  const maps = useLoader(getKTX2Loader(gl), [TEX.day, TEX.night, TEX.moon]);
+  const maps = useLoader(getKTX2Loader(gl), [low ? TEX.day : TEX.dayHi, TEX.night, TEX.moon]);
   const [dayMap, nightMap, moonMap] = maps;
   if (!dayMap || !nightMap || !moonMap) throw new Error('SC12: textures missing');
   useLayoutEffect(() => {
@@ -60,7 +62,7 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
     }
   }, [dayMap, nightMap, moonMap]);
   const { earth, atmosphere } = useMemo(() => {
-    const e = createEarthMaterial(dayMap, nightMap, low);
+    const e = createEarthMaterial(dayMap, nightMap, low, { closeup: true });
     // the thin limb atmosphere of SC06 (the old shell read as a hazy halo behind the planet)
     const a = createLimbAtmosphereMaterial(EARTH.radius, new THREE.Vector3(...EARTH.position));
     (e.uniforms['uSun']?.value as THREE.Vector3).copy(SUN);

@@ -4,6 +4,12 @@
 > All personal content comes from the existing portfolio (`c:\projects\MainPortfolio\port`). Sources and conflicts are in `PORTFOLIO_CONTENT_MAPPING.md`. Anything marked `[TO CONFIRM]` must not ship until you confirm it.
 > Specific anime worlds are **not** designed here (see `ANIME_UNIVERSE_FRAMEWORK.md`).
 
+> **Amendments as built (2026-11-25), which override the scene text below:**
+> - **One continuous flight.** Every "Transition" line below (fade up, cut to, fades into) is replaced by a continuous join: the camera, sky and planets hand over from one chapter to the next (`src/chapters/handoff.ts`, tested in `handoff.test.ts`). No fades, flashes, cuts or dissolves anywhere in the journey; only the start gate's opening burns open.
+> - **SC13 ending.** After the astronaut deploys the beacon, the camera lifts off the deck into open sky toward the Moon. The contact panel becomes one wide card (the user's "Lunar Gravity" reference): the name and contact actions on the left, the Moon with a forming dust ring and rock belt on the right. The header's Contact goes straight to this card.
+> - **SC10 look back.** Before the gate, the camera looks back at the Sun and all eight planets on one ecliptic, every planet textured (NASA maps; Venus, Uranus and Neptune from Solar System Scope, CC BY 4.0).
+> - **Open question (SC10 → SC11a):** the style ramp passes through an "ink on paper" stage, which reads as a white flash between dark space and the painted sky. Awaiting a decision on whether to go straight from realistic to cel.
+
 ---
 
 ## The story in one paragraph

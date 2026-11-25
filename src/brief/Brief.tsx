@@ -459,6 +459,12 @@ export function Brief() {
           <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; modified.
         </p>
         <p className={styles.credits}>
+          Venus, Uranus and Neptune textures:{' '}
+          <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>, licensed
+          under <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; resized. Earth,
+          Moon, Mars and Jupiter maps: NASA.
+        </p>
+        <p className={styles.credits}>
           Anime worlds: 3D models from Sketchfab, modified (simplified and recompressed), credited
           to their authors:
         </p>

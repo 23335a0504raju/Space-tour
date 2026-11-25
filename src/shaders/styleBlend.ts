@@ -3,7 +3,8 @@ import { Uniform } from 'three';
 
 /**
  * Screen-space art-style blend (SC10 crossing, SC11 anime universe, SC12 return).
- *   uStyle 0 = realistic (untouched), 1 = ink line art on paper, 2 = flat cel colour with ink lines.
+ *   uStyle 0 = realistic (untouched), 1 = the scene inked (lines, hatching), 2 = flat cel colour
+ *   with ink lines. No paper-white stage: the ramp never flashes bright between dark and painted.
  * It runs after tone mapping, on the final image, and is a pure function of `uStyle`, which the
  * Director derives from scroll progress, so the transition reverses exactly.
  */
@@ -34,12 +35,14 @@ const fragment = /* glsl */ `
 
     float l = lum(inputColor.rgb);
 
-    // ── ink line art: dark paper-white page, hatching where the scene is bright, ink lines ──
-    vec3 paper = vec3(0.93, 0.90, 0.84);
+    // ── ink line art over the scene itself: hatching where it is bright, ink lines ──
+    // (Raju, 2026-11-25: no paper flash. It used to be drawn on a paper-white page, a near-white
+    // frame between dark space and the painted sky; now the real image takes on ink first, then
+    // the cel colour floods in.)
     vec3 inkCol = vec3(0.08, 0.07, 0.11);
     float hatch = step(0.5, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.18));
     float shade = smoothstep(0.12, 0.7, l);
-    vec3 lineArt = paper * (1.0 - 0.3 * shade - 0.28 * hatch * shade);
+    vec3 lineArt = inputColor.rgb * (1.0 - 0.28 * hatch * shade);
     lineArt = mix(lineArt, inkCol, ink);
 
     // ── cel colour: posterised, saturated, with a painted sky behind everything dark ──
