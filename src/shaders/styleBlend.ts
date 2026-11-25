@@ -17,12 +17,20 @@ const fragment = /* glsl */ `
 
     // Roberts-cross edges on luminance (4 taps): lines follow every colour boundary
     vec2 px = texelSize * 1.6;
-    float a = lum(texture2D(inputBuffer, uv).rgb);
-    float b = lum(texture2D(inputBuffer, uv + vec2(px.x, px.y)).rgb);
-    float c = lum(texture2D(inputBuffer, uv + vec2(px.x, 0.0)).rgb);
-    float d = lum(texture2D(inputBuffer, uv + vec2(0.0, px.y)).rgb);
+    vec4 ta = texture2D(inputBuffer, uv);
+    vec4 tb = texture2D(inputBuffer, uv + vec2(px.x, px.y));
+    vec4 tc = texture2D(inputBuffer, uv + vec2(px.x, 0.0));
+    vec4 td = texture2D(inputBuffer, uv + vec2(0.0, px.y));
+    float a = lum(ta.rgb);
+    float b = lum(tb.rgb);
+    float c = lum(tc.rgb);
+    float d = lum(td.rgb);
     float edge = length(vec2(a - b, c - d));
-    float ink = smoothstep(0.012, 0.05, edge);
+    // Painted clouds (anime/parts.tsx Clouds) mark themselves by lowering alpha: they are already
+    // painted, so no ink round or inside them and no posterising. Opaque scene pixels have alpha 1.
+    float painted = 1.0 - clamp(min(min(ta.a, tb.a), min(tc.a, td.a)), 0.0, 1.0);
+    float cloud = 1.0 - clamp(inputColor.a, 0.0, 1.0);
+    float ink = smoothstep(0.012, 0.05, edge) * (1.0 - painted);
 
     float l = lum(inputColor.rgb);
 
@@ -40,13 +48,16 @@ const fragment = /* glsl */ `
     float q = floor(l * 4.0 + 0.5) / 4.0;
     vec3 base = inputColor.rgb * (q / lv);
     base = mix(vec3(lum(base)), base, 1.45);
+    base = mix(base, inputColor.rgb, cloud);
     vec3 cel = mix(sky, base, smoothstep(0.025, 0.1, l));
     cel = mix(cel, inkCol, ink * 0.9);
 
     float k1 = clamp(uStyle, 0.0, 1.0);
     float k2 = clamp(uStyle - 1.0, 0.0, 1.0);
     vec3 outRgb = mix(mix(inputColor.rgb, lineArt, k1), cel, k2);
-    outputColor = vec4(outRgb, inputColor.a);
+    // the clouds' mark is consumed here: the page behind the canvas is near-black, so opaque output
+    // looks the same everywhere else
+    outputColor = vec4(outRgb, 1.0);
   }
 `;
 

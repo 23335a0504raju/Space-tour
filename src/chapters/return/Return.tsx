@@ -30,6 +30,9 @@ import {
   styleAt,
 } from './return.ts';
 
+/** The painted sun here sits on the other side (mirrored x): the clouds are lit from it. */
+const RETURN_SUN = [-SUN_BEYOND[0], SUN_BEYOND[1], -300] as const;
+
 /**
  * SC12 · The Return (FINAL_STORYLINE SC12). The crossing in reverse; the screen-space style pass
  * (driven by `style()`) un-draws the cel look while this scene supplies the gate, the tunnel and
@@ -99,7 +102,7 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
           <SkyDome colors={SKY} />
         </group>
         <group position={[0, 0, 400]}>
-          <Clouds items={PAINTED_CLOUDS} />
+          <Clouds items={PAINTED_CLOUDS} sun={RETURN_SUN} />
         </group>
         <mesh position={[SUN_BEYOND[0] * -1, SUN_BEYOND[1], -460]}>
           <sphereGeometry args={[34, 24, 16]} />
