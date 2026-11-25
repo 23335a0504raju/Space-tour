@@ -6,6 +6,7 @@ import styles from './Brief.module.css';
 
 const {
   identity,
+  contact,
   experience,
   education,
   strengths,
@@ -155,6 +156,31 @@ function ProjectCard({ project, large }: { project: Project; large?: boolean }) 
   );
 }
 
+/** Section index and heading (left column on wide screens; sticks while its section scrolls). */
+function SectionHead({ id, n, title }: { id: string; n: number; title: string }) {
+  return (
+    <div className={styles.sectionHead}>
+      <p className={styles.index} aria-hidden="true">
+        {String(n).padStart(2, '0')}
+      </p>
+      <h2 id={`${id}-title`}>{title}</h2>
+    </div>
+  );
+}
+
+const SECTIONS = [
+  ['experience', 'Experience'],
+  ['projects', 'Projects'],
+  ['strengths', 'Strengths'],
+  ['stack', 'Stack'],
+  ['education', 'Education'],
+  ['certifications', 'Certifications'],
+  ['contact', 'Contact'],
+] as const;
+
+const [firstName = '', ...restName] = identity.name.value.split(' ');
+const lastName = restName.join(' ');
+
 export function Brief() {
   const flagships = projects.filter((p) => p.tier === 'diorama' || p.tier === 'architecture');
   const supporting = projects.filter((p) => p.tier === 'dossier');
@@ -166,184 +192,255 @@ export function Brief() {
       <a className="skip-link" href="#contact">
         Skip to contact
       </a>
-      <header className={styles.header}>
-        <p className={styles.kicker}>Mission Brief</p>
-        <h1 className={styles.name}>
-          <FactText fact={identity.name} />
-        </h1>
-        <p className={styles.roleLarge}>
-          <FactText fact={identity.role} />
-        </p>
-        <p className={styles.summary}>
-          <FactText fact={identity.summary} />
-        </p>
-        {shouldShow(identity.availability) && (
-          <p className={styles.summary}>
-            <FactText fact={identity.availability} />
-          </p>
-        )}
+      <header className={styles.bar}>
+        <a className={styles.brand} href="/">
+          <span className={styles.brandName}>
+            {firstName}
+            <span className={styles.dot} aria-hidden="true">
+              .
+            </span>
+          </span>
+          <span className={styles.brandRole}>
+            <FactText fact={identity.shortRole} />
+          </span>
+        </a>
         <nav aria-label="Sections" className={styles.toc}>
-          <a href="#experience">Experience</a>
-          <a href="#projects">Projects</a>
-          <a href="#strengths">Strengths</a>
-          <a href="#stack">Stack</a>
-          <a href="#education">Education</a>
-          <a href="#contact">Contact</a>
+          {SECTIONS.map(([id, label]) => (
+            <a key={id} href={`#${id}`}>
+              {label}
+            </a>
+          ))}
         </nav>
+        <div className={styles.barEnd}>
+          {shouldShow(contact.resumeUrl) && (
+            <a className={styles.pill} href={contact.resumeUrl.value} download>
+              <FactText fact={contact.resumeUrl}>Resume</FactText>
+            </a>
+          )}
+          <a className={styles.quiet} href="/">
+            Enter the mission <span aria-hidden="true">→</span>
+          </a>
+        </div>
       </header>
 
       <main className={styles.main}>
+        {/* not a landmark: the contact section is already named after Raju */}
+        <div className={styles.hero}>
+          <p className={styles.kicker}>Mission Brief</p>
+          <h1 id="brief-name" className={styles.name}>
+            <FactText fact={identity.name}>
+              <span className={styles.first}>{firstName}</span>{' '}
+              <span className={styles.last}>
+                {lastName}
+                <span aria-hidden="true">.</span>
+              </span>
+            </FactText>
+          </h1>
+          <p className={styles.roleLarge}>
+            <FactText fact={identity.role} />
+          </p>
+          <p className={styles.summary}>
+            <FactText fact={identity.summary} />
+          </p>
+          {shouldShow(identity.availability) && (
+            <p className={styles.availability}>
+              <span className={styles.live} aria-hidden="true" />
+              <FactText fact={identity.availability} />
+            </p>
+          )}
+          <div className={styles.heroActions}>
+            <a className={styles.primary} href={`mailto:${contact.email.value}`}>
+              Email <FactText fact={contact.email} />
+            </a>
+            {shouldShow(contact.resumeUrl) && (
+              <a className={styles.secondary} href={contact.resumeUrl.value} download>
+                <FactText fact={contact.resumeUrl}>Download resume</FactText>
+              </a>
+            )}
+          </div>
+        </div>
+
         <section id="experience" className={styles.section} aria-labelledby="experience-title">
-          <h2 id="experience-title">Experience</h2>
-          <ol className={styles.entries}>
-            {experience.map((job) => (
-              <ExperienceEntry key={job.id} job={job} />
-            ))}
-          </ol>
+          <SectionHead id="experience" n={1} title="Experience" />
+          <div className={styles.sectionBody}>
+            <ol className={styles.entries}>
+              {experience.map((job) => (
+                <ExperienceEntry key={job.id} job={job} />
+              ))}
+            </ol>
+          </div>
         </section>
 
         <section id="projects" className={styles.section} aria-labelledby="projects-title">
-          <h2 id="projects-title">Projects</h2>
-          <ul className={styles.projectGrid}>
-            {flagships.map((p) => (
-              <ProjectCard key={p.id} project={p} large />
-            ))}
-          </ul>
-          <h3 className={styles.subhead}>More projects</h3>
-          <ul className={styles.projectGrid}>
-            {supporting.map((p) => (
-              <ProjectCard key={p.id} project={p} />
-            ))}
-          </ul>
-          <ul className={styles.compactList}>
-            {more.map((p) => (
-              <li key={p.id}>
-                <strong>
-                  <FactText fact={p.name} />
-                </strong>{' '}
-                · <FactText fact={p.summary} />
-                <Links links={p.links} />
-              </li>
-            ))}
-          </ul>
+          <SectionHead id="projects" n={2} title="Projects" />
+          <div className={styles.sectionBody}>
+            <ul className={styles.projectGrid}>
+              {flagships.map((p) => (
+                <ProjectCard key={p.id} project={p} large />
+              ))}
+            </ul>
+            <h3 className={styles.subhead}>More projects</h3>
+            <ul className={styles.projectGrid}>
+              {supporting.map((p) => (
+                <ProjectCard key={p.id} project={p} />
+              ))}
+            </ul>
+            <ul className={styles.compactList}>
+              {more.map((p) => (
+                <li key={p.id}>
+                  <strong>
+                    <FactText fact={p.name} />
+                  </strong>{' '}
+                  · <FactText fact={p.summary} />
+                  <Links links={p.links} />
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
 
         {shouldShow(strengths) && (
           <section id="strengths" className={styles.section} aria-labelledby="strengths-title">
-            <h2 id="strengths-title">Core strengths</h2>
-            <ul className={styles.bullets}>
-              {strengths.value.map((s) => (
-                <li key={s}>
-                  <FactText fact={strengths}>{s}</FactText>
-                </li>
-              ))}
-            </ul>
+            <SectionHead id="strengths" n={3} title="Core strengths" />
+            <div className={styles.sectionBody}>
+              <ol className={styles.strengths}>
+                {strengths.value.map((s) => (
+                  <li key={s}>
+                    <FactText fact={strengths}>{s}</FactText>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </section>
         )}
 
         <section id="stack" className={styles.section} aria-labelledby="stack-title">
-          <h2 id="stack-title">Technology stack</h2>
-          <dl className={styles.stack}>
-            {stack.map((group) => (
-              <div key={group.id}>
-                <dt>{group.label}</dt>
-                <dd>
-                  <FactText fact={group.items}>{group.items.value.join(' · ')}</FactText>
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <SectionHead id="stack" n={4} title="Technology stack" />
+          <div className={styles.sectionBody}>
+            <dl className={styles.stack}>
+              {stack.map((group) => (
+                <div key={group.id}>
+                  <dt>{group.label}</dt>
+                  <dd>
+                    <FactText fact={group.items}>{group.items.value.join(' · ')}</FactText>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </section>
 
         <section id="education" className={styles.section} aria-labelledby="education-title">
-          <h2 id="education-title">Education</h2>
-          <ol className={styles.entries}>
-            {education.map((e) => (
-              <li key={e.id} className={styles.entry}>
-                <div className={styles.entryHead}>
-                  <h3>
-                    <FactText fact={e.qualification} />
-                  </h3>
-                  <p className={styles.period}>
-                    <FactText fact={e.period}>
-                      {e.period.value.start} – {e.period.value.end}
-                    </FactText>
+          <SectionHead id="education" n={5} title="Education" />
+          <div className={styles.sectionBody}>
+            <ol className={styles.entries}>
+              {education.map((e) => (
+                <li key={e.id} className={styles.entry}>
+                  <div className={styles.entryHead}>
+                    <h3>
+                      <FactText fact={e.qualification} />
+                    </h3>
+                    <p className={styles.period}>
+                      <FactText fact={e.period}>
+                        {e.period.value.start} – {e.period.value.end}
+                      </FactText>
+                    </p>
+                  </div>
+                  <p>
+                    <FactText fact={e.institution} /> · <FactText fact={e.grade} />
                   </p>
-                </div>
-                <p>
-                  <FactText fact={e.institution} /> · <FactText fact={e.grade} />
-                </p>
-              </li>
-            ))}
-          </ol>
+                </li>
+              ))}
+            </ol>
+          </div>
         </section>
 
         <section id="certifications" className={styles.section} aria-labelledby="certs-title">
-          <h2 id="certs-title">Certifications</h2>
-          <ul className={styles.compactList}>
-            {certifications.value.map((c) => (
-              <li key={c.name}>
-                <FactText fact={certifications}>
-                  {c.name} · {c.issuer}, {c.year}
-                </FactText>
-              </li>
-            ))}
-          </ul>
-          {shouldShow(courses) && (
-            <>
-              <h3 className={styles.subhead}>Courses</h3>
-              <ul className={styles.compactList}>
-                {courses.value.map((c) => (
-                  <li key={c.name}>
-                    <FactText fact={courses}>
-                      {c.name} · {c.issuer}, {c.year}
-                    </FactText>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {visibleAchievements.length > 0 && (
-            <>
-              <h3 id="achievements" className={styles.subhead}>
-                Achievements
-              </h3>
-              <ul className={styles.bullets}>
-                {visibleAchievements.map((a) => (
-                  <li key={a.value}>
-                    <FactText fact={a} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          <SectionHead id="certs" n={6} title="Certifications" />
+          <div className={styles.sectionBody}>
+            <ul className={styles.tiles}>
+              {certifications.value.map((c) => (
+                <li key={c.name} className={styles.tile}>
+                  <FactText fact={certifications}>
+                    <span className={styles.tileName}>{c.name}</span>
+                    <span className={styles.tileMeta}>
+                      {c.issuer} · {c.year}
+                    </span>
+                  </FactText>
+                </li>
+              ))}
+            </ul>
+            {shouldShow(courses) && (
+              <>
+                <h3 className={styles.subhead}>Courses</h3>
+                <ul className={styles.tiles}>
+                  {courses.value.map((c) => (
+                    <li key={c.name} className={styles.tile}>
+                      <FactText fact={courses}>
+                        <span className={styles.tileName}>{c.name}</span>
+                        <span className={styles.tileMeta}>
+                          {c.issuer} · {c.year}
+                        </span>
+                      </FactText>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {visibleAchievements.length > 0 && (
+              <>
+                <h3 id="achievements" className={styles.subhead}>
+                  Achievements
+                </h3>
+                <ul className={styles.marks}>
+                  {visibleAchievements.map((a) => (
+                    <li key={a.value}>
+                      <FactText fact={a} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         </section>
 
         {(shouldShow(learning) || shouldShow(futureDirection)) && (
           <section id="direction" className={styles.section} aria-labelledby="direction-title">
-            <h2 id="direction-title">What comes next</h2>
-            {shouldShow(learning) && (
-              <p>
-                <strong>Learning now: </strong>
-                <FactText fact={learning} />
-              </p>
-            )}
-            {shouldShow(futureDirection) && (
-              <p>
-                <strong>Next: </strong>
-                <FactText fact={futureDirection} />
-              </p>
-            )}
+            <SectionHead id="direction" n={7} title="What comes next" />
+            <div className={styles.sectionBody}>
+              <div className={styles.pair}>
+                {shouldShow(learning) && (
+                  <div className={styles.panel}>
+                    <p className={styles.subhead}>Learning now</p>
+                    <p>
+                      <FactText fact={learning} />
+                    </p>
+                  </div>
+                )}
+                {shouldShow(futureDirection) && (
+                  <div className={styles.panel}>
+                    <p className={styles.subhead}>Next</p>
+                    <p>
+                      <FactText fact={futureDirection} />
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </section>
         )}
 
-        <section id="contact" className={styles.section}>
-          <ContactPanel id="brief-contact" />
+        <section id="contact" className={`${styles.section} ${styles.contact}`}>
+          <div className={styles.contactCard}>
+            <ContactPanel id="brief-contact" />
+          </div>
         </section>
       </main>
 
       <footer className={styles.footer}>
-        <a href="/">Experience the mission</a>
+        <a className={styles.quiet} href="/">
+          Experience the mission <span aria-hidden="true">→</span>
+        </a>
         {/* CC BY credits (assets/ASSET_REGISTER.md); the full credits page is a P5 item */}
         <p className={styles.credits}>
           3D set: based on{' '}
