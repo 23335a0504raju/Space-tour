@@ -1,15 +1,14 @@
 import * as THREE from 'three';
 
 /**
- * Every file the journey loads, fetched once during the start gate (FIX_LIST 8: "download
- * everything before showing the pages"). Kept in sync with the code by preload.test.ts.
- * Not listed on purpose: earth_day_4k.ktx2 (fetched by the NASA script, not used by any chapter).
+ * What the first scenes (SC02 room, SC03 departure: the start gate's warm window) need. The start
+ * gate waits for these only; everything else keeps downloading in the background while the visitor
+ * reads the title (it used to wait for all ~17 MB, half of it the far chapters' models).
  */
-export const JOURNEY_ASSETS: readonly string[] = [
+export const CRITICAL_ASSETS: readonly string[] = [
   // decoders first: every KTX2 texture needs them
   '/basis/basis_transcoder.js',
   '/basis/basis_transcoder.wasm',
-  // SC02 room
   '/assets/env/empty_warehouse_01_1k.hdr',
   '/assets/models/astronaut.glb',
   '/assets/models/astronaut-eva.glb',
@@ -21,7 +20,20 @@ export const JOURNEY_ASSETS: readonly string[] = [
   '/assets/models/office_notepads.glb',
   '/assets/models/Shelf_01.glb',
   '/assets/models/modern_ceiling_lamp_01.glb',
-  // ship and space
+  // the bridge's screen
+  '/assets/textures/earth_day_2k.ktx2',
+];
+
+/**
+ * Every file the journey loads, fetched once from the start gate on (FIX_LIST 8), in journey order:
+ * the first scenes' files, then the rest in the background. Kept in sync with the code by
+ * preload.test.ts. Not listed on purpose: earth_day_4k.ktx2 (fetched by the NASA script, not used
+ * by any chapter).
+ */
+export const JOURNEY_ASSETS: readonly string[] = [
+  ...CRITICAL_ASSETS,
+  // background, in the order the journey meets them
+  // ship and space (SC04 cockpit, SC05 launch)
   '/assets/models/helvela.glb',
   '/assets/models/launch-pad.glb',
   '/assets/models/nasa_bennu.glb',
@@ -42,7 +54,6 @@ export const JOURNEY_ASSETS: readonly string[] = [
   '/assets/models/anime_farm.glb',
   '/assets/models/anime_town.glb',
   '/assets/models/anime_rural.glb',
-  '/assets/textures/earth_day_2k.ktx2',
   '/assets/textures/earth_night_2k.ktx2',
   '/assets/textures/moon_1k.ktx2',
   '/assets/textures/mars_2k.ktx2',
@@ -56,6 +67,8 @@ export const JOURNEY_ASSETS: readonly string[] = [
 export interface PreloadProgress {
   /** 0..1, weighted by bytes once sizes are known. */
   readonly fraction: number;
+  /** The same, over the first scenes' files only (what the start gate waits for). */
+  readonly critical: number;
   /** Files finished so far, in completion order. */
   readonly done: readonly string[];
 }
@@ -89,16 +102,26 @@ const got = new Map<string, number>();
 const done: string[] = [];
 const listeners = new Set<(p: PreloadProgress) => void>();
 let running: Promise<void> | null = null;
+let criticalDone: Promise<void> | null = null;
+let resolveCritical: () => void = () => undefined;
 
-function snapshot(): PreloadProgress {
+function fractionOf(urls: readonly string[]): number {
   let total = 0;
   let loaded = 0;
-  for (const url of JOURNEY_ASSETS) {
+  for (const url of urls) {
     const s = size.get(url) ?? GUESS_BYTES;
     total += s;
     loaded += done.includes(url) ? s : Math.min(s, got.get(url) ?? 0);
   }
-  return { fraction: total ? loaded / total : 1, done: [...done] };
+  return total ? loaded / total : 1;
+}
+
+function snapshot(): PreloadProgress {
+  return {
+    fraction: fractionOf(JOURNEY_ASSETS),
+    critical: fractionOf(CRITICAL_ASSETS),
+    done: [...done],
+  };
 }
 
 function report() {
@@ -131,21 +154,25 @@ async function fetchOne(url: string) {
     // leave it to the normal loader
   } finally {
     done.push(url);
+    if (CRITICAL_ASSETS.every((u) => done.includes(u))) resolveCritical();
     report();
   }
 }
 
 /**
  * Download all journey assets once (later calls share the same run), reporting byte progress to
- * `onProgress` until the returned unsubscribe is called. A failed file is skipped (its loader
- * falls back to the network later); the promise never rejects, so the gate can never get stuck.
+ * `onProgress` until the returned unsubscribe is called. `critical` resolves when the first
+ * scenes' files are in, `finished` when everything is. A failed file is skipped (its loader falls
+ * back to the network later); neither promise rejects, so the gate can never get stuck.
  */
 export function preloadJourney(onProgress?: (p: PreloadProgress) => void): {
+  readonly critical: Promise<void>;
   readonly finished: Promise<void>;
   readonly unsubscribe: () => void;
 } {
   installUrlModifier();
   if (onProgress) listeners.add(onProgress);
+  criticalDone ??= new Promise<void>((resolve) => (resolveCritical = resolve));
   if (!running) {
     // 4 at a time: fast on HTTP/2, polite on HTTP/1 and mobile radios
     const queue = [...JOURNEY_ASSETS];
@@ -156,6 +183,7 @@ export function preloadJourney(onProgress?: (p: PreloadProgress) => void): {
   }
   onProgress?.(snapshot());
   return {
+    critical: criticalDone,
     finished: running,
     unsubscribe: () => {
       if (onProgress) listeners.delete(onProgress);

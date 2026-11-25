@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo } from 'react';
+import { textureContext } from '../../engine/assets/canvas2d.ts';
 import { useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getKTX2Loader } from '../../engine/assets/loaders.ts';
@@ -99,7 +100,7 @@ function TexturedPlanet({
 function glowTexture(size: number, stops: readonly [number, string][]): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = c.height = size;
-  const g = c.getContext('2d')!;
+  const g = textureContext(c)!;
   const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   for (const [at, col] of stops) grad.addColorStop(at, col);
   g.fillStyle = grad;

@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { textureContext } from '../../engine/assets/canvas2d.ts';
 import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getKTX2Loader } from '../../engine/assets/loaders.ts';
@@ -52,7 +53,7 @@ function falloffTexture(size: number, alpha: (x: number, y: number) => number) {
   const c = document.createElement('canvas');
   c.width = size;
   c.height = size;
-  const g = c.getContext('2d');
+  const g = textureContext(c);
   if (g) {
     const img = g.createImageData(size, size);
     const rnd = seeded(7);

@@ -56,45 +56,70 @@ export function uploadTextures(gl: THREE.WebGLRenderer, root: THREE.Object3D): v
 }
 
 /**
- * Compile one chapter's group as it will be drawn: only that chapter visible (lights are part of
- * a program's key), then restore the visibility the Director set. Resolves when every program
- * has linked.
+ * An empty stand-in for the real scene while a chapter compiles. `compile(object, camera, scene)`
+ * gathers lights from `scene` AND from `object`, so compiling a chapter's group against the real
+ * scene counted its own lights twice (NUM_DIR_LIGHTS 2 for a one-sun chapter): every lit program
+ * compiled while warm was a variant the chapter never draws, and they all linked again on its
+ * first visible frame (scripts/measure-freezes.ts --dump). The stand-in has no children, so the
+ * lights come from the chapter alone, and it carries the environment the Director applies when
+ * the chapter is on screen (the environment is part of the program key, too).
+ */
+const stage = new THREE.Scene();
+
+/**
+ * Where a chapter may be drawn. The output is part of every program key (three 0.187
+ * WebGLPrograms): drawing to the screen bakes in `renderer.toneMapping` and the output colour space;
+ * drawing into ANY render target means no tone mapping and linear output. So one stand-in target
+ * covers every "into the post chain" case.
+ */
+export interface Output {
+  readonly target: THREE.WebGLRenderTarget | null;
+  readonly toneMapping: THREE.ToneMapping;
+}
+
+const intoPost = new THREE.WebGLRenderTarget(1, 1);
+/** Drawn into the post chain's input buffer (the composer owns tone mapping). */
+export const POST_OUTPUT: Output = { target: intoPost, toneMapping: THREE.NoToneMapping };
+/** Drawn straight to the canvas, the renderer applying AgX itself (Low without post). */
+export const SCREEN_OUTPUT: Output = { target: null, toneMapping: THREE.AgXToneMapping };
+
+/**
+ * Compile one chapter's group as it will be drawn (its own lights and environment) for each
+ * output it may be drawn to, with keepers for its custom shaders, then upload its textures.
+ * Resolves when every program has linked.
  */
 export async function compileChapter(
   gl: THREE.WebGLRenderer,
   camera: THREE.Camera,
-  scene: THREE.Scene,
   group: THREE.Group,
-  groups: ReadonlyMap<string, THREE.Group>,
-  target: THREE.WebGLRenderTarget | null,
+  environment: THREE.Texture | null,
+  outputs: readonly Output[],
 ): Promise<void> {
-  // the output encoding and tone mapping are part of a program: compile for the real target
+  const holder = makeKeepers(group);
   const previous = gl.getRenderTarget();
-  gl.setRenderTarget(target);
-  const saved = new Map<THREE.Group, boolean>();
-  for (const g of groups.values()) {
-    saved.set(g, g.visible);
-    g.visible = g === group;
-  }
+  const previousToneMapping = gl.toneMapping;
+  const wasVisible = group.visible;
+  // lights are gathered with traverseVisible: the group itself must count as visible
   group.visible = true;
-  let pending: Promise<unknown>;
+  stage.environment = environment;
+  if (holder) group.add(holder);
+  const pending: Promise<unknown>[] = [];
   try {
-    // the synchronous part (program creation, light gathering) happens inside this call
-    pending = gl.compileAsync(group, camera, scene);
+    for (const output of outputs) {
+      gl.setRenderTarget(output.target);
+      gl.toneMapping = output.toneMapping;
+      // the synchronous part (program creation, light gathering) happens inside this call
+      pending.push(gl.compileAsync(group, camera, stage).catch(() => undefined));
+    }
   } finally {
-    for (const [g, v] of saved) g.visible = v;
-    if (!saved.has(group)) group.visible = false;
+    if (holder) group.remove(holder);
+    stage.environment = null;
+    group.visible = wasVisible;
+    gl.toneMapping = previousToneMapping;
     gl.setRenderTarget(previous);
   }
-  await pending.catch(() => undefined);
+  await Promise.all(pending);
   uploadTextures(gl, group);
-  const before = gl.getRenderTarget();
-  gl.setRenderTarget(target);
-  try {
-    keepShaders(gl, camera, scene, group, groups);
-  } finally {
-    gl.setRenderTarget(before);
-  }
   pinPrograms(gl);
 }
 
@@ -108,14 +133,9 @@ const keepers: THREE.Object3D[] = [];
  * freed, and the same shaders get new numbers (new keys, a full recompile) when it comes back:
  * 164 byte-identical shaders were recompiled mid-scroll. A keeper (a clone of the object with a
  * clone of its material, never disposed and never drawn) holds each shader's number and program.
+ * Returns a holder of the new keepers (compiled with the chapter, same lights), or null.
  */
-function keepShaders(
-  gl: THREE.WebGLRenderer,
-  camera: THREE.Camera,
-  scene: THREE.Scene,
-  group: THREE.Group,
-  groups: ReadonlyMap<string, THREE.Group>,
-): void {
+function makeKeepers(group: THREE.Group): THREE.Group | null {
   const fresh: THREE.Object3D[] = [];
   group.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -131,21 +151,9 @@ function keepShaders(
     keeper.matrixAutoUpdate = false;
     fresh.push(keeper);
   });
-  if (!fresh.length) return;
-  // same lights as the chapter on screen: only this chapter's group visible
+  if (!fresh.length) return null;
+  keepers.push(...fresh);
   const holder = new THREE.Group();
   for (const k of fresh) holder.add(k);
-  group.add(holder);
-  const saved = new Map<THREE.Group, boolean>();
-  for (const g of groups.values()) {
-    saved.set(g, g.visible);
-    g.visible = g === group;
-  }
-  try {
-    gl.compile(holder, camera, scene);
-  } finally {
-    for (const [g, v] of saved) g.visible = v;
-    group.remove(holder);
-  }
-  keepers.push(...fresh);
+  return holder;
 }

@@ -157,11 +157,18 @@ function gauss(r: () => number) {
   return Math.max(-2.2, Math.min(2.2, g));
 }
 
-function makeSprite(star: boolean): HTMLCanvasElement {
+/** A 2D canvas the ring can draw on: the page's own, or an OffscreenCanvas in the ring worker. */
+export type RingCanvas = HTMLCanvasElement | OffscreenCanvas;
+type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+function makeSprite(star: boolean): OffscreenCanvas | HTMLCanvasElement {
   const s = 64;
-  const c = document.createElement('canvas');
-  c.width = c.height = s;
-  const g = c.getContext('2d')!;
+  // OffscreenCanvas works on the page and in the ring worker (no document there)
+  const c: OffscreenCanvas | HTMLCanvasElement =
+    typeof OffscreenCanvas !== 'undefined'
+      ? new OffscreenCanvas(s, s)
+      : Object.assign(document.createElement('canvas'), { width: s, height: s });
+  const g = c.getContext('2d') as Ctx2D;
   const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
   grad.addColorStop(0, 'rgba(255,255,255,1)');
   grad.addColorStop(0.12, 'rgba(255,250,240,0.85)');
@@ -196,10 +203,43 @@ export interface ShardRingOptions {
   cover: string;
 }
 
+/**
+ * Guide lines of the opening (after the reference's architectural construction lines): a golden
+ * rectangle and its spiral arcs around the title, two long diagonals, two large circles and
+ * registration marks, in a 1600 × 1000 frame laid over the screen like an SVG "slice". Each draws
+ * in over its own window of the assembly ([from, to]).
+ */
+export const GUIDES: readonly { d: string; from: number; to: number }[] = [
+  { d: 'M60 0 L1600 960', from: 0, to: 0.35 },
+  { d: 'M1540 0 L0 960', from: 0.05, to: 0.4 },
+  { d: 'M640 0 V300', from: 0.08, to: 0.25 },
+  { d: 'M760 0 V300', from: 0.12, to: 0.3 },
+  { d: 'M476 300 H1124 V700 H476 Z', from: 0.15, to: 0.5 },
+  { d: 'M876 300 V700', from: 0.3, to: 0.45 },
+  { d: 'M876 548 H1124', from: 0.38, to: 0.5 },
+  { d: 'M972 548 V700', from: 0.45, to: 0.55 },
+  { d: 'M476 700 A400 400 0 0 1 876 300', from: 0.4, to: 0.62 },
+  { d: 'M876 300 A248 248 0 0 1 1124 548', from: 0.5, to: 0.68 },
+  { d: 'M1124 548 A152 152 0 0 1 972 700', from: 0.58, to: 0.74 },
+  { d: 'M540 250 A520 520 0 1 1 1580 250', from: 0.25, to: 0.75 },
+  { d: 'M-140 960 A560 560 0 0 1 980 960', from: 0.35, to: 0.8 },
+  { d: 'M1124 860 H1600', from: 0.6, to: 0.75 },
+  { d: 'M540 230 h40 v40 h-40 Z M520 250 h80 M560 210 v80', from: 0.55, to: 0.7 },
+  { d: 'M1180 760 h40 v40 h-40 Z M1160 780 h80 M1200 740 v80', from: 0.65, to: 0.82 },
+];
+const GUIDE_W = 1600;
+const GUIDE_H = 1000;
+const GUIDE_STROKE = 'rgba(233, 231, 225, 0.17)';
+
+/** How much of the title, guides and actions remain as the opening burns (1 → 0). */
+export function chromeKeep(open: number): number {
+  return 1 - smooth(clamp01((open - 0.38) / 0.32));
+}
+
 export class ShardRing {
-  private readonly canvas: HTMLCanvasElement;
+  private readonly canvas: RingCanvas;
   private readonly opts: ShardRingOptions;
-  private readonly ctx: CanvasRenderingContext2D;
+  private readonly ctx: Ctx2D;
   private readonly shards: Shard[] = [];
   /** shard indices by palette colour (one pass per colour, not per colour × alpha step) */
   private readonly byColour: number[][] = PALETTE.map(() => []);
@@ -213,11 +253,38 @@ export class ShardRing {
   private h = 0;
   /** The 3D scene as last drawn (a small copy), for the fragments in the burn band. */
   scene: CanvasImageSource | null = null;
+  /** Guide paths with their lengths (frame units), measured on the page: Path2D has no length. */
+  private guides: { path: Path2D; len: number; from: number; to: number }[] = [];
 
-  constructor(canvas: HTMLCanvasElement, opts: ShardRingOptions) {
+  setGuideLengths(lengths: readonly number[]): void {
+    this.guides = GUIDES.map((g, i) => ({ ...g, path: new Path2D(g.d), len: lengths[i] ?? 0 }));
+  }
+
+  /** The guides, drawn in by the assembly and faded out by the opening. */
+  private drawGuides(assemble: number, alpha: number) {
+    if (!this.guides.length || alpha <= 0.001) return;
+    const c = this.ctx;
+    const { w, h } = this;
+    const k = Math.max(w / GUIDE_W, h / GUIDE_H);
+    c.save();
+    c.setTransform(k, 0, 0, k, (w - GUIDE_W * k) / 2, (h - GUIDE_H * k) / 2);
+    c.globalAlpha = alpha;
+    c.strokeStyle = GUIDE_STROKE;
+    // one CSS pixel wide at any scale (the SVG's non-scaling stroke)
+    c.lineWidth = 1 / k;
+    for (const g of this.guides) {
+      const t = clamp01((assemble - g.from) / (g.to - g.from));
+      if (t <= 0 || g.len <= 0) continue;
+      c.setLineDash(t >= 1 ? [] : [g.len * t, g.len]);
+      c.stroke(g.path);
+    }
+    c.restore();
+  }
+
+  constructor(canvas: RingCanvas, opts: ShardRingOptions) {
     this.canvas = canvas;
     this.opts = opts;
-    this.ctx = canvas.getContext('2d')!;
+    this.ctx = canvas.getContext('2d') as Ctx2D;
     const r = rng(20261122);
     const profile = ringProfile(7);
     const pickTheta = () => {
@@ -294,9 +361,10 @@ export class ShardRing {
     this.alpha = new Float32Array(opts.shards);
   }
 
-  resize(): void {
-    this.w = this.canvas.clientWidth;
-    this.h = this.canvas.clientHeight;
+  /** CSS size of the canvas element (an OffscreenCanvas has none of its own, so it is passed in). */
+  resize(width: number, height: number): void {
+    this.w = width;
+    this.h = height;
     // 1× pixel density (see the header)
     this.canvas.width = Math.round(this.w);
     this.canvas.height = Math.round(this.h);
@@ -392,6 +460,9 @@ export class ShardRing {
       c.fill('nonzero');
       c.globalCompositeOperation = 'source-over';
     }
+
+    // 1b. The guide lines, faded out with the first stretch of the opening.
+    this.drawGuides(s.assemble, chromeKeep(open) * coverAlpha);
 
     // 2. The loading ring (behind the burn edge).
     if (ringFade > 0.001) this.drawRing(s, time, base, cx, cy, ringFade * coverAlpha);

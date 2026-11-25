@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { textureContext } from '../../engine/assets/canvas2d.ts';
 // This portfolio's own source code, shown on the monitors (no third-party code, no permission issue).
 import resolverSource from '../../engine/scroll/resolver.ts?raw';
 
@@ -17,7 +18,7 @@ export function createCodeScreenTexture(
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const ctx = textureContext(canvas);
   if (!ctx) throw new Error('2D canvas unavailable');
 
   ctx.fillStyle = '#0b0e15';

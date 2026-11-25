@@ -8,17 +8,21 @@ import { preloadJourney } from '../engine/assets/preload.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { PACING, wheelStep } from '../engine/scroll/pacing.ts';
 import { shouldShow } from './FactText.tsx';
-import { createRingState, ShardRing } from './shardRing.ts';
+import { createRingHost } from './ringHost.ts';
+import type { RingHost } from './ringHost.ts';
+import { chromeKeep } from './shardRing.ts';
 import styles from './StartGate.module.css';
 
 const { identity } = content;
 
 /** Loader quiet for this long (ms) means the first scene's assets are in. */
-const QUIET_MS = 1200;
-/** Pause after loading, so shaders finish compiling behind the cover. */
-const REVEAL_DELAY_MS = 450;
-/** Fastest the ring may assemble (fraction per second): a cached visit still sees it gather. */
-const ASSEMBLE_RATE = 0.62;
+const QUIET_MS = 600;
+/** The title shows this long after the ring has closed on a drawn scene. */
+const REVEAL_DELAY_MS = 250;
+/** A first frame that never settles (a very slow driver) must not keep the title away. */
+const DRAWN_GIVE_UP_MS = 8000;
+/** Frames this short (ms) mean the first scene draws smoothly: its one-off work is done. */
+const SMOOTH_FRAME_MS = 60;
 const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+<>/';
 /** Scroll distance (screens) that burns the opening all the way through. */
 const OPEN_SCREENS = 1.25;
@@ -64,34 +68,12 @@ function grow(el: HTMLElement, short: string, full: string, duration: number): g
 }
 
 /**
- * Guide lines of the opening (after the reference's architectural construction lines): a golden
- * rectangle and its spiral arcs around the title, two long diagonals, two large circles and
- * registration marks. Each draws in over its own window of the load fraction ([from, to]).
- */
-const GUIDES: readonly { d: string; from: number; to: number }[] = [
-  { d: 'M60 0 L1600 960', from: 0, to: 0.35 },
-  { d: 'M1540 0 L0 960', from: 0.05, to: 0.4 },
-  { d: 'M640 0 V300', from: 0.08, to: 0.25 },
-  { d: 'M760 0 V300', from: 0.12, to: 0.3 },
-  { d: 'M476 300 H1124 V700 H476 Z', from: 0.15, to: 0.5 },
-  { d: 'M876 300 V700', from: 0.3, to: 0.45 },
-  { d: 'M876 548 H1124', from: 0.38, to: 0.5 },
-  { d: 'M972 548 V700', from: 0.45, to: 0.55 },
-  { d: 'M476 700 A400 400 0 0 1 876 300', from: 0.4, to: 0.62 },
-  { d: 'M876 300 A248 248 0 0 1 1124 548', from: 0.5, to: 0.68 },
-  { d: 'M1124 548 A152 152 0 0 1 972 700', from: 0.58, to: 0.74 },
-  { d: 'M540 250 A520 520 0 1 1 1580 250', from: 0.25, to: 0.75 },
-  { d: 'M-140 960 A560 560 0 0 1 980 960', from: 0.35, to: 0.8 },
-  { d: 'M1124 860 H1600', from: 0.6, to: 0.75 },
-  { d: 'M540 230 h40 v40 h-40 Z M520 250 h80 M560 210 v80', from: 0.55, to: 0.7 },
-  { d: 'M1180 760 h40 v40 h-40 Z M1160 780 h80 M1200 740 v80', from: 0.65, to: 0.82 },
-];
-
-/**
  * Opening sequence (task 8, after Shopify Editions Winter '26). UI state before the journey
  * starts; story state stays a pure function of scroll progress.
- *  1. Loading: guide lines draw in and a ring of shards and sparkles assembles around the name,
- *     both driven by the real download fraction.
+ *  1. Loading: guide lines draw in and a ring of shards and sparkles assembles around the name.
+ *     It runs in a worker (ringLoop.ts), so it stays smooth while the page builds the first scene,
+ *     and follows the whole load: the first scenes' files, then the scene built and first drawn.
+ *     The rest of the journey keeps downloading in the background.
  *  2. Title: the role grows to its full form, the tagline and the Begin / Explore projects
  *     actions appear. The cover stays solid.
  *  3. Opening (scroll, reversible; or Begin): the cover burns away. A spark at the centre eats an
@@ -109,25 +91,29 @@ export function StartGate() {
   const [skipped] = useState(entered); // ?gate=off: no gate, no hint (tests, captures)
   const [pct, setPct] = useState(0);
   const [ready, setReady] = useState(false);
+  /** the first scene has drawn smooth frames behind the cover (its one-off stalls are over) */
+  const [drawn, setDrawn] = useState(false);
+  /** the ring has closed */
+  const [assembled, setAssembled] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [gone, setGone] = useState(false);
 
   const root = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const guides = useRef<SVGSVGElement>(null);
+  const host = useRef<RingHost | null>(null);
   const title = useRef<HTMLDivElement>(null);
   const role = useRef<HTMLSpanElement>(null);
   const tagline = useRef<HTMLParagraphElement>(null);
   const dock = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const ring = useRef(createRingState());
-  /** Where the visitor's scroll has taken the opening (0..1); `ring.open` eases toward it. */
+  /** The opening as shown (0..1), eased toward `openTarget` and sent to the ring. */
+  const opening = useRef({ open: 0 });
+  /** Where the visitor's scroll has taken the opening (0..1). */
   const openTarget = useRef(0);
   const phase = useRef<'loading' | 'title' | 'leaving'>('loading');
   const chrome = useRef<HTMLDivElement>(null);
-  /** real download fraction (0..1), read by the ticker */
+  /** download fraction of the first scenes' files (0..1) */
   const fraction = useRef(0);
-  const readyRef = useRef(false);
 
   const [first = '', ...rest] = factText(identity.name).split(' ');
   const last = rest.join(' ');
@@ -135,11 +121,22 @@ export function StartGate() {
   const fullRole = factText(identity.role) || shortRole;
   const taglineText = factText(identity.tagline);
 
-  // Real download progress of every journey file (bytes).
+  // The ring follows the whole load in three stages: the first scenes' files (bytes, to 78 %),
+  // the scene built from them (to 96 %, creeping while it builds), its first frames drawn (100 %).
+  // Within a stage the ring keeps creeping ahead a little, so it never sits still.
+  useEffect(() => {
+    const ring = host.current;
+    if (!ring) return;
+    if (drawn) ring.setLoad(1);
+    else if (ready) ring.setLoad(0.82, 0.96);
+    else ring.setLoad(0.78 * fraction.current, Math.min(0.8, 0.78 * fraction.current + 0.08));
+  }, [ready, drawn, pct]);
+
+  // Real download progress of the first scenes' files (bytes); the rest continue in the background.
   useEffect(() => {
     const { unsubscribe } = preloadJourney((p) => {
-      fraction.current = Math.max(fraction.current, p.fraction);
-      setPct((prev) => Math.max(prev, Math.min(99, Math.floor(p.fraction * 100))));
+      fraction.current = Math.max(fraction.current, p.critical);
+      setPct((prev) => Math.max(prev, Math.min(99, Math.floor(p.critical * 100))));
     });
     return unsubscribe;
   }, []);
@@ -151,20 +148,42 @@ export function StartGate() {
     return () => window.clearTimeout(id);
   }, [assetsReady, progress, active]);
 
-  // reveal once the ring has had time to close (it assembles at a capped rate)
+  // Then let the scene draw behind the cover until its frames are smooth. Its first frames do
+  // one-off work (shader links, texture uploads) that froze the title as it animated in; now it
+  // happens while the loader, in its worker, keeps moving.
   useEffect(() => {
-    readyRef.current = ready;
-    if (!ready) return;
-    const left = prefersReducedMotion() ? 0 : (1 - ring.current.assemble) / ASSEMBLE_RATE;
-    const id = window.setTimeout(() => setRevealed(true), Math.max(REVEAL_DELAY_MS, left * 1000));
+    if (!ready || drawn) return;
+    let frames = 0;
+    let last = 0;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      setDrawn(true);
+    };
+    const stop = addAfterEffect((now) => {
+      const gap = last ? now - last : Infinity;
+      last = now;
+      frames += 1;
+      if (frames >= 3 && gap < SMOOTH_FRAME_MS) finish();
+    });
+    const giveUp = window.setTimeout(finish, DRAWN_GIVE_UP_MS);
+    return () => {
+      stop();
+      window.clearTimeout(giveUp);
+    };
+  }, [ready, drawn]);
+
+  // reveal once the ring has closed on a drawn scene
+  useEffect(() => {
+    if (!drawn || !assembled) return;
+    const id = window.setTimeout(() => setRevealed(true), REVEAL_DELAY_MS);
     return () => window.clearTimeout(id);
-  }, [ready]);
+  }, [drawn, assembled]);
 
   const stage = gone ? 'gone' : entered ? 'leaving' : revealed ? 'title' : 'loading';
 
-  // Once loaded, the 3D scene starts drawing behind the solid cover. Its first frame links the
-  // first scene's shaders (a one-off stall, as on the reference site at its reveal); it happens
-  // here, before the title animates in, so the title and the opening stay smooth.
+  // Once loaded, the 3D scene starts drawing behind the solid cover (see the effect above).
   useEffect(() => {
     if (ready) useJourneyStore.getState().showScene();
   }, [ready]);
@@ -236,52 +255,40 @@ export function StartGate() {
     };
   }, [skipped, stage, enter]);
 
-  // The ring: one 2D canvas drawn on the GSAP ticker (the one clock) until the gate is gone.
+  // The ring (in its worker) and, on the page, the opening: the visitor's scroll eased into the
+  // burn, the title, guides and actions burning away with it, and the camera pushing through.
   useEffect(() => {
     const el = canvas.current;
     if (skipped || !el) return;
     const coarse = window.matchMedia('(pointer: coarse)').matches;
     const small = Math.min(window.innerWidth, window.innerHeight) < 600;
-    const renderer = new ShardRing(el, {
-      shards: coarse || small ? 900 : 2600,
-      sparks: coarse || small ? 220 : 480,
-      fragments: coarse || small ? 380 : 1500,
-      cover: '#05060a',
-    });
-    const paths = guides.current ? [...guides.current.querySelectorAll('path')] : [];
     const reduced = prefersReducedMotion();
-    const state = ring.current;
-    let shown = -1;
+    const ring = createRingHost(
+      el,
+      {
+        shards: coarse || small ? 900 : 2600,
+        sparks: coarse || small ? 220 : 480,
+        fragments: coarse || small ? 380 : 1500,
+        cover: '#05060a',
+      },
+      reduced,
+      (assemble) => {
+        // the name gathers with the ring
+        if (phase.current === 'loading' && title.current) {
+          title.current.style.opacity = String(0.2 + 0.8 * Math.min(1, assemble * 1.4));
+        }
+        if (assemble >= 0.999) setAssembled(true);
+      },
+    );
+    host.current = ring;
+    ring.setLoad(0.78 * fraction.current, 0.08);
+    const state = opening.current;
     let lastOpen = -1;
     let started = false;
     const cam = canvasEl();
-    renderer.resize();
-    const onResize = () => renderer.resize();
+    const onResize = () => ring.resize();
     window.addEventListener('resize', onResize);
-    const tick = (time: number, dt: number) => {
-      // the displayed assembly follows the real fraction, eased and rate-capped
-      const target = readyRef.current ? 1 : fraction.current * 0.97;
-      if (reduced) state.assemble = target;
-      else if (state.assemble < target) {
-        const step = Math.min(
-          target - state.assemble,
-          Math.max((target - state.assemble) * (1 - Math.exp(-2.4 * (dt / 1000))), 0.002),
-          ASSEMBLE_RATE * (dt / 1000),
-        );
-        state.assemble += step;
-      }
-      if (Math.abs(state.assemble - shown) > 0.0005) {
-        shown = state.assemble;
-        for (let i = 0; i < paths.length; i += 1) {
-          const g = GUIDES[i];
-          if (!g) continue;
-          const k = Math.min(1, Math.max(0, (shown - g.from) / (g.to - g.from)));
-          paths[i]!.style.strokeDashoffset = String(1 - k);
-        }
-        if (title.current && !readyRef.current) {
-          title.current.style.opacity = String(0.2 + 0.8 * Math.min(1, shown * 1.4));
-        }
-      }
+    const tick = () => {
       if (phase.current === 'title' && !reduced) {
         // same ease as the page scroll (pacing.ts): one smoothing layer, frame-rate independent
         const k = 1 - Math.pow(1 - PACING.ease, gsap.ticker.deltaRatio());
@@ -292,45 +299,36 @@ export function StartGate() {
           useJourneyStore.getState().enter('scroll');
         }
       }
-      if (phase.current !== 'loading' && state.open !== lastOpen) {
-        lastOpen = state.open;
-        // the title, guides and actions burn away with the first stretch of the opening
-        const ease = (v: number) => v * v * (3 - 2 * v);
-        const keep = 1 - ease(Math.min(1, Math.max(0, (state.open - 0.38) / 0.32)));
-        if (chrome.current) {
-          chrome.current.style.opacity = String(keep);
-          chrome.current.style.visibility = keep < 0.01 ? 'hidden' : '';
-        }
-        if (dock.current && phase.current === 'title') {
-          dock.current.style.opacity = String(1 - ease(Math.min(1, state.open / 0.08)));
-        }
-        // and the camera pushes through the hole
-        if (cam) gsap.set(cam, { scale: 1.06 - 0.06 * state.open });
+      if (phase.current === 'loading' || state.open === lastOpen) return;
+      lastOpen = state.open;
+      ring.setOpen(state.open);
+      // the title, guides and actions burn away with the first stretch of the opening
+      const keep = chromeKeep(state.open);
+      if (chrome.current) {
+        chrome.current.style.opacity = String(keep);
+        chrome.current.style.visibility = keep < 0.01 ? 'hidden' : '';
       }
-      renderer.draw(state, reduced ? 0 : time);
+      if (dock.current && phase.current === 'title') {
+        const ease = (v: number) => v * v * (3 - 2 * v);
+        dock.current.style.opacity = String(1 - ease(Math.min(1, state.open / 0.08)));
+      }
+      // and the camera pushes through the hole
+      if (cam) gsap.set(cam, { scale: 1.06 - 0.06 * state.open });
     };
     gsap.ticker.add(tick);
-    const copy = document.createElement('canvas');
-    const copyCtx = copy.getContext('2d');
     const source = () => document.querySelector<HTMLCanvasElement>('[data-journey-canvas] canvas');
     const stopCopy = addAfterEffect(() => {
       const open = state.open;
-      if (!copyCtx || open <= 0 || open >= 1) return;
+      if (open <= 0 || open >= 1) return;
       const src = source();
-      if (!src) return;
-      const cw = Math.max(1, Math.round(window.innerWidth / 3));
-      const ch = Math.max(1, Math.round(window.innerHeight / 3));
-      if (copy.width !== cw || copy.height !== ch) {
-        copy.width = cw;
-        copy.height = ch;
-      }
-      copyCtx.drawImage(src, 0, 0, cw, ch);
-      renderer.scene = copy;
+      if (src) ring.sendScene(src);
     });
     return () => {
       gsap.ticker.remove(tick);
       stopCopy();
       window.removeEventListener('resize', onResize);
+      ring.dispose();
+      host.current = null;
     };
   }, [skipped]);
 
@@ -377,7 +375,7 @@ export function StartGate() {
     if (stage !== 'leaving' || skipped) return;
     phase.current = 'leaving';
     const cam = canvasEl();
-    const state = ring.current;
+    const state = opening.current;
     const finish = () => {
       if (cam) gsap.set(cam, { clearProps: 'transform' });
       setGone(true);
@@ -387,7 +385,7 @@ export function StartGate() {
       return;
     }
     gsap.killTweensOf(state);
-    state.assemble = 1;
+    host.current?.setLoad(1);
     const left = 1 - state.open;
     const byScroll = enteredBy === 'scroll';
     const tween = gsap.to(state, {
@@ -419,17 +417,6 @@ export function StartGate() {
     <section ref={root} className={styles.gate} aria-label="Start" inert={entered}>
       <canvas ref={canvas} className={styles.ring} aria-hidden="true" />
       <div ref={chrome} className={styles.chrome}>
-        <svg
-          ref={guides}
-          className={styles.guides}
-          viewBox="0 0 1600 1000"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          {GUIDES.map((g) => (
-            <path key={g.d} d={g.d} pathLength={1} />
-          ))}
-        </svg>
         <progress
           className="visually-hidden"
           max={100}
