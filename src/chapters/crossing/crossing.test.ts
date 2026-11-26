@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { createShotState } from '../../engine/camera/shots.ts';
-import { GATE, T_EXIT, T_GATE, TRAVEL, crossingShot, shipZ, styleAt } from './crossing.ts';
+import {
+  GATE,
+  T_EXIT,
+  T_GATE,
+  T_OUT,
+  TRAVEL,
+  TUNNEL,
+  crossingShot,
+  shipZ,
+  spaceSkyAt,
+  styleAt,
+} from './crossing.ts';
 
 describe('SC10 crossing', () => {
   it('the ship passes the gate then leaves the tunnel, in order', () => {
@@ -12,7 +23,21 @@ describe('SC10 crossing', () => {
     expect(styleAt(0)).toBe(0);
     expect(styleAt(T_GATE - 0.05)).toBe(0);
     expect(styleAt(1)).toBeCloseTo(2, 6);
-    expect(styleAt(T_EXIT)).toBeCloseTo(2, 6);
+    expect(styleAt(T_OUT)).toBeCloseTo(2, 6);
+  });
+  it('the camera leaves the tunnel through its mouth, never through the wall', () => {
+    const s = createShotState();
+    for (let t = 0; t <= 1; t += 0.005) {
+      crossingShot(t, s);
+      const inside = s.position.z < TUNNEL.start && s.position.z > TUNNEL.end;
+      if (inside) expect(Math.hypot(s.position.x, s.position.y)).toBeLessThan(TUNNEL.radius * 0.9);
+    }
+    crossingShot(T_OUT, s);
+    expect(s.position.z).toBeLessThan(TUNNEL.end);
+  });
+  it('the stars are gone before the sky is painted', () => {
+    expect(spaceSkyAt(0.7)).toBe(1);
+    expect(spaceSkyAt(T_OUT)).toBe(0);
   });
   it('the blend is monotonic and passes through line art (1) on the way', () => {
     let prev = -1;

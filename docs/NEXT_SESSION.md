@@ -39,15 +39,23 @@
 - **Earth close-ups** (SC12/SC13): clouds, limb-only haze, 4K map (`createEarthMaterial(…, { closeup: true })`).
 - **SC10 look back:** Venus/Uranus/Neptune textured (A051–A053, CC BY 4.0, credited); Uranus tilted with rings; the
   Sun rebuilt after Raju's reference (`src/shaders/sun.ts`); orbit lines fade over the Sun.
-- **Anime worlds** (other session): painted sky, ranges, trees, gates, motes, cloud-deck fade, cel PaintedSun.
+- **Anime worlds** (other session): painted cumulus clouds (`PaintedPuffs`, `Clouds`), painted sky domes and
+  mountain ranges (`PaintedRange`), clustered painted trees, Japanese facades and tiled roofs on the village houses
+  (`paintVillage` in `anime/world.tsx`), flat vermilion gates, painted motes, cloud-deck fade, `PaintedSun`
+  (no halo in SC10), smooth ringed planet. All in `src/chapters/anime/`. Painted surfaces mark themselves in the
+  alpha channel (`PAINTED_BLEND`, constant 0.5) and the style pass skips ink and posterising for them.
 - Performance sweep, every chapter at its rest points: 60 fps both tiers; draw calls ≤122 Balanced / ≤74 Low;
   triangles ≤416k / ≤236k (all within budget).
 
 ## Remaining tasks, in order
 1. SC10→SC11a join leftovers: dark inked star dots over the painted sky at t≈0.95, the tunnel's grey wall in the
-   right third, a dark curved band across SC11a's sky at its start (anime files).
-2. SC11b on Low is near budget (74/80 draw calls, 236k/250k triangles): trim before adding more there.
-3. Dev-only console warning `glGetProgramiv: Program object expected` mid-journey (StrictMode + warm-up path).
+   right third (anime files). (The dark band across SC11a's sky is fixed: painted dome.)
+2. SC11b West Street town buildings (A049/A050 models): their textures render purple-pink and the street is flat
+   orange; repaint them in the painted style (Raju's screenshot, 2026-11-25).
+3. Needs Raju's approval: ink lines from depth/normals instead of luminance (`styleBlend.ts`), to clear the scratchy
+   ink on detailed models (Ichiraku Ramen, the ship). Changes the line art in every anime world.
+4. SC11b on Low is near budget (74/80 draw calls, 236k/250k triangles): trim before adding more there.
+5. Dev-only console warning `glGetProgramiv: Program object expected` mid-journey (StrictMode + warm-up path).
 
 ## Parked until the end (content, mobile)
 - Content: Spotmies end date (LinkedIn "Present" vs resume "Jun 2026"); Sports Paramount spelling; Spotmies project

@@ -72,6 +72,7 @@ export function Starfield({
   follow = false,
   orient,
   fade,
+  fadeSky = false,
 }: {
   count?: number;
   radius?: number;
@@ -87,6 +88,8 @@ export function Starfield({
   orient?: THREE.Quaternion;
   /** Star brightness 0..1, read every frame (SC05 brings the flight stars in over its own). */
   fade?: { current: number };
+  /** Fade the deep-sky backdrop with the stars too (SC10 clears the whole space sky). */
+  fadeSky?: boolean;
 }) {
   const geometry = useMemo(() => {
     const rand = seeded(seed);
@@ -141,12 +144,21 @@ export function Starfield({
   const holder = useRef<THREE.Group>(null);
   useFrame(({ camera }) => {
     if (follow) holder.current?.position.copy(camera.position);
-    if (fade) material.uniforms.uFade!.value = fade.current;
+    if (fade) {
+      material.uniforms.uFade!.value = fade.current;
+      // even at zero brightness the points would still write alpha, which the style pass reads as
+      // "not painted" (PAINTED_BLEND) and inks as grey blobs over painted clouds
+      if (holder.current) holder.current.visible = fade.current > 0.001;
+    }
   });
   return (
     <>
       {sky && (
-        <DeepSky rotation={((seed % 5) - 2) * 0.14} {...(orient ? { quaternion: orient } : {})} />
+        <DeepSky
+          rotation={((seed % 5) - 2) * 0.14}
+          {...(orient ? { quaternion: orient } : {})}
+          {...(fade && fadeSky ? { fade } : {})}
+        />
       )}
       <group ref={holder} quaternion={orient ?? IDENTITY}>
         <points geometry={geometry} material={material} frustumCulled={false} />

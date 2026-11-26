@@ -204,7 +204,10 @@ export function DeepSky({
   rotation = 0,
   quaternion,
   gain = 1,
+  fade,
 }: {
+  /** Brightness 0..1 read every frame (SC10 clears the space sky before it is painted). */
+  fade?: { current: number };
   /** Turn about the vertical axis, so each chapter frames a different stretch of the sky. */
   rotation?: number;
   /** A full orientation instead (the shared flight sky, chapters/space/skyFrame.ts). */
@@ -233,10 +236,23 @@ export function DeepSky({
   );
   const group = useRef<THREE.Group>(null);
   // camera-centred: the sky is at infinity, so it never parallaxes
-  useFrame(({ camera }) => group.current?.position.copy(camera.position));
+  const mesh = useRef<THREE.Mesh>(null);
+  useFrame(({ camera }) => {
+    group.current?.position.copy(camera.position);
+    if (fade) {
+      material.uniforms['uGain']!.value = gain * fade.current;
+      if (mesh.current) mesh.current.visible = fade.current > 0.001;
+    }
+  });
   return (
     <group ref={group}>
-      <mesh quaternion={orientation} material={material} renderOrder={-10} frustumCulled={false}>
+      <mesh
+        ref={mesh}
+        quaternion={orientation}
+        material={material}
+        renderOrder={-10}
+        frustumCulled={false}
+      >
         <sphereGeometry args={[SKY_RADIUS, 64, 32]} />
       </mesh>
     </group>

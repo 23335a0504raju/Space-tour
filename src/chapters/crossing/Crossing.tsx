@@ -19,6 +19,7 @@ import {
   holeRadiusAt,
   gateOpen,
   shipZ,
+  spaceSkyAt,
   styleAt,
 } from './crossing.ts';
 
@@ -60,7 +61,7 @@ function EdgeDust({ id, frame }: ChapterSceneProps) {
   useDisposeOnUnmount(geo, mat);
   // fades in after the boundary (SC09 has no dust: nothing may pop in at the cut)
   useFrame(() => {
-    if (frame.id === id) mat.opacity = 0.6 * smooth(frame.t / 0.08);
+    if (frame.id === id) mat.opacity = 0.6 * smooth(frame.t / 0.08) * spaceSkyAt(frame.t);
   });
   return <points geometry={geo} material={mat} frustumCulled={false} />;
 }
@@ -70,20 +71,22 @@ function CrossingScene({ id, frame }: ChapterSceneProps) {
   const light = useRef<THREE.DirectionalLight>(null);
   const sunTarget = useMemo(() => new THREE.Object3D(), []);
   const beyond = useRef<THREE.Group>(null);
+  const stars = useMemo(() => ({ current: 1 }), []);
   useFrame(({ camera }) => {
     if (frame.id !== id) return;
+    stars.current = spaceSkyAt(frame.t);
     // story: ship position, light follows the ship
     const z = shipZ(frame.t);
     ship.current?.position.set(0, 0, z);
     light.current?.position.set(SUN_DIR[0] ?? 0, SUN_DIR[1] ?? 0, (SUN_DIR[2] ?? 0) + z);
     sunTarget.position.set(0, 0, z);
-    // the far side stays hidden until the camera is well into the fall (pure function of t)
+    // the far side stays hidden until the camera nears the mouth (pure function of t)
     if (beyond.current)
-      beyond.current.visible = camera.position.z < GATE.z - 0.55 * (TUNNEL.start - TUNNEL.end);
+      beyond.current.visible = camera.position.z < GATE.z - 0.5 * (TUNNEL.start - TUNNEL.end);
   });
   return (
     <group>
-      <Starfield {...TRAVEL_STARS} follow orient={TRAVEL_SKY} />
+      <Starfield {...TRAVEL_STARS} follow orient={TRAVEL_SKY} fade={stars} fadeSky />
       {/* the Sun and the eight planets behind us: the look back (solarSystem.ts) */}
       <Suspense fallback={null}>
         <SolarSystem />

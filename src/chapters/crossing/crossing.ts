@@ -11,7 +11,12 @@ export const TRAVEL = 220;
 export const shipZ = (t: number) => -Math.min(1, Math.max(0, t)) * TRAVEL;
 
 export const GATE = { z: -110, radius: 14 } as const;
-export const TUNNEL = { start: -110, end: -200, radius: 11 } as const;
+/**
+ * The fall ends at a mouth the trailing camera flies straight out of (t ≈ 0.89). Any longer and the
+ * camera, which runs ~45 units behind the ship, swings out through the tunnel's side wall and sees
+ * the cylinder from outside (the grey crescent of 2026-11-25).
+ */
+export const TUNNEL = { start: -110, end: -150, radius: 11 } as const;
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const ease = (x: number) => x * x * (3 - 2 * x);
@@ -20,12 +25,18 @@ const span = (t: number, a: number, b: number) => ease(clamp01((t - a) / (b - a)
 /** Story time at which the ship passes the gate / leaves the tunnel. */
 export const T_GATE = -GATE.z / TRAVEL;
 export const T_EXIT = -TUNNEL.end / TRAVEL;
+/** Story time at which the camera, trailing the ship, flies out of the tunnel's mouth. */
+export const T_OUT = 0.9;
 
 /**
  * 0 realistic · 1 ink line art · 2 cel colour. The fall itself is real (lensing, darkness, a light at
- * the end); the world is only re-drawn as the ship breaks out into the light.
+ * the end); the world is re-drawn as the ship breaks out into the light, and is fully painted once
+ * the camera follows it out.
  */
-export const styleAt = (t: number) => span(t, 0.74, 0.84) + span(t, 0.84, T_EXIT);
+export const styleAt = (t: number) => span(t, 0.74, 0.84) + span(t, 0.84, T_OUT);
+
+/** The space sky (stars, dust) is gone once the colour comes in: no inked dots on the painted sky. */
+export const spaceSkyAt = (t: number) => 1 - span(t, 0.8, 0.88);
 
 /** The disk is already blazing when the story begins; it brightens a little on approach. */
 export const gateOpen = (t: number) => 0.9 + 0.1 * span(t, 0, 0.3);
@@ -42,7 +53,8 @@ const rel: ShotKey[] = [
   { t: 0.3, position: [22, 8, 54], target: [0, 0, -50], fov: 50 },
   { t: 0.48, position: [14, 6, 46], target: [0, 0, -50], fov: 54 },
   { t: 0.7, position: [4, 5, 40], target: [0, 0, -50], fov: 60 },
-  { t: 0.9, position: [-14, 7, 46], target: [0, 2, -40], fov: 54 },
+  // stays near the axis until it is out of the tunnel's mouth (rho < 9.5 while z > TUNNEL.end)
+  { t: 0.9, position: [-6, 6, 46], target: [0, 2, -40], fov: 54 },
   { t: 1, position: [-22, 9, 52], target: [0, 3, -30], fov: 50 },
 ];
 
