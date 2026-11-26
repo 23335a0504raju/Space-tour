@@ -146,8 +146,9 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Final Transmission',
     act: 'homecoming',
     artStyle: 'realistic',
-    screens: 2.4,
-    restPoints: [0.6],
+    // the astronaut on the deck, then the lift into open sky to the Moon and the contact card
+    screens: 3.2,
+    restPoints: [0.9],
     navLabel: 'Contact',
     briefAnchor: 'contact',
   },

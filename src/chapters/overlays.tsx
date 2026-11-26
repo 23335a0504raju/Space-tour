@@ -3,6 +3,7 @@ import { content } from '../content/index.ts';
 import type { Project } from '../content/index.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
+import { CARD_REST, MOON_ANCHOR } from './homecoming/homecoming.ts';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
 import { PROJECT_MEDIA } from '../ui/projectMedia.ts';
 import styles from './overlays.module.css';
@@ -17,7 +18,7 @@ export interface OverlayDef {
   readonly rest: number;
   readonly placement: 'center' | 'left' | 'right' | 'bottom';
   /** 'editorial': large type straight over the scene on a soft vignette, no panel box. */
-  readonly variant?: 'editorial' | 'showcase';
+  readonly variant?: 'editorial' | 'showcase' | 'card';
   /** Half-width of the readable band around the rest point, in local t (default 0.12). */
   readonly band?: number;
   readonly label: string;
@@ -39,6 +40,8 @@ const {
 } = content;
 
 const LINK_LABELS = { live: 'Live site', code: 'Source code', demo: 'Demo' } as const;
+/** Certifications on the SC11-A panel (newest first); the Mission Brief lists them all. */
+const PANEL_CERTS = 6;
 /** Features shown on a showcase panel; the Project Bay lists them all. */
 const SHOWCASE_FEATURES = 3;
 
@@ -334,7 +337,7 @@ const allOverlayDefs: readonly OverlayDef[] = [
         <Kicker>Discipline</Kicker>
         <h2 className={styles.heading}>Certifications</h2>
         <ul className={styles.lines}>
-          {certifications.value.map((c) => (
+          {certifications.value.slice(0, PANEL_CERTS).map((c) => (
             <li key={c.name}>
               <FactText fact={certifications}>
                 {c.name}{' '}
@@ -345,6 +348,13 @@ const allOverlayDefs: readonly OverlayDef[] = [
             </li>
           ))}
         </ul>
+        {certifications.value.length > PANEL_CERTS && (
+          <p className={styles.metaInline}>
+            <a href="/brief/#certifications">
+              {certifications.value.length - PANEL_CERTS} more, and courses, in the Mission Brief
+            </a>
+          </p>
+        )}
       </>
     ),
   },
@@ -371,7 +381,7 @@ const allOverlayDefs: readonly OverlayDef[] = [
   {
     key: 'horizon',
     chapterId: 'sc11c-horizon',
-    // learning and future direction are still [TO CONFIRM]: no empty panel until they are supplied
+    // no empty panel while learning and future direction are both still missing
     available: () => shouldShow(content.learning) || shouldShow(content.futureDirection),
     rest: 0.55,
     placement: 'right',
@@ -380,36 +390,52 @@ const allOverlayDefs: readonly OverlayDef[] = [
       <>
         <Kicker>Horizon</Kicker>
         <h2 className={styles.heading}>What comes next</h2>
-        <p className={styles.lead}>
-          <FactText fact={content.learning} />
-        </p>
-        <p>
-          <FactText fact={content.futureDirection} />
-        </p>
+        {shouldShow(content.learning) && (
+          <>
+            <p className={styles.kicker}>Learning now</p>
+            <p className={styles.lead}>
+              <FactText fact={content.learning} />
+            </p>
+          </>
+        )}
+        {shouldShow(content.futureDirection) && (
+          <>
+            <p className={styles.kicker}>Next</p>
+            <p>
+              <FactText fact={content.futureDirection} />
+            </p>
+          </>
+        )}
       </>
     ),
   },
   {
     key: 'contact',
     chapterId: 'sc13-transmission',
-    rest: 0.6,
-    placement: 'left',
+    rest: CARD_REST,
+    placement: 'center',
+    // the final card (after the user's Lunar Gravity reference): copy on the left over a fading
+    // scrim, the Moon and its ring in the empty right half (LunarMoon places it there)
+    variant: 'card',
     label: 'Contact',
     holdToEnd: true,
     render: () => (
       <>
-        <ContactPanel id="final-transmission" />
-        <button
-          type="button"
-          className={styles.bay}
-          onClick={() => {
-            const go = useJourneyStore.getState().navigate;
-            if (go) go('sc02-room');
-            else window.scrollTo({ top: 0, behavior: 'instant' });
-          }}
-        >
-          Replay mission
-        </button>
+        <div className={styles.cardMoon} {...{ [MOON_ANCHOR]: '' }} aria-hidden="true" />
+        <div className={styles.cardCopy}>
+          <ContactPanel id="final-transmission" display />
+          <button
+            type="button"
+            className={styles.bay}
+            onClick={() => {
+              const go = useJourneyStore.getState().navigate;
+              if (go) go('sc02-room');
+              else window.scrollTo({ top: 0, behavior: 'instant' });
+            }}
+          >
+            Replay mission
+          </button>
+        </div>
       </>
     ),
   },

@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { textureContext } from '../../engine/assets/canvas2d.ts';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
@@ -21,7 +22,7 @@ function doorTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
-  const g = c.getContext('2d')!;
+  const g = textureContext(c)!;
   const grad = g.createLinearGradient(0, 0, 0, h);
   grad.addColorStop(0, '#3d434d');
   grad.addColorStop(0.5, '#353a43');

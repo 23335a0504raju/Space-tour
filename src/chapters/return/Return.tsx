@@ -7,7 +7,7 @@ import { useJourneyStore } from '../../engine/store.ts';
 import { createLimbAtmosphereMaterial, createEarthMaterial } from '../../shaders/earth.ts';
 import { AREAS } from '../anime/anime.ts';
 import { PAINTED_CLOUDS, SUN_BEYOND } from '../anime/clouds.ts';
-import { Clouds, RingedPlanet, SkyDome } from '../anime/parts.tsx';
+import { Clouds, PaintedSun, RingedPlanet, SkyDome } from '../anime/parts.tsx';
 import { HORIZON_PLANETS } from '../anime/areas.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield } from '../greybox/parts.tsx';
@@ -30,6 +30,9 @@ import {
   styleAt,
 } from './return.ts';
 
+/** The painted sun here sits on the other side (mirrored x): the clouds are lit from it. */
+const RETURN_SUN = [-SUN_BEYOND[0], SUN_BEYOND[1], -300] as const;
+
 /**
  * SC12 · The Return (FINAL_STORYLINE SC12). The crossing in reverse; the screen-space style pass
  * (driven by `style()`) un-draws the cel look while this scene supplies the gate, the tunnel and
@@ -37,6 +40,8 @@ import {
  */
 const TEX = {
   day: '/assets/textures/earth_day_2k.ktx2',
+  // the closest views of Earth (here and SC13) use the 4K map on Balanced (A021)
+  dayHi: '/assets/textures/earth_day_4k.ktx2',
   night: '/assets/textures/earth_night_2k.ktx2',
   moon: '/assets/textures/moon_1k.ktx2',
 } as const;
@@ -47,7 +52,7 @@ const SKY = AREAS.horizon.sky;
 function ReturnScene({ id, frame }: ChapterSceneProps) {
   const gl = useThree((s) => s.gl);
   const low = useJourneyStore((s) => s.tier !== 'balanced');
-  const maps = useLoader(getKTX2Loader(gl), [TEX.day, TEX.night, TEX.moon]);
+  const maps = useLoader(getKTX2Loader(gl), [low ? TEX.day : TEX.dayHi, TEX.night, TEX.moon]);
   const [dayMap, nightMap, moonMap] = maps;
   if (!dayMap || !nightMap || !moonMap) throw new Error('SC12: textures missing');
   useLayoutEffect(() => {
@@ -57,7 +62,7 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
     }
   }, [dayMap, nightMap, moonMap]);
   const { earth, atmosphere } = useMemo(() => {
-    const e = createEarthMaterial(dayMap, nightMap, low);
+    const e = createEarthMaterial(dayMap, nightMap, low, { closeup: true });
     // the thin limb atmosphere of SC06 (the old shell read as a hazy halo behind the planet)
     const a = createLimbAtmosphereMaterial(EARTH.radius, new THREE.Vector3(...EARTH.position));
     (e.uniforms['uSun']?.value as THREE.Vector3).copy(SUN);
@@ -99,12 +104,9 @@ function ReturnScene({ id, frame }: ChapterSceneProps) {
           <SkyDome colors={SKY} />
         </group>
         <group position={[0, 0, 400]}>
-          <Clouds items={PAINTED_CLOUDS} />
+          <Clouds items={PAINTED_CLOUDS} sun={RETURN_SUN} />
         </group>
-        <mesh position={[SUN_BEYOND[0] * -1, SUN_BEYOND[1], -460]}>
-          <sphereGeometry args={[34, 24, 16]} />
-          <meshBasicMaterial color={new THREE.Color(2.2, 1.7, 1.2)} toneMapped={false} />
-        </mesh>
+        <PaintedSun radius={34} position={[SUN_BEYOND[0] * -1, SUN_BEYOND[1], -460]} />
       </group>
 
       {/* the big ringed planet of SC11c, still ahead (its place relative to the ship) */}

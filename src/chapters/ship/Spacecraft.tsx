@@ -1,4 +1,5 @@
 import { forwardRef, useMemo, useRef } from 'react';
+import { textureContext } from '../../engine/assets/canvas2d.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -29,7 +30,7 @@ function canvasTexture(w: number, h: number, draw: (c: CanvasRenderingContext2D)
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext('2d');
+  const ctx = textureContext(canvas);
   if (ctx) draw(ctx);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;

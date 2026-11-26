@@ -18,19 +18,36 @@ const base = args.find((a) => a.startsWith('--url='))?.slice(6) ?? 'http://local
 const specs = args.filter((a) => !a.startsWith('--'));
 const wide = args.includes('--wide');
 const small = args.includes('--small');
-const viewport = small
-  ? { width: 360, height: 740 }
-  : portrait
-    ? { width: 412, height: 915 }
-    : wide
-      ? { width: 1919, height: 1067 }
-      : { width: 1440, height: 900 };
+/** --size=WxH: any desktop window (e.g. a short laptop window) */
+const sized = args
+  .find((a) => a.startsWith('--size='))
+  ?.slice(7)
+  .split('x')
+  .map(Number);
+const viewport =
+  sized?.length === 2
+    ? { width: sized[0]!, height: sized[1]! }
+    : small
+      ? { width: 360, height: 740 }
+      : portrait
+        ? { width: 412, height: 915 }
+        : wide
+          ? { width: 1919, height: 1067 }
+          : { width: 1440, height: 900 };
 const outDir = join(
   import.meta.dirname,
   '..',
   'spike-results',
   'shots',
-  small ? 'small' : portrait ? 'portrait' : wide ? 'wide' : 'desktop',
+  sized?.length === 2
+    ? `${sized[0]}x${sized[1]}`
+    : small
+      ? 'small'
+      : portrait
+        ? 'portrait'
+        : wide
+          ? 'wide'
+          : 'desktop',
 );
 mkdirSync(outDir, { recursive: true });
 

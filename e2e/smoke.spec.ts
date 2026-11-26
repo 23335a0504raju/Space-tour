@@ -18,15 +18,15 @@ test.describe('P0 smoke', () => {
     await expect(nav.getByRole('button', { name: 'Contact' })).toBeVisible();
   });
 
-  test('contact sheet opens, closes with Escape, and returns focus', async ({ page }) => {
+  test('Contact in the header flies to the final card (no separate sheet)', async ({ page }) => {
     await page.goto('/?gate=off');
+    await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
     await openNav(page);
-    const trigger = page.getByRole('button', { name: 'Contact' });
-    await trigger.click();
-    await expect(page.getByRole('dialog', { name: 'Contact' })).toBeVisible();
-    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Contact' }).click();
+    const card = page.locator('section[aria-label="Contact"]:not([aria-hidden="true"])');
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    await expect(card.getByRole('button', { name: 'Copy email' })).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'Contact' })).toBeHidden();
-    await expect(trigger).toBeFocused();
   });
 
   test('Mission Brief lists both internships and hides project templates in production', async ({
@@ -35,7 +35,7 @@ test.describe('P0 smoke', () => {
     await page.goto('/brief/');
     const experience = page.locator('#experience');
     await expect(experience).toContainText('Spotmies');
-    await expect(experience).toContainText('Pit Solutions');
+    await expect(experience).toContainText(/Pit Solutions/i);
     await expect(experience).not.toContainText('Template');
   });
 

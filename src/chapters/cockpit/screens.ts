@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { textureContext } from '../../engine/assets/canvas2d.ts';
 import { sections } from '../sections.ts';
 import { content, isPublishable } from '../../content/index.ts';
 
@@ -17,7 +18,7 @@ function frame(title: string): { canvas: HTMLCanvasElement; ctx: CanvasRendering
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
-  const ctx = canvas.getContext('2d');
+  const ctx = textureContext(canvas);
   if (!ctx) throw new Error('2D canvas unavailable');
   ctx.fillStyle = '#060a12';
   ctx.fillRect(0, 0, W, H);

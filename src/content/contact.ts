@@ -1,4 +1,4 @@
-import { fromSource, missing } from './fact.ts';
+import { fromSource } from './fact.ts';
 import { SRC } from './sources.ts';
 import type { Contact } from './types.ts';
 
@@ -8,9 +8,10 @@ export const contact: Contact = {
     [SRC.resume, SRC.contact],
     'Confirm this is the recruiter-facing address (Q11).',
   ),
-  resumeUrl: missing(
+  resumeUrl: fromSource(
     '/resume.pdf',
-    'Two different Google Drive resumes exist (ResumeNew.jsx vs Contact.jsx). Provide the current PDF (Q5).',
+    [SRC.resume2026],
+    'The current resume Raju supplied (2026-11-24). It includes his phone number, so publishing it makes the number public.',
   ),
   links: [
     {
@@ -21,11 +22,11 @@ export const contact: Contact = {
     {
       id: 'linkedin',
       label: 'LinkedIn',
-      href: fromSource('https://www.linkedin.com/in/raju-chowdavada-06b734347', [
-        SRC.resume,
-        SRC.contact,
-        SRC.footer,
-      ]),
+      href: fromSource(
+        'https://www.linkedin.com/in/rajuchowdavada/',
+        [SRC.linkedin, SRC.resume, SRC.contact, SRC.footer],
+        'The old URL (/in/raju-chowdavada-06b734347) redirects here; this is the public profile URL.',
+      ),
     },
     {
       id: 'leetcode',

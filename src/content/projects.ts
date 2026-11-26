@@ -17,8 +17,8 @@ export const projects: readonly Project[] = [
     name: fromSource('SmartWay Traffic', [SRC.portfolio, SRC.hero]),
     summary: fromSource(
       'AI traffic and emergency detection management system using YOLOv8, FastAPI and Eclipse SUMO, detecting collisions, fire and congestion.',
-      P,
-      'Is detection live camera input, recorded video, or simulation? (Q10) This decides what the diorama may show.',
+      [SRC.portfolio, SRC.postSmartWay],
+      'Q10 answered by the SmartWay LinkedIn post: YOLOv8 detection on camera frames, plus Eclipse SUMO simulation files as input "instead of relying purely on live cameras". The diorama may show both.',
     ),
     role: fromSource('Creator & Lead Developer', P),
     stack: fromSource(
@@ -152,8 +152,8 @@ export const projects: readonly Project[] = [
         'Academic resource sharing',
         'Cross-institution networking',
       ],
-      P,
-      '"Real-time" should match the repository. Confirm.',
+      [SRC.portfolio, SRC.linkedinFeatured, SRC.driveReports],
+      'LinkedIn Featured: "60+ users with real-time chat and role-based access". The project report (Unified Learning, Oct 2024) lists role-based access, posting and notifications, chat and group messaging. "Real-time" still to match the repository.',
     ),
     links: fromSource(
       {
@@ -176,14 +176,14 @@ export const projects: readonly Project[] = [
     ),
     role: fromSource('Lead Developer & ML Engineer', P),
     stack: fromSource(['React', 'Django REST', 'TensorFlow.js', 'Vercel', 'Render'], P),
-    features: unverified(
+    features: fromSource(
       [
-        'ML-based demand forecasting',
+        'Demand forecasting with Linear Regression and Random Forest models trained on Kaggle datasets',
         'Automated low-stock alerts',
         'Interactive data visualisations',
       ],
-      P,
-      'ML forecasting claim should match the repository.',
+      [SRC.resume2026, SRC.portfolio, SRC.driveReports],
+      'The current resume names the models and says Random Forest beat the baseline by about 20%. Alerts and visualisations are from the old site.',
     ),
     links: fromSource(
       {

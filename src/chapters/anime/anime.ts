@@ -5,7 +5,7 @@ import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
  * SC11 anime-universe story data (no React; unit-tested). Three areas, each a chapter with its own
  * local frame: the ship flies down -z through it (a pure function of t) with a chase camera. The
  * overlay panel sits opposite the area's landmark at the rest point (right, left, right).
- * ANIME_UNIVERSE_FRAMEWORK: structure only; these worlds are generic stand-ins.
+ * The worlds themselves are laid out in layout.ts.
  */
 export const TRAVEL = 220;
 export const shipZ = (t: number) => -Math.min(1, Math.max(0, t)) * TRAVEL;
@@ -17,6 +17,12 @@ export interface AreaDef {
   /** Sky gradient, horizon → zenith (flattened into painted bands by the style pass). */
   readonly sky: readonly [string, string, string, string];
   readonly light: string;
+  /**
+   * The sky and light the world opens with, blending into `sky`/`light` over its first stretch
+   * (entrySky below): SC11-A opens on SC10's sunset palette and turns to day as the deck sinks.
+   */
+  readonly entrySky?: readonly [string, string, string, string];
+  readonly entryLight?: string;
   readonly keys: readonly ShotKey[];
 }
 
@@ -25,8 +31,12 @@ const keys = (list: ShotKey[]): readonly ShotKey[] => list;
 export const AREAS: Readonly<Record<AreaId, AreaDef>> = {
   discipline: {
     id: 'discipline',
-    sky: ['#ffd6b8', '#f7a9a0', '#c96f8f', '#5a3a78'],
-    light: '#ffe2c8',
+    // a clear anime day (painted, smooth): pale haze at the horizon, deep blue overhead
+    sky: ['#cfe4f4', '#86bdee', '#3b86dc', '#1b50c0'],
+    light: '#fff4e2',
+    // SC10's last frame is this sunset, so the crossing joins with no cut
+    entrySky: ['#ffd6b8', '#f7a9a0', '#c96f8f', '#5a3a78'],
+    entryLight: '#ffe2c8',
     keys: keys([
       // the first frame matches SC10's last frame, so the crossing flows straight in (no cut)
       { t: 0, position: [-22, 9, 52], target: [0, 3, -30], fov: 50 },
@@ -71,8 +81,9 @@ export function areaShot(area: AreaId, t: number, out: ShotState): void {
 
 /** Landmark positions (chapter frame) that the rest-point cameras look at; tested against the frame. */
 export const LANDMARKS: Readonly<Record<AreaId, readonly [number, number, number]>> = {
-  discipline: [-55, 10, -125],
-  proof: [55, -8, -110],
+  // Ichiraku Ramen on the village street, Ryuk perched over the town, the big ringed planet
+  discipline: [-40, -30, -125],
+  proof: [40, 14, -110],
   horizon: [-95, 22, -330],
 };
 
@@ -99,13 +110,25 @@ export function skyMix(area: AreaId, t: number): { a: AreaId; b: AreaId; k: numb
   return { a: area, b: area, k: 0 };
 }
 
+/** How far a world has turned from its entry sky to its own, 0..1 (as SC11-A's deck sinks). */
+export const entrySky = (t: number) => smooth((t - 0.06) / 0.34);
+
 /**
- * Landmark scale 0..1 about the ship: worlds grow around the ship as it enters and shrink away as
- * it leaves, so no model ever pops at a boundary. The first world is already there (SC10 emerges
- * into it).
+ * How present a world is, 0..1: a world rises up into place round the ship as it enters and sinks
+ * away below as it leaves (layout.ts DROP), so no model ever pops at a boundary.
  */
-export function markScale(area: AreaId, t: number): number {
-  const enter = area === 'discipline' ? 1 : smooth(t / 0.2);
-  const leave = smooth((1 - t) / 0.15);
-  return enter * leave;
+export function presence(t: number): number {
+  return smooth(t / 0.18) * smooth((1 - t) / 0.16);
+}
+
+/**
+ * Opacity of the sea of cloud the ship climbs through between two worlds: it hides the sinking
+ * world and the rising one, and both sides of a boundary show it fully (the handoff picture).
+ * SC10's painted cloud deck covers SC11-A's entry, and SC12 opens on clear sky, so the first
+ * entry and the last exit have no sea.
+ */
+export function cloudSea(area: AreaId, t: number): number {
+  const i = ORDER.indexOf(area);
+  if (t < 0.5) return i > 0 ? 1 - smooth(t / 0.18) : 0;
+  return i < ORDER.length - 1 ? 1 - smooth((1 - t) / 0.16) : 0;
 }

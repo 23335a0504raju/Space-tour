@@ -1,4 +1,4 @@
-import { fromSource, missing } from './fact.ts';
+import { confirmed, conflict, fromSource, missing } from './fact.ts';
 import { SRC } from './sources.ts';
 import type { Experience, WorkProject } from './types.ts';
 
@@ -23,38 +23,135 @@ const projectTemplate = (id: string, hint: string): WorkProject => ({
   ),
 });
 
+const U = [SRC.userSpotmies];
+const LATER = 'Raju will send the full brief and links later (2026-11-24).';
+const A = [SRC.userAnswers];
+/** Raju, 2026-11-24: "yes no issue, under Spotmies mention them". */
+const permission = () => confirmed(true, A, 'Raju confirmed these may be named under Spotmies.');
+
+/**
+ * Spotmies projects as Raju described them (session, 2026-11-24). Only what he said is recorded;
+ * everything else stays `missing` until he sends the details.
+ */
+const spotmiesProjects: readonly WorkProject[] = [
+  {
+    id: 'sports-paramount',
+    name: fromSource('Sports Paramount', U, 'Raju wrote "sportsparamount". Confirm the spelling.'),
+    summary: fromSource('A sports platform.', U, `"Completely related to sports side". ${LATER}`),
+    contribution: fromSource(
+      [
+        'Designed the complete architecture',
+        'Built it end to end on my own, from the start to a fully functional product',
+      ],
+      U,
+      'Raju: "fully handled by me, complete architecture to full functional, start to end".',
+    ),
+    stack: missing(['Technology 1'], `Not stated yet. ${LATER}`),
+    links: missing({}, `Not stated yet. ${LATER}`),
+    publicPermission: permission(),
+  },
+  {
+    id: 'spotmies-cloud',
+    name: fromSource('Cloud and AWS management', U),
+    summary: fromSource('AWS messaging and access management, and internal tools.', U),
+    contribution: fromSource(
+      [
+        'Worked with AWS end to end: SMS, SNS and IAM',
+        'Connected the services and kept them working',
+        'Built internal tools',
+      ],
+      [...U, ...A],
+      'Raju: "in cloud I completely worked with AWS, SMS, SNS, IAM connectivity and working".',
+    ),
+    stack: fromSource(['AWS SNS', 'AWS SMS', 'AWS IAM'], U),
+    links: missing({}, 'Internal work: probably no public links.'),
+    publicPermission: permission(),
+  },
+  {
+    id: 'openplan-ai',
+    name: fromSource('OpenPlan AI landing page', U),
+    summary: missing('What OpenPlan AI is.', `Not stated yet. ${LATER}`),
+    contribution: fromSource(['Built the landing page'], U, 'Confirm this was your build.'),
+    stack: missing(['Technology 1'], `Not stated yet. ${LATER}`),
+    links: missing({}, `Not stated yet. ${LATER}`),
+    publicPermission: permission(),
+  },
+  {
+    id: 'mutiny',
+    name: fromSource('Mutiny', U),
+    summary: fromSource('A social media connectivity project.', U, LATER),
+    contribution: missing(['What you built'], `Not stated yet. ${LATER}`),
+    stack: missing(['Technology 1'], `Not stated yet. ${LATER}`),
+    links: missing({}, `Not stated yet. ${LATER}`),
+    publicPermission: permission(),
+  },
+];
+
 export const experience: readonly Experience[] = [
   {
     id: 'spotmies',
-    organisation: fromSource('Spotmies', [SRC.resume]),
-    role: fromSource('Full-Stack Developer Intern', [SRC.resume]),
-    period: fromSource({ start: 'Dec 2025', end: 'Jun 2026' }, [SRC.resume]),
-    summary: fromSource(
-      'Built full-stack applications with React.js and Node.js, including backend APIs and frontend interfaces, and deployed them to production on Vercel and Render.',
-      [SRC.resume],
-      'Rephrased from the resume description (less promotional). Approve wording.',
+    organisation: fromSource('Spotmies LLP', [SRC.linkedinExperience, SRC.resume]),
+    role: confirmed(
+      'Full-Stack Developer',
+      [...A, SRC.resume2026, SRC.linkedin],
+      'Raju chose "Full stack developer" (2026-11-24). LinkedIn experience says "Mern Stack Developer".',
     ),
-    projects: [
-      projectTemplate(
-        'spotmies-project-1',
-        'Possible candidate mentioned in Batch 1: MeraSports / Sports Paramount (employer not stated).',
-      ),
-      projectTemplate(
-        'spotmies-project-2',
-        'Possible candidate mentioned in Batch 1: Arcslot (employer not stated).',
-      ),
-    ],
+    period: conflict(
+      { start: 'Dec 2025', end: 'Present' },
+      [SRC.linkedinExperience, SRC.resume2026],
+      'Still open: LinkedIn says Dec 2025 – Present (full-time); the current resume says Dec 2025 – Jun 2026 (intern). Are you still at Spotmies?',
+    ),
+    summary: fromSource(
+      'Builds and ships full-stack features with React.js and Node.js, from API design to frontend integration: RESTful APIs used by both web and mobile apps, and production deployments on Vercel and Render.',
+      [SRC.linkedinExperience, SRC.resume],
+      'Rephrased from the LinkedIn description. Its "zero-downtime release strategies" claim is left out until there is evidence (decision B3-5). Approve wording.',
+    ),
+    responsibilities: fromSource(
+      [
+        'Integrated Redis for API response caching, session storage and rate limiting, cutting average API response time by about 20–40%',
+        'Raised test coverage from about 30% to 60% with JUnit/TestNG unit and integration tests and Postman API checks',
+        'Containerised services with Docker and automated builds and deployments with Jenkins and GitHub Actions',
+        'Payment handling, bug fixes, and cloud and database management',
+        'Git and repository management across projects',
+        'Agile/Scrum: sprint planning, daily stand-ups and code reviews',
+      ],
+      [...U, SRC.resume2026, ...A],
+      `Raju's message and the current resume's Spotmies bullets; the metrics are the resume's own, published on Raju's word ("no proof required", 2026-11-24). ${LATER}`,
+    ),
+    lessons: fromSource(
+      [
+        'Real-time is harder than it looks: the hard part is not sending the data but handling reconnections, dropped connections and stale state.',
+        'A model is only as good as its data: the algorithm is the easy 20 percent; making the data trustworthy is the other 80.',
+        'Performance is a feature: caching the right things, indexing the right columns, and not asking the database the same question a hundred times.',
+      ],
+      [SRC.postSpotmiesLessons],
+      'Condensed from Raju\'s own LinkedIn post ("Three lessons that genuinely changed how I build"). Approve wording.',
+    ),
+    projects: spotmiesProjects,
   },
   {
     id: 'pit-solutions',
-    organisation: fromSource('Pit Solutions', [SRC.resume]),
-    role: fromSource('Frontend Development Intern', [SRC.resume]),
-    period: fromSource({ start: 'Dec 2022', end: 'May 2023' }, [SRC.resume]),
-    summary: fromSource(
-      'Designed and built responsive client-facing dashboards with HTML, CSS, and JavaScript, working in Agile sprints with multidisciplinary teams.',
-      [SRC.resume],
-      'Rephrased from the resume description. Approve wording.',
+    organisation: fromSource('PIT Solutions', [SRC.resume, SRC.linkedinExperience]),
+    role: confirmed(
+      'Frontend Developer Intern',
+      [...A, SRC.resume2026, SRC.linkedinExperience],
+      'Raju chose "frontend developer" (2026-11-24); the resume and LinkedIn both say it was an internship.',
     ),
-    projects: [projectTemplate('pit-solutions-project-1', 'No project named in any source yet.')],
+    period: fromSource(
+      { start: 'Dec 2022', end: 'May 2023' },
+      [SRC.resume2026, SRC.resume],
+      'The current resume. LinkedIn says Jun 2023.',
+    ),
+    summary: fromSource(
+      'Built 5+ responsive frontend modules for client dashboards with React.js and JavaScript, integrating REST APIs and using Git for version control.',
+      [SRC.resume2026],
+      'From the current resume.',
+    ),
+    projects: [
+      projectTemplate(
+        'pit-solutions-project-1',
+        'No project named on the resume or LinkedIn (checked 2026-11-24).',
+      ),
+    ],
   },
 ];

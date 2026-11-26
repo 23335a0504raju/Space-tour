@@ -1,4 +1,4 @@
-import { confirmed, fromSource, missing } from './fact.ts';
+import { confirmed, fromSource } from './fact.ts';
 import { SRC } from './sources.ts';
 import type { Identity } from './types.ts';
 
@@ -27,13 +27,14 @@ export const identity: Identity = {
     'Opening hook line, approved by Raju 2026-11-19. Copy, not a factual claim.',
   ),
   summary: fromSource(
-    'Software Engineer specializing in scalable web applications, APIs, and full-stack systems using Java, Python, React.js, and Node.js.',
-    [SRC.resume],
-    'Shortened from the resume summary (dropped "Proficient in optimizing application performance"). Approve wording.',
+    'Full-stack developer with hands-on experience in REST API design, cloud deployment on AWS and CI/CD automation, building with Java, Python, Node.js, React, FastAPI and Django REST.',
+    [SRC.resume2026],
+    'Shortened from the current resume summary. Approve wording.',
   ),
-  location: fromSource('Visakhapatnam, Andhra Pradesh', [SRC.resume]),
-  availability: missing(
-    'Open to full-time software engineering roles',
-    'Not in any source. Provide or approve an availability line (Q11).',
+  location: fromSource('Visakhapatnam, Andhra Pradesh', [SRC.resume, SRC.linkedin]),
+  availability: fromSource(
+    'Open to software engineering roles at product-based companies and high-growth startups',
+    [SRC.linkedin],
+    'From the LinkedIn About ("Open to SWE roles at product-based companies and high-growth startups"). Approve wording (Q11).',
   ),
 };

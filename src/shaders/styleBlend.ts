@@ -3,7 +3,8 @@ import { Uniform } from 'three';
 
 /**
  * Screen-space art-style blend (SC10 crossing, SC11 anime universe, SC12 return).
- *   uStyle 0 = realistic (untouched), 1 = ink line art on paper, 2 = flat cel colour with ink lines.
+ *   uStyle 0 = realistic (untouched), 1 = the scene inked (lines, hatching), 2 = flat cel colour
+ *   with ink lines. No paper-white stage: the ramp never flashes bright between dark and painted.
  * It runs after tone mapping, on the final image, and is a pure function of `uStyle`, which the
  * Director derives from scroll progress, so the transition reverses exactly.
  */
@@ -12,26 +13,54 @@ const fragment = /* glsl */ `
 
   float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
+  // Painted surfaces (anime/parts.tsx PAINTED_BLEND: clouds, the painted sun) write a constant 0.5
+  // into alpha as they cover a pixel. Over drawn scenery alpha falls from 1 towards 0.5; over empty
+  // space it rises from 0 towards 0.5. Exactly 0 is empty space, exactly 1 is ordinary scenery.
+  float paintedCover(float a) {
+    a = clamp(a, 0.0, 1.0);
+    return a >= 0.5 ? 2.0 * (1.0 - a) : 2.0 * a;
+  }
+
   void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
     if (uStyle < 0.001) { outputColor = inputColor; return; }
 
     // Roberts-cross edges on luminance (4 taps): lines follow every colour boundary
     vec2 px = texelSize * 1.6;
-    float a = lum(texture2D(inputBuffer, uv).rgb);
-    float b = lum(texture2D(inputBuffer, uv + vec2(px.x, px.y)).rgb);
-    float c = lum(texture2D(inputBuffer, uv + vec2(px.x, 0.0)).rgb);
-    float d = lum(texture2D(inputBuffer, uv + vec2(0.0, px.y)).rgb);
+    vec4 ta = texture2D(inputBuffer, uv);
+    vec4 tb = texture2D(inputBuffer, uv + vec2(px.x, px.y));
+    vec4 tc = texture2D(inputBuffer, uv + vec2(px.x, 0.0));
+    vec4 td = texture2D(inputBuffer, uv + vec2(0.0, px.y));
+    float a = lum(ta.rgb);
+    float b = lum(tb.rgb);
+    float c = lum(tc.rgb);
+    float d = lum(td.rgb);
     float edge = length(vec2(a - b, c - d));
-    float ink = smoothstep(0.012, 0.05, edge);
+    // Painted surfaces are already painted: no ink round or inside them, no posterising. The mark
+    // is looked for on both sides (the edge taps only go right and up), and counts at full
+    // strength from a faint cover, so ink never bleeds round a soft edge.
+    vec2 pm = texelSize * 3.0;
+    float cm = max(
+      max(paintedCover(texture2D(inputBuffer, uv - vec2(pm.x, 0.0)).a), paintedCover(texture2D(inputBuffer, uv - vec2(0.0, pm.y)).a)),
+      max(paintedCover(texture2D(inputBuffer, uv + vec2(pm.x, 0.0)).a), paintedCover(texture2D(inputBuffer, uv + vec2(0.0, pm.y)).a))
+    );
+    cm = max(cm, max(max(paintedCover(ta.a), paintedCover(tb.a)), max(paintedCover(tc.a), paintedCover(td.a))));
+    float painted = clamp(cm * 8.0, 0.0, 1.0);
+    float cloud = paintedCover(inputColor.a);
+    // nothing drawn here: the painted sky goes in, whatever its brightness (bloom over empty
+    // space used to stay as a grey band round SC10's clouds)
+    float empty = 1.0 - smoothstep(0.0, 0.02, inputColor.a);
+    float ink = smoothstep(0.012, 0.05, edge) * (1.0 - painted);
 
     float l = lum(inputColor.rgb);
 
-    // ── ink line art: dark paper-white page, hatching where the scene is bright, ink lines ──
-    vec3 paper = vec3(0.93, 0.90, 0.84);
+    // ── ink line art over the scene itself: hatching where it is bright, ink lines ──
+    // (Raju, 2026-11-25: no paper flash. It used to be drawn on a paper-white page, a near-white
+    // frame between dark space and the painted sky; now the real image takes on ink first, then
+    // the cel colour floods in.)
     vec3 inkCol = vec3(0.08, 0.07, 0.11);
     float hatch = step(0.5, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.18));
     float shade = smoothstep(0.12, 0.7, l);
-    vec3 lineArt = paper * (1.0 - 0.3 * shade - 0.28 * hatch * shade);
+    vec3 lineArt = inputColor.rgb * (1.0 - 0.28 * hatch * shade);
     lineArt = mix(lineArt, inkCol, ink);
 
     // ── cel colour: posterised, saturated, with a painted sky behind everything dark ──
@@ -40,13 +69,41 @@ const fragment = /* glsl */ `
     float q = floor(l * 4.0 + 0.5) / 4.0;
     vec3 base = inputColor.rgb * (q / lv);
     base = mix(vec3(lum(base)), base, 1.45);
+    // painted surfaces stay under the bloom threshold, so AgX leaves them greyish: lift them
+    // towards white (a screen curve, which keeps their tone order)
+    vec3 lifted = 1.0 - (1.0 - inputColor.rgb) * (1.0 - inputColor.rgb);
+    base = mix(base, lifted, cloud);
     vec3 cel = mix(sky, base, smoothstep(0.025, 0.1, l));
+    cel = mix(cel, sky + inputColor.rgb * 0.6, empty);
+    // a painted surface over empty space (alpha between 0 and 0.5: a soft halo, a cloud's edge)
+    // was blended over black. Undo that and lay it over the painted sky instead, or the partial
+    // cover read as a dark pixel (a black ring round the sun's halo in SC10).
+    float ia = clamp(inputColor.a, 0.0, 1.0);
+    if (ia > 0.002 && ia < 0.5) {
+      float cov = 2.0 * ia;
+      vec3 own = inputColor.rgb / max(cov, 0.02);
+      vec3 ownLifted = 1.0 - (1.0 - own) * (1.0 - own);
+      cel = mix(sky, ownLifted, clamp(cov, 0.0, 1.0));
+    } else if (ia >= 0.5 && ia < 0.995) {
+      // partly painted over drawn scenery (alpha 1 towards 0.5). Over a dark backdrop (SC10's
+      // space) the cel pass would keep the dim mix as a grey ring; estimate what is behind,
+      // assuming the paint is bright (crowns, glow, sun), and treat a dark backdrop as sky.
+      float cov = 2.0 * (1.0 - ia);
+      float under = (l - 0.75 * cov) / max(1.0 - cov, 0.05);
+      if (under < 0.05) {
+        vec3 own = inputColor.rgb / max(cov, 0.02);
+        vec3 ownLifted = 1.0 - (1.0 - own) * (1.0 - own);
+        cel = mix(sky, ownLifted, clamp(cov, 0.0, 1.0));
+      }
+    }
     cel = mix(cel, inkCol, ink * 0.9);
 
     float k1 = clamp(uStyle, 0.0, 1.0);
     float k2 = clamp(uStyle - 1.0, 0.0, 1.0);
     vec3 outRgb = mix(mix(inputColor.rgb, lineArt, k1), cel, k2);
-    outputColor = vec4(outRgb, inputColor.a);
+    // the clouds' mark is consumed here: the page behind the canvas is near-black, so opaque output
+    // looks the same everywhere else
+    outputColor = vec4(outRgb, 1.0);
   }
 `;
 

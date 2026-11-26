@@ -1,9 +1,11 @@
-import { useLayoutEffect, useMemo } from 'react';
-import { useLoader, useThree } from '@react-three/fiber';
+import { useLayoutEffect, useMemo, useRef } from 'react';
+import { textureContext } from '../../engine/assets/canvas2d.ts';
+import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getKTX2Loader } from '../../engine/assets/loaders.ts';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
-import { Planet } from '../greybox/parts.tsx';
+import { useJourneyStore } from '../../engine/store.ts';
+import { createCoronaMaterial, createSunMaterial } from '../../shaders/sun.ts';
 import { SaturnSystem } from '../saturn/Saturn.tsx';
 import { SATURN } from '../saturn/saturn.ts';
 import {
@@ -17,9 +19,10 @@ import {
 import type { PlanetKind } from './solarSystem.ts';
 
 /**
- * SC10's look back: the Sun and all eight planets (solarSystem.ts). Textured planets use NASA maps
- * already in the project (A023–A026); Venus, Uranus and Neptune are procedural (no new assets).
- * Every planet is lit from the visible Sun, with a hard terminator and a thin atmosphere rim.
+ * SC10's look back: the Sun and all eight planets (solarSystem.ts). Earth, Mars, Jupiter and the
+ * Moon-mapped Mercury use NASA maps (A021–A026); Venus, Uranus and Neptune use Solar System Scope
+ * maps (A051–A053, CC BY 4.0, credited in the Mission Brief). Every planet is lit from the visible
+ * Sun, with a hard terminator and a thin atmosphere rim; Uranus lies on its side with its faint rings.
  */
 
 const TEX = {
@@ -27,7 +30,13 @@ const TEX = {
   mars: '/assets/textures/mars_2k.ktx2',
   jupiter: '/assets/textures/jupiter_2k.ktx2',
   moon: '/assets/textures/moon_1k.ktx2',
+  venus: '/assets/textures/venus_1k.ktx2',
+  uranus: '/assets/textures/uranus_1k.ktx2',
+  neptune: '/assets/textures/neptune_1k.ktx2',
 } as const;
+
+/** Uranus's axis lies almost in its orbit plane (about 98°): its rings stand nearly upright. */
+const URANUS_TILT: [number, number, number] = [0.25, 0.4, 1.71];
 
 const litVertex = /* glsl */ `
   varying vec2 vUv;
@@ -63,6 +72,7 @@ function TexturedPlanet({
   atmosphere = '#000000',
   atmosphereStrength = 0,
   spin = 0,
+  rotation,
 }: {
   map: THREE.Texture;
   position: THREE.Vector3;
@@ -71,6 +81,8 @@ function TexturedPlanet({
   atmosphere?: string;
   atmosphereStrength?: number;
   spin?: number;
+  /** overrides the default slight tilt (Uranus lies on its side) */
+  rotation?: [number, number, number] | undefined;
 }) {
   const material = useMemo(
     () =>
@@ -89,9 +101,63 @@ function TexturedPlanet({
   );
   useDisposeOnUnmount(material);
   return (
-    <mesh position={position} rotation={[0.2, spin, 0.05]} material={material}>
+    <mesh position={position} rotation={rotation ?? [0.2, spin, 0.05]} material={material}>
       <sphereGeometry args={[radius, 64, 32]} />
     </mesh>
+  );
+}
+
+/**
+ * Uranus's rings: narrow, dark and faint (nothing like Saturn's), the epsilon ring the brightest.
+ * Thin bands on one flat annulus in the planet's tilted equator (radii in planet radii).
+ */
+function UranusRings({
+  position,
+  radius,
+  rotation,
+}: {
+  position: THREE.Vector3;
+  radius: number;
+  rotation: [number, number, number];
+}) {
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        uniforms: { uR: { value: radius } },
+        vertexShader: /* glsl */ `
+          varying vec2 vP;
+          void main() {
+            vP = position.xy;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: /* glsl */ `
+          uniform float uR; varying vec2 vP;
+          void main() {
+            float r = length(vP) / uR;
+            float a = 0.0;
+            a += 0.35 * (1.0 - smoothstep(0.0, 0.006, abs(r - 1.64)));
+            a += 0.30 * (1.0 - smoothstep(0.0, 0.006, abs(r - 1.70)));
+            a += 0.40 * (1.0 - smoothstep(0.0, 0.008, abs(r - 1.79)));
+            a += 0.45 * (1.0 - smoothstep(0.0, 0.007, abs(r - 1.86)));
+            a += 0.50 * (1.0 - smoothstep(0.0, 0.008, abs(r - 1.95)));
+            a += 1.00 * (1.0 - smoothstep(0.0, 0.022, abs(r - 2.00)));
+            gl_FragColor = vec4(vec3(0.62, 0.66, 0.7) * a * 0.55, a * 0.5);
+            #include <colorspace_fragment>
+          }`,
+      }),
+    [radius],
+  );
+  useDisposeOnUnmount(material);
+  // the annulus lies in the planet's equator (the sphere's local x/z plane)
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} material={material}>
+        <ringGeometry args={[radius * 1.55, radius * 2.1, 128, 1]} />
+      </mesh>
+    </group>
   );
 }
 
@@ -99,7 +165,7 @@ function TexturedPlanet({
 function glowTexture(size: number, stops: readonly [number, string][]): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = c.height = size;
-  const g = c.getContext('2d')!;
+  const g = textureContext(c)!;
   const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   for (const [at, col] of stops) grad.addColorStop(at, col);
   g.fillStyle = grad;
@@ -109,46 +175,50 @@ function glowTexture(size: number, stops: readonly [number, string][]): THREE.Ca
   return t;
 }
 
-/** The Sun: a white-hot disc, a warm corona and a faint horizontal flare (bloom does the rest). */
+/** Corona quad half-size, in Sun radii (flames and prominences reach well past the limb). */
+const CORONA_EXTENT = 1.9;
+
+/**
+ * The Sun as a body (Raju's reference, 2026-11-25): a boiling red-orange photosphere with bright
+ * active regions and dark filaments (src/shaders/sun.ts), a ragged flame fringe with prominences
+ * on a camera-facing quad, and a soft warm glow. Surface motion is ambient (clock time).
+ */
 function Sun() {
-  const { corona, flare } = useMemo(
+  const low = useJourneyStore((s) => s.tier !== 'balanced');
+  const { surface, corona, glow } = useMemo(
     () => ({
-      corona: glowTexture(256, [
-        [0, 'rgba(255,252,244,1)'],
-        [0.08, 'rgba(255,244,222,0.7)'],
-        [0.22, 'rgba(255,214,160,0.16)'],
-        [0.5, 'rgba(255,190,120,0.04)'],
-        [1, 'rgba(255,170,90,0)'],
-      ]),
-      flare: glowTexture(256, [
-        [0, 'rgba(255,240,215,0.9)'],
-        [0.5, 'rgba(255,220,170,0.12)'],
-        [1, 'rgba(255,200,140,0)'],
+      surface: createSunMaterial(low),
+      corona: createCoronaMaterial(low, CORONA_EXTENT),
+      glow: glowTexture(256, [
+        [0, 'rgba(255,110,30,0.3)'],
+        [0.25, 'rgba(255,80,15,0.1)'],
+        [0.55, 'rgba(255,60,10,0.025)'],
+        [1, 'rgba(255,50,10,0)'],
       ]),
     }),
-    [],
+    [low],
   );
-  useDisposeOnUnmount(corona, flare);
+  useDisposeOnUnmount(surface, corona, glow);
+  const fringe = useRef<THREE.Mesh>(null);
+  useFrame(({ clock, camera }) => {
+    const t = clock.elapsedTime;
+    surface.uniforms['uTime']!.value = t;
+    corona.uniforms['uTime']!.value = t;
+    // the fringe faces the camera's position (not its view direction: off-axis the disc and the
+    // flames drifted apart into a crescent)
+    fringe.current?.lookAt(camera.position);
+  });
   return (
     <group position={SUN_POSITION}>
-      <mesh>
-        <sphereGeometry args={[SUN_RADIUS, 32, 16]} />
-        <meshBasicMaterial color={new THREE.Color(9, 7.6, 6)} toneMapped={false} />
+      <mesh material={surface}>
+        <sphereGeometry args={[SUN_RADIUS, low ? 48 : 96, low ? 32 : 64]} />
       </mesh>
-      <sprite scale={[SUN_RADIUS * 11, SUN_RADIUS * 11, 1]}>
+      <mesh ref={fringe} material={corona}>
+        <planeGeometry args={[SUN_RADIUS * CORONA_EXTENT * 2, SUN_RADIUS * CORONA_EXTENT * 2]} />
+      </mesh>
+      <sprite scale={[SUN_RADIUS * 9, SUN_RADIUS * 9, 1]}>
         <spriteMaterial
-          map={corona}
-          color={new THREE.Color(1.7, 1.55, 1.4)}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          toneMapped={false}
-        />
-      </sprite>
-      <sprite scale={[SUN_RADIUS * 40, SUN_RADIUS * 1.6, 1]}>
-        <spriteMaterial
-          map={flare}
-          color={new THREE.Color(1.6, 1.4, 1.2)}
+          map={glow}
           transparent
           depthWrite={false}
           blending={THREE.AdditiveBlending}
@@ -159,13 +229,36 @@ function Sun() {
   );
 }
 
-const PROCEDURAL: Partial<
-  Record<PlanetKind, { colors: [string, string, string]; atmosphere: string; strength: number }>
-> = {
-  venus: { colors: ['#e9d6a8', '#d8bf8c', '#f4e6c4'], atmosphere: '#ffe6b0', strength: 0.9 },
-  uranus: { colors: ['#a6d8dc', '#bfe6e8', '#94ccd2'], atmosphere: '#c4ecff', strength: 0.8 },
-  neptune: { colors: ['#2f5fb3', '#3f78cc', '#264d96'], atmosphere: '#7aa8ff', strength: 0.8 },
+/** Atmosphere rims for the textured planets (colour, strength). */
+const RIMS: Partial<Record<PlanetKind, readonly [string, number]>> = {
+  earth: ['#7fb2ff', 1.1],
+  mars: ['#e6a07a', 0.4],
+  venus: ['#ffe6b0', 0.9],
+  uranus: ['#c4ecff', 0.8],
+  neptune: ['#7aa8ff', 0.8],
 };
+
+/** Where the Sun's disc is on screen (drawing-buffer pixels), written each frame by OrbitFade. */
+const sunOnScreen = {
+  px: { value: new THREE.Vector2(-1e4, -1e4) },
+  r: { value: 0 },
+};
+const sunNdc = new THREE.Vector3();
+
+/** Projects the Sun's centre and radius to the screen for the orbit lines' fade. */
+function OrbitFade() {
+  useFrame(({ camera, gl }) => {
+    const size = gl.getDrawingBufferSize(sunScratch);
+    sunNdc.copy(SUN_POSITION).project(camera);
+    sunOnScreen.px.value.set(((sunNdc.x + 1) / 2) * size.x, ((sunNdc.y + 1) / 2) * size.y);
+    const dist = camera.position.distanceTo(SUN_POSITION);
+    const fov = THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov ?? 45);
+    sunOnScreen.r.value =
+      sunNdc.z < 1 ? (SUN_RADIUS / (dist * Math.tan(fov / 2))) * (size.y / 2) : 0;
+  });
+  return null;
+}
+const sunScratch = new THREE.Vector2();
 
 /** Thin orbit lines round the Sun, one per planet (an orrery's guides, faint and additive). */
 function Orbits() {
@@ -177,6 +270,18 @@ function Orbits() {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
+    // edge-on, every orbit passes in front of the Sun: fade the lines where they cross its disc
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms['uSunPx'] = sunOnScreen.px;
+      shader.uniforms['uSunR'] = sunOnScreen.r;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('void main() {', 'uniform vec2 uSunPx; uniform float uSunR;\nvoid main() {')
+        .replace(
+          '#include <opaque_fragment>',
+          'diffuseColor.a *= smoothstep(uSunR * 1.15, uSunR * 2.2, distance(gl_FragCoord.xy, uSunPx));\n#include <opaque_fragment>',
+        );
+    };
+    material.customProgramCacheKey = () => 'orbits-sun-fade';
     const lines = PLANETS.map((p) => {
       const g = new THREE.BufferGeometry().setFromPoints(orbitPoints(p));
       const line = new THREE.Line(g, material);
@@ -197,15 +302,28 @@ function Orbits() {
 
 export function SolarSystem() {
   const gl = useThree((s) => s.gl);
-  const [earth, mars, jupiter, moon] = useLoader(getKTX2Loader(gl), [
+  const maps = useLoader(getKTX2Loader(gl), [
     TEX.earth,
     TEX.mars,
     TEX.jupiter,
     TEX.moon,
+    TEX.venus,
+    TEX.uranus,
+    TEX.neptune,
   ]);
   useLayoutEffect(() => {
-    for (const t of [earth, mars, jupiter, moon]) if (t) t.colorSpace = THREE.SRGBColorSpace;
-  }, [earth, mars, jupiter, moon]);
+    for (const t of maps) if (t) t.colorSpace = THREE.SRGBColorSpace;
+  }, [maps]);
+  const [earth, mars, jupiter, moon, venus, uranus, neptune] = maps;
+  const mapFor: Partial<Record<PlanetKind, THREE.Texture | undefined>> = {
+    earth,
+    mars,
+    jupiter,
+    mercury: moon,
+    venus,
+    uranus,
+    neptune,
+  };
   const placed = useMemo(() => PLANETS.map((p) => ({ ...p, position: planetPosition(p) })), []);
   const saturnSun = useMemo(() => {
     const s = placed.find((p) => p.kind === 'saturn');
@@ -215,24 +333,8 @@ export function SolarSystem() {
     <group>
       <Sun />
       <Orbits />
+      <OrbitFade />
       {placed.map((p) => {
-        const proc = PROCEDURAL[p.kind];
-        if (proc) {
-          const sun = sunFrom(p.position).toArray() as [number, number, number];
-          return (
-            <Planet
-              key={p.kind}
-              position={p.position.toArray() as [number, number, number]}
-              radius={p.radius}
-              mode="bands"
-              colors={proc.colors}
-              atmosphere={proc.atmosphere}
-              atmosphereStrength={proc.strength}
-              sun={sun}
-              segments={64}
-            />
-          );
-        }
         if (p.kind === 'saturn') {
           return (
             <group key={p.kind} position={p.position} scale={p.radius / SATURN.radius}>
@@ -240,25 +342,23 @@ export function SolarSystem() {
             </group>
           );
         }
-        const map =
-          p.kind === 'earth'
-            ? earth
-            : p.kind === 'mars'
-              ? mars
-              : p.kind === 'jupiter'
-                ? jupiter
-                : moon;
+        const map = mapFor[p.kind];
         if (!map) return null;
+        const [atmosphere, atmosphereStrength] = RIMS[p.kind] ?? ['#000000', 0];
+        const tilt = p.kind === 'uranus' ? URANUS_TILT : undefined;
         return (
-          <TexturedPlanet
-            key={p.kind}
-            map={map}
-            position={p.position}
-            radius={p.radius}
-            tint={p.kind === 'mercury' ? '#cbbba6' : '#ffffff'}
-            atmosphere={p.kind === 'earth' ? '#7fb2ff' : p.kind === 'mars' ? '#e6a07a' : '#000000'}
-            atmosphereStrength={p.kind === 'earth' ? 1.1 : p.kind === 'mars' ? 0.4 : 0}
-          />
+          <group key={p.kind}>
+            <TexturedPlanet
+              map={map}
+              position={p.position}
+              radius={p.radius}
+              tint={p.kind === 'mercury' ? '#cbbba6' : '#ffffff'}
+              atmosphere={atmosphere}
+              atmosphereStrength={atmosphereStrength}
+              rotation={tilt}
+            />
+            {tilt && <UranusRings position={p.position} radius={p.radius} rotation={tilt} />}
+          </group>
         );
       })}
     </group>

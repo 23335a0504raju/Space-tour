@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { textureContext } from '../../engine/assets/canvas2d.ts';
 import * as THREE from 'three';
 import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 
@@ -18,7 +19,7 @@ function canvas(key: string, draw: (g: CanvasRenderingContext2D) => void): HTMLC
   const c = document.createElement('canvas');
   c.width = SIZE;
   c.height = SIZE;
-  const g = c.getContext('2d');
+  const g = textureContext(c);
   if (g) draw(g);
   cache.set(key, c);
   return c;

@@ -10,7 +10,7 @@ import { HOLE_AHEAD, saturnShip, saturnShot } from './saturn/saturn.ts';
 import { GATE, crossingShot, shipZ as crossingZ } from './crossing/crossing.ts';
 import type { Vec3 } from './handoff.ts';
 import { departureShot } from './greybox/departure.ts';
-import { ORDER, areaShot, markScale, skyMix } from './anime/anime.ts';
+import { ORDER, areaShot, cloudSea, presence, skyMix } from './anime/anime.ts';
 import { returnShot, shipZ as returnZ } from './return/return.ts';
 import { HANDOFF, homecomingShot } from './homecoming/homecoming.ts';
 import { LIFT } from './room/layout.ts';
@@ -53,9 +53,11 @@ describe('continuous flight between chapters (handoff.ts)', () => {
       expect(m1.a).toBe(m2.a);
       expect(m1.b).toBe(m2.b);
       expect(m1.k).toBeCloseTo(m2.k, 9);
-      // worlds shrink away and grow in: nothing pops
-      expect(markScale(a, 1)).toBe(0);
-      expect(markScale(b, 0)).toBe(0);
+      // worlds sink away below the cloud sea and rise out of it: nothing pops
+      expect(presence(1)).toBe(0);
+      expect(presence(0)).toBe(0);
+      expect(cloudSea(a, 1)).toBe(1);
+      expect(cloudSea(b, 0)).toBe(1);
     }
   });
 

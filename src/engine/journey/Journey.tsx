@@ -1,4 +1,12 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { RefObject } from 'react';
 import gsap from 'gsap';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -33,7 +41,11 @@ import { ScrollTrack } from '../scroll/ScrollTrack.tsx';
 import { usePacedWheel } from '../scroll/usePacedWheel.ts';
 import { useScrollMaster } from '../scroll/useScrollMaster.ts';
 import { preloadJourney } from '../assets/preload.ts';
-import { compileChapter } from '../assets/warm.ts';
+import { compileChapter, POST_OUTPUT, SCREEN_OUTPUT } from '../assets/warm.ts';
+import { prepaintCards } from '../../ui/prepaint.ts';
+import { uploadGeometry } from '../assets/uploadGeometry.ts';
+import type { Output } from '../assets/warm.ts';
+import { getEnvironment } from '../environment.ts';
 import { useJourneyStore } from '../store.ts';
 import styles from './Journey.module.css';
 
@@ -111,6 +123,9 @@ function StyleSync({
   return null;
 }
 
+const BALANCED_OUTPUTS: readonly Output[] = [POST_OUTPUT];
+const TOGGLING_OUTPUTS: readonly Output[] = [SCREEN_OUTPUT, POST_OUTPUT];
+
 function ToneMappingOwner({ composer }: { composer: boolean }) {
   const gl = useThree((s) => s.gl);
   useEffect(() => {
@@ -127,12 +142,13 @@ function ToneMappingOwner({ composer }: { composer: boolean }) {
 function FirstFrame({
   when,
   links,
-  drawTarget,
+  outputs,
   onReady,
 }: {
   when: boolean;
   links: DirectorLinks;
-  drawTarget: () => THREE.WebGLRenderTarget | null;
+  /** Where the scene may be drawn (see ChapterSlot); the composer may not exist yet. */
+  outputs: readonly Output[];
   onReady: () => void;
 }) {
   const { gl, camera, scene } = useThree();
@@ -142,25 +158,60 @@ function FirstFrame({
     const done = () => live && onReady();
     // a slow driver must not keep the scene hidden: draw anyway after a while
     const giveUp = window.setTimeout(done, 4000);
-    // as the Director will show it: only the active chapter visible
+    // as the Director will show it: only the active chapter visible, with its environment (the
+    // environment is part of every lit program's key; compiling without it warmed variants the
+    // first frame never used, and that frame then linked the room's shaders again: 0.9 s)
     const active = chapters[useJourneyStore.getState().activeIndex]?.id;
     const saved = new Map<THREE.Group, boolean>();
     for (const [id, g] of links.groups) {
       saved.set(g, g.visible);
       g.visible = id === active;
     }
+    const environment = scene.environment;
+    scene.environment = getEnvironment(
+      active ? implementations[active]?.environment?.key : undefined,
+    );
     const previous = gl.getRenderTarget();
-    gl.setRenderTarget(drawTarget());
-    const pending = gl.compileAsync(scene, camera);
-    gl.setRenderTarget(previous);
-    for (const [g, v] of saved) g.visible = v;
-    void pending.catch(() => undefined).then(done);
+    const toneMapping = gl.toneMapping;
+    const pending: Promise<unknown>[] = [];
+    try {
+      for (const output of outputs) {
+        gl.setRenderTarget(output.target);
+        gl.toneMapping = output.toneMapping;
+        pending.push(gl.compileAsync(scene, camera).catch(() => undefined));
+      }
+    } finally {
+      gl.toneMapping = toneMapping;
+      gl.setRenderTarget(previous);
+      scene.environment = environment;
+      for (const [g, v] of saved) g.visible = v;
+    }
+    void Promise.all(pending).then(done);
     return () => {
       live = false;
       window.clearTimeout(giveUp);
     };
-  }, [when, gl, camera, scene, links, drawTarget, onReady]);
+  }, [when, gl, camera, scene, links, outputs, onReady]);
   return null;
+}
+
+/**
+ * A cheap fingerprint of everything a chapter draws: each drawable's material ids and versions
+ * (three bumps `version` on `needsUpdate`). It changes when a model streams in or a material is
+ * replaced or recompiled, which is exactly when the chapter needs compiling again.
+ */
+function materialSignature(root: THREE.Object3D): string {
+  let n = 0;
+  let h = 0;
+  root.traverse((o) => {
+    const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+    if (!m) return;
+    for (const mat of Array.isArray(m) ? m : [m]) {
+      n += 1;
+      h = (Math.imul(h, 31) + mat.id * 1009 + mat.version) | 0;
+    }
+  });
+  return `${n}:${h}`;
 }
 
 /** Runs `onCommit` once its Suspense boundary has committed (the scene's content exists). */
@@ -179,19 +230,22 @@ function ChapterSlot({
   id,
   frame,
   links,
-  drawTarget,
+  outputs,
 }: {
   id: string;
   frame: JourneyFrame;
   links: DirectorLinks;
-  /** Where the scene is really drawn (the post chain's input buffer), so shaders compile for it. */
-  drawTarget: () => THREE.WebGLRenderTarget | null;
+  /** Every output the scene may be drawn to while mounted, so shaders compile for each. */
+  outputs: readonly Output[];
 }) {
   const ref = useRef<THREE.Group>(null);
-  const { gl, camera, scene } = useThree();
+  const { gl, camera } = useThree();
   const impl = implementations[id];
 
-  useEffect(() => {
+  // A layout effect, and the group starts hidden: a chapter mounting at a boundary used to stay
+  // visible (unregistered) for one frame, so two chapters' lights were on together and every lit
+  // material of the entering chapter linked a two-rig variant (the entry freezes of SC08, SC11).
+  useLayoutEffect(() => {
     const group = ref.current;
     if (!group) return;
     links.groups.set(id, group);
@@ -205,20 +259,51 @@ function ChapterSlot({
     const group = ref.current;
     if (!group) return;
     let live = true;
+    let busy = false;
+    let compiled = '';
+    const run = () => {
+      if (!live || busy) return;
+      // only while hidden: on screen, the chapter's own frames compile whatever is left
+      if (frame.id === id) return;
+      // this chapter's own environment (registered when it loads; part of the program key)
+      const environment = getEnvironment(impl?.environment?.key);
+      const signature = () => `${materialSignature(group)}|${environment?.uuid ?? ''}`;
+      if (signature() === compiled) return;
+      busy = true;
+      // user-timing marks: scripts/measure-freezes.ts --why lines hitches up with warm-ups
+      performance.mark(`warm:${id}:start`);
+      const pending = compileChapter(gl, camera, group, environment, outputs);
+      // Read after the compile's synchronous part: compiling a transparent double-sided material
+      // sets needsUpdate (three compiles each side), which bumps its version. Read before, the
+      // signature never matched again and SC11c and SC13 recompiled every 500 ms while warm.
+      compiled = signature();
+      void pending
+        .then(() => {
+          // its vertex buffers too, while still hidden (src/engine/assets/uploadGeometry.ts)
+          if (live && frame.id !== id) uploadGeometry(gl, camera, group);
+        })
+        .finally(() => {
+          performance.mark(`warm:${id}:end`);
+          busy = false;
+        });
+    };
     // a frame later: the scene's own effects (materials made in effects) have run
-    requestAnimationFrame(() => {
-      if (!live) return;
-      void compileChapter(gl, camera, scene, group, links.groups, drawTarget());
-    });
+    requestAnimationFrame(run);
+    // Content that arrives later (models behind nested Suspense boundaries, materials patched after
+    // mount) used to compile on the chapter's first visible frame: 1–2 s freezes on entry
+    // (scripts/measure-freezes.ts --why). While the chapter stays hidden in the warm window, compile
+    // again whenever its set of materials changes. Unchanged: no GL work at all.
+    const timer = window.setInterval(run, 500);
     return () => {
       live = false;
+      window.clearInterval(timer);
     };
-  }, [gl, camera, scene, links, drawTarget]);
+  }, [gl, camera, outputs, frame, id, impl]);
 
   if (!impl) return null;
   const { Scene } = impl;
   return (
-    <group ref={ref}>
+    <group ref={ref} visible={false}>
       {/* Per-chapter boundary: a chapter streaming in assets never blanks the others. */}
       <Suspense fallback={null}>
         <Scene id={id} frame={frame} />
@@ -229,8 +314,14 @@ function ChapterSlot({
 }
 
 function OverlayLayer({ links }: { links: DirectorLinks }) {
+  const layer = useRef<HTMLDivElement>(null);
+  // first paint of every card at load, not mid-scroll (src/ui/prepaint.ts)
+  useEffect(() => {
+    if (!layer.current) return;
+    return prepaintCards(layer.current, overlayStyles.prepaint ?? 'prepaint');
+  }, []);
   return (
-    <div className={overlayStyles.layer}>
+    <div ref={layer} className={overlayStyles.layer}>
       {overlayDefs.map((def) => (
         <section
           key={def.key}
@@ -426,12 +517,13 @@ function JourneyCanvas() {
   const assetsReady = useJourneyStore((s) => s.assetsReady);
   const setAssetsReady = useJourneyStore((s) => s.setAssetsReady);
 
-  // Download every journey asset before any chapter mounts (the start gate shows the progress).
+  // Download the first scenes' files before any chapter mounts (the start gate shows the progress);
+  // the rest keep downloading in the background, in journey order, well ahead of the visitor.
   useEffect(() => {
-    const { finished, unsubscribe } = preloadJourney();
+    const { critical, unsubscribe } = preloadJourney();
     let live = true;
     const giveUp = window.setTimeout(setAssetsReady, PRELOAD_GIVE_UP_MS);
-    void finished.then(() => live && setAssetsReady());
+    void critical.then(() => live && setAssetsReady());
     return () => {
       live = false;
       window.clearTimeout(giveUp);
@@ -441,7 +533,6 @@ function JourneyCanvas() {
   usePacedWheel(!prefersReducedMotion() && entered);
 
   const composerRef = useRef<EffectComposerImpl>(null);
-  const drawTarget = useCallback(() => composerRef.current?.inputBuffer ?? null, []);
   const tier = useJourneyStore((s) => s.tier);
   const webgl = useJourneyStore((s) => s.webgl);
   const activeIndex = useJourneyStore((s) => s.activeIndex);
@@ -563,6 +654,10 @@ function JourneyCanvas() {
   // Low tier has no post chain; it gets a minimal one only while art-style chapters are near.
   const lowStyle = tier !== 'balanced' && mounted.some((c) => c.act === 'beyond');
   const composer = tier === 'balanced' || lowStyle;
+  // Off Balanced the post chain comes and goes with the warm window, and every mounted chapter
+  // switches between the two program variants when it does (Low: 458 ms at SC09 as SC10 came near).
+  // Warm both, so whichever is live when a chapter shows is already linked.
+  const outputs = tier === 'balanced' ? BALANCED_OUTPUTS : TOGGLING_OUTPUTS;
 
   return (
     <>
@@ -591,11 +686,11 @@ function JourneyCanvas() {
           <FirstFrame
             when={(sceneShown || entered) && assetsReady}
             links={links}
-            drawTarget={drawTarget}
+            outputs={outputs}
             onReady={onFirstFrameReady}
           />
           {mounted.map((c) => (
-            <ChapterSlot key={c.id} id={c.id} frame={frame} links={links} drawTarget={drawTarget} />
+            <ChapterSlot key={c.id} id={c.id} frame={frame} links={links} outputs={outputs} />
           ))}
           {tier === 'balanced' && (
             <EffectComposer ref={composerRef} multisampling={0}>

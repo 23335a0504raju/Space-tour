@@ -9,16 +9,20 @@ interface Props {
   /** Heading level for the name, so the panel fits the host page's outline. */
   readonly headingLevel?: 2 | 3;
   readonly id?: string;
+  /** The SC13 card: the name as a large two-line title (first name, then last name fading out). */
+  readonly display?: boolean;
 }
 
 /**
  * The one contact component used by the journey's contact overlay, the SC13 ending
  * and the Mission Brief (CONTACT_EXPERIENCE.md §2), so they can never disagree.
  */
-export function ContactPanel({ headingLevel = 2, id }: Props) {
+export function ContactPanel({ headingLevel = 2, id, display = false }: Props) {
   const [copied, setCopied] = useState(false);
   const Heading = headingLevel === 2 ? 'h2' : 'h3';
   const email = contact.email.value;
+  const [first = '', ...rest] = identity.name.value.split(' ');
+  const last = rest.join(' ');
 
   const copyEmail = async () => {
     try {
@@ -31,11 +35,26 @@ export function ContactPanel({ headingLevel = 2, id }: Props) {
   };
 
   return (
-    <section className={styles.panel} aria-labelledby={id ? `${id}-title` : undefined}>
+    <section
+      className={display ? `${styles.panel} ${styles.cardMode}` : styles.panel}
+      aria-labelledby={id ? `${id}-title` : undefined}
+    >
       <p className={styles.kicker}>Open channel</p>
-      <Heading id={id ? `${id}-title` : undefined} className={styles.name}>
-        <FactText fact={identity.name} />
-      </Heading>
+      {display ? (
+        <Heading id={id ? `${id}-title` : undefined} className={styles.display}>
+          <FactText fact={identity.name}>
+            <span className={styles.first}>{first}</span>{' '}
+            <span className={styles.last}>
+              {last}
+              <span aria-hidden="true">.</span>
+            </span>
+          </FactText>
+        </Heading>
+      ) : (
+        <Heading id={id ? `${id}-title` : undefined} className={styles.name}>
+          <FactText fact={identity.name} />
+        </Heading>
+      )}
       <p className={styles.role}>
         <FactText fact={identity.role} />
       </p>
