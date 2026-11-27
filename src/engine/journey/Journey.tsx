@@ -692,6 +692,9 @@ function JourneyCanvas() {
           // Balanced anti-aliases in post (SMAA); MSAA on the canvas would be wasted there.
           gl={{ antialias: false, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {
+            // each program's first use asked the driver for its logs, a blocking round trip of up
+            // to 60 ms mid-scroll; the checks only help while developing
+            gl.debug.checkShaderErrors = import.meta.env.DEV;
             const el = gl.domElement;
             el.addEventListener('webglcontextlost', (e) => {
               e.preventDefault();

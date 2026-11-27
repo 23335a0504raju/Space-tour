@@ -24,7 +24,8 @@ export const chapters: readonly ChapterMeta[] = [
     act: 'origin',
     artStyle: 'realistic',
     screens: 1.6,
-    restPoints: [0.35],
+    // no pause: no card here, and time slowing to a quarter read as stuck mid stand-up
+    restPoints: [],
   },
   {
     id: 'sc04-crew-record',

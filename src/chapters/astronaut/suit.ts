@@ -147,7 +147,30 @@ interface Probe {
   readonly normal: THREE.Vector3;
 }
 
+/**
+ * Probe results per body geometry. Every clone stands in the same bind pose, so the answers never
+ * change, and finding them costs about 90 ms of raycasting against the skinned mesh: each chapter
+ * that mounted an astronaut (SC02, SC03, SC04) froze the stand-up for that long.
+ */
+const probed = new WeakMap<THREE.BufferGeometry, Map<string, Probe>>();
+
 function probe(
+  surface: THREE.SkinnedMesh,
+  from: THREE.Vector3,
+  dir: THREE.Vector3,
+  fallback: Probe,
+): Probe {
+  let known = probed.get(surface.geometry);
+  if (!known) probed.set(surface.geometry, (known = new Map()));
+  const key = [from, dir].map((p) => p.toArray().map((n) => n.toFixed(4))).join(';');
+  const cached = known.get(key);
+  if (cached) return cached;
+  const result = cast(surface, from, dir, fallback);
+  known.set(key, result);
+  return result;
+}
+
+function cast(
   surface: THREE.SkinnedMesh,
   from: THREE.Vector3,
   dir: THREE.Vector3,

@@ -99,6 +99,69 @@ for (const node of root.listNodes()) {
 }
 console.log(`removed ${removed} triangles (the crew seats beside the desk and on the walk)`);
 
+// ── 1c. the loose parts those cuts left behind ─────────────────────────────
+// Casters and an armrest fell outside the boxes and hung round the astronaut's legs during the
+// stand-up (Raju's review, 2026-11-27). Any separate piece lying wholly within reach of a removed
+// seat goes with it; the deck and the consoles are large connected pieces that reach beyond.
+const REACH = 0.35;
+let scraps = 0;
+for (const node of root.listNodes()) {
+  const mesh = node.getMesh();
+  if (!mesh || !node.getName().startsWith('1_')) continue;
+  const m = node.getWorldMatrix() as unknown as number[];
+  for (const prim of mesh.listPrimitives()) {
+    const pos = prim.getAttribute('POSITION');
+    const idx = prim.getIndices();
+    if (!pos || !idx) continue;
+    const points = Array.from({ length: pos.getCount() }, (_, i) => {
+      const [x = 0, y = 0, z = 0] = pos.getElement(i, []) as number[];
+      return [0, 1, 2].map(
+        (r) => (m[r] ?? 0) * x + (m[4 + r] ?? 0) * y + (m[8 + r] ?? 0) * z + (m[12 + r] ?? 0),
+      );
+    });
+    // connected pieces, welding corners that share a position
+    const count = idx.getCount() / 3;
+    const parent = Array.from({ length: count }, (_, i) => i);
+    const find = (i: number): number =>
+      parent[i] === i ? i : (parent[i] = find(parent[i] as number));
+    const first = new Map<string, number>();
+    for (let t = 0; t < count; t += 1)
+      for (let k = 0; k < 3; k += 1) {
+        const key = points[idx.getScalar(t * 3 + k)]!.map((n) => n.toFixed(3)).join(',');
+        const other = first.get(key);
+        if (other === undefined) first.set(key, t);
+        else parent[find(t)] = find(other);
+      }
+    const outside = new Map<number, boolean[]>();
+    for (let t = 0; t < count; t += 1) {
+      const piece = find(t);
+      let out = outside.get(piece);
+      if (!out) outside.set(piece, (out = REMOVE_BOXES.map(() => false)));
+      for (let k = 0; k < 3; k += 1) {
+        const [x = 0, y = 0, z = 0] = points[idx.getScalar(t * 3 + k)]!;
+        REMOVE_BOXES.forEach((b, i) => {
+          const inside =
+            x > b.minX - REACH &&
+            x < b.maxX + REACH &&
+            y > b.minY - 0.15 &&
+            y < b.maxY &&
+            z > b.minZ - REACH &&
+            z < b.maxZ + REACH;
+          if (!inside) out![i] = true;
+        });
+      }
+    }
+    const keep: number[] = [];
+    for (let t = 0; t < count; t += 1) {
+      if (outside.get(find(t))!.every(Boolean))
+        keep.push(idx.getScalar(t * 3), idx.getScalar(t * 3 + 1), idx.getScalar(t * 3 + 2));
+      else scraps += 1;
+    }
+    idx.setArray(new Uint32Array(keep));
+  }
+}
+console.log(`removed ${scraps} triangles of loose seat parts`);
+
 // ── 3. deck height: area-weighted histogram of upward-facing triangles (world space) ──
 function worldMatrix(n: GltfNode): number[] {
   return n.getWorldMatrix() as unknown as number[];
