@@ -25,6 +25,7 @@ import {
 } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
+import { Matrix4, Quaternion, Vector3 } from 'three';
 
 const ROOT = join(import.meta.dirname, '..');
 const OUT = join(ROOT, 'public', 'assets', 'models');
@@ -39,6 +40,11 @@ interface Job {
   readonly tris?: number;
   /** longest texture side */
   readonly tex: number;
+  /**
+   * UASTC instead of ETC1S: for tiny swatch textures, where ETC1S's shared colour codebook blends
+   * neighbouring swatches (a green ground came out straw)
+   */
+  readonly uastc?: boolean;
   /** skinned: never join or palette (the skeleton must stay intact) */
   readonly skinned?: boolean;
   /** flat-colour materials merged into one palette texture */
@@ -65,20 +71,68 @@ interface Job {
   readonly recolor?: Readonly<Record<string, string>>;
   /** raise coplanar decal layers (a road painted on the terrain) by `dy` world units */
   readonly lift?: { readonly material: RegExp; readonly dy: number };
+  /** swatch textures: exact sRGB hex → replacement hex (a pastel palette repainted) */
+  readonly swatches?: Readonly<Record<string, string>>;
+  /** richer, brighter base-colour textures (photo-flat exports read grey under tone mapping) */
+  readonly boost?: { readonly saturation: number; readonly brightness: number };
+  /** rigged in an A-pose: swing the upper arms down by this many degrees to a standing pose */
+  readonly relaxArms?: number;
+  /** static T-pose mesh: bend the arms down by `degrees` about the shoulders (source metres) */
+  readonly bendArms?: {
+    readonly degrees: number;
+    readonly shoulderX: number;
+    readonly shoulderY: number;
+  };
 }
 
+/**
+ * The farm's pastel swatches, repainted as an anime farm: green grass, red barn, warm timber.
+ */
+const FARM_SWATCHES: Readonly<Record<string, string>> = {
+  '#f9e79f': '#dcbc82',
+  // the ground plate
+  '#ffd54f': '#7fb25a',
+  '#e59866': '#c98a4e',
+  '#9e9d24': '#3f8038',
+  '#afb42b': '#4f9440',
+  '#c0ca33': '#62a844',
+  '#d4e157': '#86c250',
+  '#827717': '#33682e',
+  '#ef9a9a': '#c9463c',
+  '#ffcdd2': '#d9695a',
+  '#ec7063': '#c23f34',
+  '#cd6155': '#a5342c',
+  '#795548': '#664539',
+  '#8d6e63': '#7a5750',
+  '#5d4037': '#46302a',
+  '#6d4c41': '#573b32',
+};
+
 const JOBS: readonly Job[] = [
-  // Naruto world (SC11a)
+  // Naruto world (SC11a): the whole Hidden Leaf village the ship flies over (one atlas, one draw)
   {
-    zip: 'Naruto/scene.gltf',
-    out: 'anime_naruto.glb',
-    tris: 14000,
-    tex: 512,
-    smooth: true,
+    zip: 'Naruto/naruto_hiddenly_village.zip',
+    out: 'anime_village.glb',
+    tex: 2048,
+    boost: { saturation: 1.35, brightness: 1.12 },
   },
-  { zip: 'Naruto/ichiraku_ramen_naruto.zip', out: 'anime_ichiraku.glb', tris: 7000, tex: 512 },
+  // its people: Free Fire character rigs, posed from their A-pose
+  ...(['itachi', 'jiraiya_free_fire_skin', 'obito', 'pain'] as const).map((name): Job => ({
+    zip: `Naruto/${name}${name === 'jiraiya_free_fire_skin' ? '' : '_free_fire'}_original_rig.zip`,
+    out: `anime_${name.replace('_free_fire_skin', '')}.glb`,
+    tex: 512,
+    skinned: true,
+    relaxArms: 28,
+  })),
+  {
+    zip: 'Naruto/naruto_sage.zip',
+    out: 'anime_sage.glb',
+    tex: 512,
+    bendArms: { degrees: 68, shoulderX: 0.17, shoulderY: 1.36 },
+  },
   // Death Note world (SC11b)
-  { zip: 'deathnote/death_note.zip', out: 'anime_deathnote.glb', tex: 256 },
+  // a 3 m prop on the sand: a few hundred triangles are plenty
+  { zip: 'deathnote/death_note.zip', out: 'anime_deathnote.glb', tex: 256, tris: 1200 },
   {
     zip: 'deathnote/ryuk_from_death_note.zip',
     out: 'anime_ryuk.glb',
@@ -86,20 +140,31 @@ const JOBS: readonly Job[] = [
     tex: 512,
     skinned: true,
   },
-  {
+  // Kinnaird House closes the town's vista; the lower tier gets a lighter copy
+  ...([22000, 6000] as const).map((tris): Job => ({
     zip: 'deathnote/free_london_kinnaird_house.zip',
-    out: 'anime_kinnaird.glb',
-    tris: 22000,
-    tex: 1024,
+    out: tris < 10000 ? 'anime_kinnaird_lo.glb' : 'anime_kinnaird.glb',
+    tris,
+    tex: tris < 10000 ? 512 : 1024,
     smooth: true,
-  },
+    // hundreds of loose parts: edge collapse alone cannot get it down
+    pruneSmall: tris < 10000,
+  })),
   // Demon Slayer world (SC11c)
+  {
+    zip: 'demonslayer/inosuke_free_fire_original_rig.zip',
+    out: 'anime_inosuke.glb',
+    tex: 512,
+    skinned: true,
+    relaxArms: 28,
+  },
   {
     zip: 'demonslayer/tanjiro_kamado_from_demon_slayer_-_fully_rigged.zip',
     out: 'anime_tanjiro.glb',
     tris: 16000,
     tex: 512,
     skinned: true,
+    relaxArms: 66,
   },
   {
     zip: 'demonslayer/nezuko_kamado-demon_slayer.zip',
@@ -112,14 +177,18 @@ const JOBS: readonly Job[] = [
     smooth: true,
   },
   { zip: 'demonslayer/blossom_katana.zip', out: 'anime_katana.glb', tris: 5000, tex: 512 },
-  {
+  // the farm tiles: every triangle on Balanced (simplifying them ate the pine crowns, the barn
+  // roof's ridges and the windmill's blades); a simplified copy for the lower tier
+  ...([undefined, 20000] as const).map((tris): Job => ({
     zip: 'demonslayer/low_poly_farm_v2.zip',
-    out: 'anime_farm.glb',
-    tris: 20000,
+    out: tris ? 'anime_farm_lo.glb' : 'anime_farm.glb',
+    swatches: FARM_SWATCHES,
+    uastc: true,
+    ...(tris ? { tris } : {}),
     tex: 1024,
     palette: true,
     smooth: true,
-  },
+  })),
   // Death Note world (SC11b): the town the ship flies through, and its outskirts
   {
     zip: 'deathnote/west_street.zip',
@@ -283,6 +352,112 @@ function pruneSimplify(doc: Awaited<ReturnType<typeof io.read>>, target: number)
   }
 }
 
+/** Replace exact swatch colours in every base-colour texture. */
+async function repaintSwatches(
+  doc: Awaited<ReturnType<typeof io.read>>,
+  swatches: NonNullable<Job['swatches']>,
+): Promise<void> {
+  const rgb = (hex: string) => parseInt(hex.slice(1), 16);
+  const to = new Map(Object.entries(swatches).map(([a, b]) => [rgb(a), rgb(b)]));
+  const used = new Set<number>();
+  for (const tex of doc.getRoot().listTextures()) {
+    const image = tex.getImage();
+    if (!image) continue;
+    const { data, info } = await sharp(Buffer.from(image))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    for (let i = 0; i < data.length; i += info.channels) {
+      const from = (data[i]! << 16) | (data[i + 1]! << 8) | data[i + 2]!;
+      const next = to.get(from);
+      if (next === undefined) continue;
+      used.add(from);
+      data[i] = next >> 16;
+      data[i + 1] = (next >> 8) & 255;
+      data[i + 2] = next & 255;
+    }
+    const out = await sharp(data, { raw: info }).png().toBuffer();
+    tex.setImage(new Uint8Array(out)).setMimeType('image/png');
+  }
+  if (used.size !== to.size)
+    throw new Error(`swatches: found ${used.size} of ${to.size} colours in the textures`);
+}
+
+/** Saturate and brighten every base-colour texture. */
+async function boostTextures(
+  doc: Awaited<ReturnType<typeof io.read>>,
+  boost: NonNullable<Job['boost']>,
+): Promise<void> {
+  for (const tex of doc.getRoot().listTextures()) {
+    const image = tex.getImage();
+    if (!image) continue;
+    const out = await sharp(Buffer.from(image)).modulate(boost).png().toBuffer();
+    tex.setImage(new Uint8Array(out)).setMimeType('image/png');
+  }
+}
+
+/**
+ * Swing both upper arms down: a turn about the world's front axis at each shoulder joint. Only the
+ * joint's rest rotation changes (the bind matrices stay), so the skin follows.
+ */
+function relaxArms(doc: Awaited<ReturnType<typeof io.read>>, degrees: number): void {
+  let turned = 0;
+  for (const node of doc.getRoot().listNodes()) {
+    // the two rig families here: Free Fire's bone_LeftArm_05, Tanjiro's L_UpperArm_1_327
+    const found = /^(?:bone_(Left|Right)Arm_|([LR])_UpperArm_1_)/.exec(node.getName());
+    const side = found?.[1] ?? found?.[2];
+    const parent = node.getParentNode();
+    if (!side || !parent) continue;
+    const half = (((side.startsWith('L') ? -1 : 1) * degrees * Math.PI) / 180) * 0.5;
+    const turn = new Quaternion(0, 0, Math.sin(half), Math.cos(half));
+    // local' = parent⁻¹ · turn · parent · local (the parent chain is uniformly scaled)
+    const p = new Quaternion().setFromRotationMatrix(
+      new Matrix4().extractRotation(new Matrix4().fromArray(parent.getWorldMatrix())),
+    );
+    const local = new Quaternion().fromArray(node.getRotation());
+    const next = p.clone().invert().multiply(turn).multiply(p).multiply(local).normalize();
+    node.setRotation([next.x, next.y, next.z, next.w]);
+    turned += 1;
+  }
+  if (turned !== 2) throw new Error(`relaxArms: turned ${turned} arm joints, expected 2`);
+}
+
+/** Bend a static T-pose mesh's arms down about the shoulders, easing in across the shoulder. */
+function bendArms(
+  doc: Awaited<ReturnType<typeof io.read>>,
+  bend: NonNullable<Job['bendArms']>,
+): void {
+  const seen = new Set<unknown>();
+  for (const node of doc.getRoot().listNodes()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const world = new Matrix4().fromArray(node.getWorldMatrix());
+    const back = world.clone().invert();
+    for (const prim of mesh.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      if (!pos || seen.has(pos)) continue;
+      seen.add(pos);
+      const p = new Vector3();
+      const v = [0, 0, 0];
+      for (let i = 0; i < pos.getCount(); i += 1) {
+        pos.getElement(i, v);
+        p.fromArray(v).applyMatrix4(world);
+        const side = Math.sign(p.x);
+        const out = Math.abs(p.x) - bend.shoulderX;
+        // arms only: beyond the shoulder, at shoulder height
+        if (out < -0.03 || Math.abs(p.y - bend.shoulderY) > 0.2) continue;
+        const k = Math.min(1, Math.max(0, (out + 0.03) / 0.12));
+        const a = (-side * bend.degrees * Math.PI * k * k * (3 - 2 * k)) / 180;
+        const x = p.x - side * bend.shoulderX;
+        const y = p.y - bend.shoulderY;
+        p.x = side * bend.shoulderX + x * Math.cos(a) - y * Math.sin(a);
+        p.y = bend.shoulderY + x * Math.sin(a) + y * Math.cos(a);
+        p.applyMatrix4(back);
+        pos.setElement(i, p.toArray());
+      }
+    }
+  }
+}
+
 /** Keep only base-colour maps (the cel pass ignores the rest). */
 function baseColourOnly(doc: Awaited<ReturnType<typeof io.read>>): void {
   for (const mat of doc.getRoot().listMaterials()) {
@@ -328,6 +503,10 @@ for (const job of JOBS) {
       loose ? join(ROOT, 'raw-assets', job.zip) : join(scratch, 'scene.gltf'),
     );
     const before = tris(doc);
+    if (job.relaxArms) relaxArms(doc, job.relaxArms);
+    if (job.bendArms) bendArms(doc, job.bendArms);
+    if (job.swatches) await repaintSwatches(doc, job.swatches);
+    if (job.boost) await boostTextures(doc, job.boost);
     if (job.clean) cleanPrimitives(doc);
     if (job.lift) liftLayer(doc, job.lift);
     if (job.baseOnly) baseColourOnly(doc);
@@ -366,7 +545,7 @@ for (const job of JOBS) {
     if (process.argv.includes('--review'))
       await io.write(join(ROOT, 'raw-assets', '_work', job.out), doc);
     run(GLTF, ['resize', t1, t2, '--width', String(job.tex), '--height', String(job.tex)]);
-    run(GLTF, ['etc1s', t2, t1, '--quality', '150']);
+    run(GLTF, job.uastc ? ['uastc', t2, t1] : ['etc1s', t2, t1, '--quality', '150']);
     const file = join(OUT, job.out);
     run(GLTF, ['meshopt', t1, file]);
     const sha = createHash('sha256').update(readFileSync(file)).digest('hex').slice(0, 16);

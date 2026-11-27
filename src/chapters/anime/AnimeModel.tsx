@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -7,26 +7,34 @@ import { gltfExtender } from '../../engine/assets/loaders.ts';
 import type { JourneyFrame } from '../contract.ts';
 import { hazed } from './haze.ts';
 import type { Haze } from './haze.ts';
-import { painted } from './painted.ts';
+import { painted, paintedAtlas } from './painted.ts';
 import type { Paint } from './painted.ts';
 
 /**
  * One anime-world model (SC11), fitted by measurement: the Sketchfab exports come in every scale
  * and unit (a character 0.02 or 130 units tall), so each is measured after skinning and scaled so
  * its height (or longest side) is `size` metres, centred, with its feet on y = 0 of the group.
+ * Everything stands on the ground: nothing hovers or spins (Raju, 2026-11-27).
  * Skinned models are cloned with SkeletonUtils (neighbouring chapters mount at the same time).
- * Ambient motion only (the looping pose clips, a slow spin, a bob): never story state.
+ * Ambient motion only (looping pose clips): never story state.
  */
 export const ANIME_MODELS = {
-  naruto: '/assets/models/anime_naruto.glb',
-  ichiraku: '/assets/models/anime_ichiraku.glb',
+  village: '/assets/models/anime_village.glb',
+  sage: '/assets/models/anime_sage.glb',
+  itachi: '/assets/models/anime_itachi.glb',
+  jiraiya: '/assets/models/anime_jiraiya.glb',
+  pain: '/assets/models/anime_pain.glb',
+  obito: '/assets/models/anime_obito.glb',
+  inosuke: '/assets/models/anime_inosuke.glb',
   deathNote: '/assets/models/anime_deathnote.glb',
   ryuk: '/assets/models/anime_ryuk.glb',
   kinnaird: '/assets/models/anime_kinnaird.glb',
+  kinnairdLow: '/assets/models/anime_kinnaird_lo.glb',
   tanjiro: '/assets/models/anime_tanjiro.glb',
   nezuko: '/assets/models/anime_nezuko.glb',
   katana: '/assets/models/anime_katana.glb',
   farm: '/assets/models/anime_farm.glb',
+  farmLow: '/assets/models/anime_farm_lo.glb',
   town: '/assets/models/anime_town.glb',
   rural: '/assets/models/anime_rural.glb',
 } as const;
@@ -41,15 +49,14 @@ interface Props {
   readonly fit?: 'height' | 'max' | 'none';
   readonly position: readonly [number, number, number];
   readonly rotationY?: number;
-  /** slow spin about the vertical (rad/s) and a gentle bob (m) */
-  readonly spin?: number;
-  readonly bob?: number;
   /** play the model's `Anim_*` clips on a loop */
   readonly animate?: boolean;
   /** fade into this world's horizon (haze.ts) */
   readonly haze?: Haze;
   /** paint it (painted.ts) in place of the chapter's lighting; needs `haze` */
   readonly paint?: Paint;
+  /** how it is painted: the town's boards and dirt, or the model's own colours (default boards) */
+  readonly finish?: 'boards' | 'own';
   /** static props: let three cull them (skinned models stay unculled: their bounds lie) */
   readonly cull?: boolean;
   readonly id: string;
@@ -66,11 +73,10 @@ export function AnimeModel({
   fit = 'height',
   position,
   rotationY = 0,
-  spin = 0,
-  bob = 0,
   animate = false,
   haze,
   paint,
+  finish = 'boards',
   cull = false,
   id,
   frame,
@@ -86,7 +92,8 @@ export function AnimeModel({
       if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
       mesh.frustumCulled = cull && !(mesh as THREE.SkinnedMesh).isSkinnedMesh;
       if (haze) {
-        const skin = (m: THREE.Material) => (paint ? painted(m, haze, paint) : hazed(m, haze));
+        const brush = finish === 'own' ? paintedAtlas : painted;
+        const skin = (m: THREE.Material) => (paint ? brush(m, haze, paint) : hazed(m, haze));
         mesh.material = Array.isArray(mesh.material)
           ? mesh.material.map(skin)
           : skin(mesh.material);
@@ -117,7 +124,7 @@ export function AnimeModel({
     root.scale.multiplyScalar(scale);
     const clips = gltf.animations.filter((a) => a.name.includes('Anim_'));
     return { holder, root, clips };
-  }, [gltf, size, fit, haze, paint, cull]);
+  }, [gltf, size, fit, haze, paint, finish, cull]);
 
   const mixer = useMemo(() => {
     if (!animate || built.clips.length === 0) return null;
@@ -138,15 +145,12 @@ export function AnimeModel({
     [built, mixer],
   );
 
-  const group = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
-    if (frame.id !== id || !group.current) return;
+    if (frame.id !== id) return;
     mixer?.update(Math.min(delta, 0.1));
-    if (spin) group.current.rotation.y += delta * spin;
-    if (bob) group.current.position.y = position[1] + Math.sin(performance.now() / 1000) * bob;
   });
   return (
-    <group ref={group} position={[...position]} rotation={[0, rotationY, 0]}>
+    <group position={[...position]} rotation={[0, rotationY, 0]}>
       <primitive object={built.holder} />
     </group>
   );

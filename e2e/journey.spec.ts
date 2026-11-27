@@ -43,7 +43,7 @@ test('journey: a long jump never leaves a passed panel on screen (P4 regression)
     await scrollToProgress(page, to);
     await page.waitForTimeout(SETTLE_MS);
     await expect(page.locator('section[aria-label]:not([aria-hidden="true"])')).toHaveCount(0);
-    for (const label of ['Experience', 'Education'])
+    for (const label of ['Experience', 'Work at Spotmies LLP', 'Education'])
       await expect(page.locator(`section[aria-label="${label}"]`)).toHaveCSS(
         'visibility',
         'hidden',
@@ -77,6 +77,7 @@ test('journey: every rest point shows its content (screenshots for review)', asy
     ['sc13-transmission', 0.9, 'Contact', /Open channel/],
     ['sc08-jupiter', 0.25, 'SmartWay Traffic', /Creator & Lead Developer/],
     ['sc04-crew-record', 0.35, 'Experience', /Spotmies[\s\S]*Pit Solutions/i],
+    ['sc04-crew-record', 0.525, 'Work at Spotmies LLP', /Sports Paramount[\s\S]*Mutiny/],
     ['sc04-crew-record', 0.7, 'Education', /MVGR College of Engineering/],
   ];
   for (const [id, r, label, text] of checks) {
@@ -98,6 +99,7 @@ test('journey: in a short laptop window no card scrolls inside itself', async ({
   const track = buildTrack(chapters, classifyAspect(size.width, size.height));
   // the tallest cards
   for (const [id, r, label] of [
+    ['sc04-crew-record', 0.525, /Work at Spotmies/],
     ['sc08-jupiter', 0.5, /DocumentDB/],
     ['sc09-saturn', 0.75, /Technology stack/],
     ['sc11a-discipline', 0.55, /Certifications/],

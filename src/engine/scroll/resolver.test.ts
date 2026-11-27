@@ -32,7 +32,8 @@ describe('buildTrack', () => {
     expect(progressFor(track, 'sc13-transmission')).toBeGreaterThan(0.84);
     // shortened from 33.5 for pace (UI_SCROLL_AUDIT.md step 1)
     expect(track.totalScreens).toBeGreaterThan(20);
-    expect(track.totalScreens).toBeLessThan(25);
+    // and the three anime worlds and Crew Record's third card lengthened (2026-11-27)
+    expect(track.totalScreens).toBeLessThan(26);
   });
 
   it('portrait tracks are shorter but keep the same proportions', () => {

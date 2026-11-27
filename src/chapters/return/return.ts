@@ -28,6 +28,12 @@ const span = (t: number, a: number, b: number) => ease(clamp01((t - a) / (b - a)
 export const styleAt = (t: number) =>
   2 - span(t, T_GATE, T_GATE + 0.08) - span(t, T_GATE + 0.08, T_GATE + 0.16);
 
+/**
+ * SC11c hands over with ink on shapes; entering the gate there is only light to draw, so the ink
+ * follows colour boundaries again and the line-art stage draws the tunnel.
+ */
+export const colourInkAt = (t: number) => span(t, T_GATE - 0.08, T_GATE);
+
 /** The gate is open and glowing as it is approached. */
 export const gateOpen = (t: number) => 0.9 + 0.1 * span(t, 0, 0.12);
 

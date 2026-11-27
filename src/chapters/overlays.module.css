@@ -18,19 +18,21 @@
   --o: 0;
   /* how far the card is scaled down to fit a short window (src/ui/fitCards.ts) */
   --fit: 1;
-  --pad: clamp(1.25rem, min(1.1rem + 1.6vw, 5svh), 2.75rem);
+  --pad: clamp(1rem, min(0.8rem + 0.8vw, 3svh), 1.625rem);
 
   position: absolute;
   display: grid;
   height: fit-content;
-  max-width: min(34rem * var(--fit), calc(100vw - 2 * var(--gutter)));
+  max-width: min(28rem * var(--fit), calc(100vw - 2 * var(--gutter)));
   /* the band between the header with its progress line and the bottom bar */
   max-height: calc(100svh - 12.25rem);
   overflow: auto;
   padding: calc(var(--pad) * var(--fit));
-  background:
-    linear-gradient(180deg, rgb(233 231 225 / 3.5%), rgb(233 231 225 / 0%) 40%), rgb(9 11 17 / 80%);
-  border: 1px solid rgb(233 231 225 / 9%);
+  /* see-through (Raju, 2026-11-27): the scene stays visible behind the text. Without frosting
+     (Low) it is a little denser, so text keeps its contrast over a bright sky */
+  background: rgb(9 11 17 / 76%);
+  border: 1px solid rgb(233 231 225 / 14%);
+  text-shadow: 0 1px 3px rgb(3 4 8 / 75%);
   border-radius: 6px;
   box-shadow: 0 40px 90px -50px rgb(0 0 0 / 80%);
   opacity: 0;
@@ -42,7 +44,7 @@
 /* a card's content: scaled as one piece, so type, spacing and shape shrink together */
 .fit {
   display: grid;
-  gap: clamp(0.5rem, 1.8svh, 1rem);
+  gap: clamp(0.4rem, 1.2svh, 0.7rem);
   min-width: 0;
   zoom: var(--fit);
 }
@@ -76,7 +78,21 @@
 
 /* frosted only on the High tier, where the GPU has room for it; never animated */
 :root[data-tier='balanced'] .panel:not(.editorial) {
-  backdrop-filter: blur(12px) saturate(1.05);
+  /* the glass dims what is behind it, so the tint itself can stay light */
+  background: rgb(9 11 17 / 44%);
+  backdrop-filter: blur(9px) brightness(0.52) saturate(1.1);
+}
+
+/* compact reading sizes inside a card; secondary text is brighter, for the lighter glass */
+.panel:not(.editorial, .card, .world) {
+  --text-body: clamp(0.875rem, 0.83rem + 0.16vw, 0.9688rem);
+  --text-card: clamp(1.375rem, 1.1rem + 0.8vw, 1.875rem);
+  --color-muted: #cac7be;
+}
+
+/* the small gold labels are lifted too, or they sink into a bright sky behind the glass */
+.panel:not(.editorial, .card, .world) .kicker {
+  color: color-mix(in srgb, var(--color-accent) 70%, white);
 }
 
 .center {
@@ -154,7 +170,7 @@
 }
 
 .label {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-2);
   font-family: var(--font-mono);
   font-size: var(--text-meta);
   font-weight: 500;
@@ -227,6 +243,11 @@
   text-shadow: none;
 }
 
+.showActions {
+  gap: 0 var(--space-6);
+  margin-top: 0;
+}
+
 .bay {
   justify-self: start;
   align-self: start;
@@ -288,8 +309,8 @@
 /* ── Experience / education timeline ─────────────────────────────────────────── */
 .record {
   display: grid;
-  gap: var(--space-6);
-  margin: var(--space-2) 0 0;
+  gap: var(--space-4);
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -315,15 +336,50 @@
 }
 
 .record h3 {
-  font-size: clamp(1.125rem, 1rem + 0.4vw, 1.375rem);
+  font-size: clamp(1rem, 0.95rem + 0.2vw, 1.125rem);
   font-weight: 500;
   letter-spacing: -0.01em;
 }
 
 .record p:not(.meta) {
   font-size: var(--text-body);
-  line-height: 1.6;
-  color: rgb(233 231 225 / 82%);
+  line-height: 1.5;
+  color: rgb(233 231 225 / 90%);
+}
+
+/* ── Work inside one job: a project a line ───────────────────────────────────── */
+.work {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work li {
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-rule);
+}
+
+.work h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.work p {
+  font-size: 0.8438rem;
+  line-height: 1.45;
+  color: rgb(233 231 225 / 86%);
+}
+
+/* the results list under it, one step smaller */
+.work ~ .showList {
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.work ~ .label {
+  margin-bottom: 0;
 }
 
 /* ── Core strengths: numbered spectral lines ─────────────────────────────────── */
@@ -338,11 +394,11 @@
 .strengths li {
   counter-increment: line;
   display: grid;
-  grid-template-columns: 2.75rem 1fr;
+  grid-template-columns: 2.25rem 1fr;
   align-items: baseline;
-  padding: var(--space-3) 0;
+  padding: var(--space-2) 0;
   font-family: var(--font-display);
-  font-size: clamp(1.0625rem, 0.95rem + 0.4vw, 1.3125rem);
+  font-size: clamp(0.9688rem, 0.9rem + 0.24vw, 1.0938rem);
   font-weight: 500;
   letter-spacing: -0.01em;
   border-top: 1px solid var(--color-rule);
@@ -371,7 +427,9 @@
 }
 
 .lines li {
-  padding: var(--space-3) 0;
+  padding: var(--space-2) 0;
+  font-size: 0.9063rem;
+  line-height: 1.45;
   border-top: 1px solid var(--color-rule);
 }
 
@@ -400,9 +458,9 @@
 
 .rings > div {
   display: grid;
-  grid-template-columns: minmax(7rem, 9rem) 1fr;
-  gap: var(--space-4);
-  padding: var(--space-3) 0;
+  grid-template-columns: minmax(5.5rem, 7rem) 1fr;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
   border-top: 1px solid var(--color-rule);
 }
 
@@ -416,11 +474,12 @@
 
 .rings dd {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
 }
 
 /* ── World titles (anime/titles.tsx): lettering floating over the scene, no card ───────────── */
 .world {
+  text-shadow: none;
   /* high in the sky, clear of the ship (these win over .center, which places it) */
   top: 7.5rem;
   bottom: auto;
@@ -443,12 +502,13 @@
 }
 
 :root[data-tier='balanced'] .panel.world {
+  background: none;
   backdrop-filter: none;
 }
 
 /* ── Project showcase ─────────────────────────────────────────────────────────── */
 .showcase {
-  max-width: min(46rem * var(--fit), calc(100vw - 2 * var(--gutter)));
+  max-width: min(35rem * var(--fit), calc(100vw - 2 * var(--gutter)));
 }
 
 .showHead {
@@ -466,7 +526,7 @@
 .showLead {
   max-width: 60ch;
   font-size: var(--text-body);
-  line-height: 1.6;
+  line-height: 1.5;
   color: rgb(233 231 225 / 86%);
 }
 
@@ -481,7 +541,7 @@
 .showMedia img {
   display: block;
   width: 100%;
-  height: clamp(5.5rem, 17vh, 9rem);
+  height: clamp(4rem, 9vh, 5.5rem);
   object-fit: cover;
   object-position: top center;
 }
@@ -489,7 +549,7 @@
 .showCols {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: var(--space-8);
+  gap: var(--space-4);
 }
 
 .showList {
@@ -498,8 +558,8 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 0.9375rem;
-  line-height: 1.5;
+  font-size: 0.8438rem;
+  line-height: 1.45;
 }
 
 .showList li {
@@ -527,7 +587,7 @@
 }
 
 .chips li {
-  padding: 3px var(--space-3);
+  padding: 1px var(--space-2);
   font-family: var(--font-mono);
   font-size: var(--text-meta);
   color: var(--color-text);
@@ -756,9 +816,9 @@
   text-align: left;
   background: linear-gradient(
     90deg,
-    rgb(5 6 10 / 97%) 0%,
-    rgb(5 6 10 / 90%) 36%,
-    rgb(5 6 10 / 40%) 54%,
+    rgb(5 6 10 / 84%) 0%,
+    rgb(5 6 10 / 72%) 36%,
+    rgb(5 6 10 / 30%) 54%,
     rgb(5 6 10 / 0%) 70%
   );
   border: 1px solid rgb(233 231 225 / 8%);
@@ -767,6 +827,13 @@
 }
 
 :root[data-tier='balanced'] .panel.card {
+  background: linear-gradient(
+    90deg,
+    rgb(5 6 10 / 84%) 0%,
+    rgb(5 6 10 / 72%) 36%,
+    rgb(5 6 10 / 30%) 54%,
+    rgb(5 6 10 / 0%) 70%
+  );
   backdrop-filter: none;
 }
 

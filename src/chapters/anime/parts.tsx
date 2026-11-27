@@ -103,43 +103,6 @@ export function Island({
   );
 }
 
-/**
- * A torii-style gate: two pillars, a top beam and a tie beam. Flat, unlit vermilion (as painted):
- * a lit, shaded underside fell dark enough for the style pass to swap it for its painted sky, a
- * pink slab overhead as the camera flies under the gate.
- */
-export function Torii({
-  position,
-  scale = 1,
-  color = '#d6443f',
-  cap = '#a8322e',
-}: {
-  position: readonly [number, number, number];
-  scale?: number;
-  color?: string;
-  /** the top beam, a deeper vermilion */
-  cap?: string;
-}) {
-  return (
-    <group position={[...position]} scale={scale}>
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * 17, 17, 0]}>
-          <cylinderGeometry args={[1.5, 1.8, 34, 8]} />
-          <meshBasicMaterial color={color} />
-        </mesh>
-      ))}
-      <mesh position={[0, 33, 0]}>
-        <boxGeometry args={[50, 3, 3.4]} />
-        <meshBasicMaterial color={cap} />
-      </mesh>
-      <mesh position={[0, 27, 0]}>
-        <boxGeometry args={[36, 1.8, 2.2]} />
-        <meshBasicMaterial color={color} />
-      </mesh>
-    </group>
-  );
-}
-
 /** Concentric discs slowly turning like a mandala (ambient motion only). */
 export function RingStack({
   position,

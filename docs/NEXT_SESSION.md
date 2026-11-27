@@ -20,9 +20,8 @@
   (not `dist/`), and commit only your own hunks unless he says "commit all".
 
 ## State of the repo
-- Branch **`main`** (`feat/sc11-fly-through-worlds` was merged, PR #1). The 2026-11-27 work below is committed
-  on `main`; check `git status -sb` for whether it has been pushed.
-- Checks at hand-off: `npm run verify` 137/137, `npm run build` OK, Playwright 27 passed, 1 skipped (phone).
+- Branch **`main`**: `feat/anime-worlds-voyage` merged and pushed on Raju's word (2026-11-27).
+- Checks at that merge: `npm run verify` 145/145, `npm run build` OK, Playwright 27 passed, 1 skipped (phone).
 - Git Bash notes: no backticks or `\n` escapes inside heredoc-written scripts (write scripts with the Write tool).
   Prettier reflows long lines, so string replacements written before formatting often miss: check every edit applied.
   `active` is a reserved word in GLSL.
@@ -61,14 +60,47 @@
 - **Cards fit the window:** desktop cards scale down (`--fit`, `src/ui/fitCards.ts`) instead of scrolling inside
   themselves, and stay between the header and the bottom bar. Checked 1180x620, 1280x720, 1536x730, 1920x950.
 
+## Done (2026-11-27, anime worlds)
+- **SC11a is the whole Hidden Leaf village** (A054, `anime_village.glb`, one draw call): turned 45° and scaled 160 so
+  the main street runs down the flight line to the Hokage tower and the stone faces (`layout.ts` `VILLAGE`),
+  painted from its own atlas (`painted.ts` `paintedAtlas`), forest round the island. The procedural houses, torii,
+  tower, Ichiraku Ramen (A041) and the old Naruto (A040) are gone.
+- **Cast** (A055–A060): Naruto (sage), Jiraiya, Itachi, Pain, Obito on the village street; Tanjiro, Nezuko, Inosuke on
+  the farm road; Ryuk and the notebook in the town street. **Raju: nobody floats** — everyone stands on solid ground,
+  in a natural pose (tested in `layout.test.ts`). A-pose / T-pose rigs are posed by `optimize-anime.ts`.
+- **World-to-world travel** (`voyage.ts` pure and tested, `Voyage.tsx`): each world sinks under its planet's clouds,
+  the planet falls away as a globe, stars and streaks, the next planet grows ahead, the next world rises out of it.
+  Replaces the cloud sea and the sky blend. SC11 chapters are 1.65 screens.
+- Checks: verify 145/145, build OK, Playwright 27 passed, 1 skipped; 60 fps both tiers (Balanced ≤104 draw calls,
+  ≤368k triangles; Low ≤74 / ≤236k). Entry hitches (`measure-freezes`): SC11a ~83 ms (was ~33 before this work),
+  SC11b ~50–67 ms, SC11c ~100–117 ms (was ~167); none over 250 ms.
+- **Ink lines from scene depth** (`styleBlend.ts`, `lens.ts`; a chapter may ask for colour ink with `colourInk(t)`,
+  SC12's tunnel does): outlines and raised corners instead of texture noise. The checks and frames above include it.
+
+## Done (2026-11-27, after the first push)
+- SC10: the space stars fade out before the colour comes in (`spaceSkyAt`), no dark dots on the painted sky.
+- SC11c farm: it looked broken, not only dull. Simplifying had eaten the pine crowns, roof ridges and windmill
+  blades, and ETC1S blended its tiny colour swatches (green came out straw). Now repainted (`FARM_SWATCHES`),
+  UASTC, painted from its own colours (`AnimeModel` `finish="own"`), full detail on Balanced and the 25k copy
+  (`anime_farm_lo.glb`) on Low. Brighter farmland round it.
+- SC11b within the plan's Low budget: 58 draw calls, 194k triangles (was 74 / 236k): lighter Kinnaird House and 10
+  rural buildings on Low; the notebook prop is 1.2k triangles on both tiers.
+
+## Done (2026-11-27, cards and Spotmies)
+- Raju: cards were huge and the site showed little. Cards are narrower with compact type (`overlays.module.css`) and
+  see-through (Balanced: 44% tint over dimmed, blurred scene; Low: 76% tint).
+- New Crew Record card "Work at Spotmies LLP" (`src/chapters/WorkCard.tsx`, SC04 rest 0.525, SC04 2.5 screens): the
+  four projects and three results already in `src/content/experience.ts`.
+- LinkedIn was not re-read (needs his login); the content is from the 2026-11-24 read. Ask him to paste the Experience
+  and About text for anything newer.
+
 ## Remaining tasks, in order
-1. Small: star dots still show over the sky around SC10 t≈0.86, while the cel colour is coming in.
-2. Anime models still look dull or scratchy next to the painted town: SC11c farm tiles (animals, fences), Ichiraku
-   Ramen, the ship. The painted material could take the farm; ink is task 3.
-3. Needs Raju's approval: ink lines from depth/normals instead of luminance (`styleBlend.ts`), to clear the scratchy
-   ink on detailed models (Ichiraku Ramen, the ship). Changes the line art in every anime world.
-4. SC11b on Low is near budget (draw calls ~74/80, 236k/250k triangles): trim before adding more there.
-5. Dev-only console warning `glGetProgramiv: Program object expected` mid-journey (StrictMode + warm-up path).
+1. Review the line art (ink from depth) in SC10-SC12 with Raju.
+2. The farm on Low still uses the simplified copy (thin trees and ridges): a better low variant if it matters.
+3. Dev-only console warning `glGetProgramiv: Program object expected` after a cold jump into SC11: no JS-side query
+   of a deleted program exists, and adding synchronous `getError` probes makes it vanish, so it is a timing quirk
+   inside the browser's GL layer. Not seen to affect anything; left as is.
+4. Entry hitches ~80-120 ms as SC11a and SC11c warm up (none over 250 ms).
 
 ## Parked until the end (content, mobile)
 - Content: Spotmies end date (LinkedIn "Present" vs resume "Jun 2026"); Sports Paramount spelling; Spotmies project

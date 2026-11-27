@@ -39,6 +39,23 @@ vec3 hazeSky() {
 }
 `;
 
+/**
+ * An opaque surface lost wholly in the haze also marks itself as painted (alpha 0.5, as
+ * parts.tsx PAINTED_BLEND): the style pass then treats it exactly like the sky behind it, instead
+ * of posterising it into a grey band along the horizon.
+ */
+const FRAG_BODY = /* glsl */ `#include <dithering_fragment>
+  {
+    float lost = smoothstep(uHazeNear, uHazeFar, length(vHazePos));
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeSky(), lost);
+#ifdef HAZE_MARK
+    gl_FragColor.a = mix(gl_FragColor.a, 0.5, smoothstep(0.85, 1.0, lost));
+#endif
+  }`;
+
+/** Only a plain opaque material may write its own alpha (others blend with it). */
+const marks = (mat: THREE.Material) => !mat.transparent && mat.blending === THREE.NormalBlending;
+
 /** Patch a built-in material (standard, lambert, basic) in place. */
 export function applyHaze<M extends THREE.Material>(mat: M, haze: Haze): M {
   mat.onBeforeCompile = (shader) => {
@@ -54,13 +71,11 @@ export function applyHaze<M extends THREE.Material>(mat: M, haze: Haze): M {
         '#include <project_vertex>\n  vHazePos = mvPosition.xyz;',
       );
     shader.fragmentShader =
+      (marks(mat) ? '#define HAZE_MARK\n' : '') +
       FRAG_DECL +
-      shader.fragmentShader.replace(
-        '#include <dithering_fragment>',
-        '#include <dithering_fragment>\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeSky(), smoothstep(uHazeNear, uHazeFar, length(vHazePos)));',
-      );
+      shader.fragmentShader.replace('#include <dithering_fragment>', FRAG_BODY);
   };
-  mat.customProgramCacheKey = () => 'sc11-haze';
+  mat.customProgramCacheKey = () => (marks(mat) ? 'sc11-haze-mark' : 'sc11-haze');
   mat.needsUpdate = true;
   return mat;
 }

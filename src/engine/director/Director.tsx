@@ -80,6 +80,7 @@ export function Director({ master, frame, links }: Props) {
     frame.t = dwell(r.localT, meta.restPoints);
     frame.style = impl.style ? impl.style(frame.t) : meta.artStyle === 'anime' ? 2 : 0;
     frame.backdrop = impl.backdrop?.(frame.t) ?? 0;
+    frame.colourInk = impl.colourInk?.(frame.t) ?? frame.backdrop;
 
     // Discrete: only when the chapter actually changes (mounting/unmounting neighbours).
     const store = useJourneyStore.getState();

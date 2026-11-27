@@ -1,5 +1,6 @@
-import { BlendFunction, Effect } from 'postprocessing';
-import { Uniform } from 'three';
+import { BlendFunction, Effect, EffectAttribute, ToneMappingEffect } from 'postprocessing';
+import { Uniform, Vector4 } from 'three';
+import { LENS_WARP, lensState } from './lens.ts';
 
 /**
  * Screen-space art-style blend (SC10 crossing, SC11 anime universe, SC12 return).
@@ -7,12 +8,26 @@ import { Uniform } from 'three';
  *   with ink lines. No paper-white stage: the ramp never flashes bright between dark and painted.
  *   uBackdrop 1 = dark pixels are open space and take the painted sky (the SC10 crossing),
  *               0 = they are drawn things (dark wood, a black coat) and keep their own colour
+ * Ink comes from the shape of things (scene depth): outlines and raised corners, never the colour
+ * noise of a texture. Where there is no shape to draw (open space, the return tunnel's light),
+ * uColourInk makes it follow colour boundaries instead.
  * It runs after tone mapping, on the final image, and is a pure function of `uStyle`, which the
  * Director derives from scroll progress, so the transition reverses exactly.
  */
+/** Where a bend in the depth starts to be inked, and where the line is full. */
+const INK_FROM = 1.6;
+const INK_FULL = 4.5;
+
 const fragment = /* glsl */ `
+  #define INK_FROM ${INK_FROM.toFixed(2)}
+  #define INK_FULL ${INK_FULL.toFixed(2)}
   uniform float uStyle;
   uniform float uBackdrop;
+  uniform float uColourInk;
+  // the black hole's lens (centre, radius, aspect) when it runs in an earlier pass: the depth is
+  // then unbent, and must be read where the picture came from. Radius 0 otherwise.
+  uniform vec4 uLens;
+  ${LENS_WARP}
 
   float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
@@ -24,7 +39,26 @@ const fragment = /* glsl */ `
     return a >= 0.5 ? 2.0 * (1.0 - a) : 2.0 * a;
   }
 
-  void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+  // 1 / view distance. Across the screen it is linear over any flat surface, whatever its angle, so
+  // its second difference is zero on walls, roofs and ground and only breaks at a shape's edge.
+  float nearness(vec2 p) {
+    return -1.0 / getViewZ(readDepth(lensWarp(p, uLens.xy, uLens.z, uLens.w)));
+  }
+
+  // Ink along outlines and raised corners, on the nearer side only (one clean line, not two).
+  float shapeInk(vec2 uv) {
+    vec2 o = texelSize * max(1.2, resolution.y / 720.0);
+    float c = nearness(uv);
+    float x = 2.0 * c - nearness(uv - vec2(o.x, 0.0)) - nearness(uv + vec2(o.x, 0.0));
+    float y = 2.0 * c - nearness(uv - vec2(0.0, o.y)) - nearness(uv + vec2(0.0, o.y));
+    // how sharply the surface turns away, per radian of view (a pixel step spans about o.y)
+    float bend = (max(x, 0.0) + max(y, 0.0)) / (c * o.y);
+    // far shapes are drawn without lines: they would only crowd into grey
+    float near = 1.0 - smoothstep(160.0, 460.0, 1.0 / c);
+    return smoothstep(INK_FROM, INK_FULL, bend) * near;
+  }
+
+  void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {
     if (uStyle < 0.001) { outputColor = inputColor; return; }
 
     // Roberts-cross edges on luminance (4 taps): lines follow every colour boundary
@@ -52,7 +86,11 @@ const fragment = /* glsl */ `
     // nothing drawn here: the painted sky goes in, whatever its brightness (bloom over empty
     // space used to stay as a grey band round SC10's clouds)
     float empty = 1.0 - smoothstep(0.0, 0.02, inputColor.a);
-    float ink = smoothstep(0.012, 0.05, edge) * (1.0 - painted);
+    // shape ink only asks whether this pixel is painted: an inked shape keeps its outline against a
+    // painted sky or range
+    float ownPaint = clamp(paintedCover(ta.a) * 8.0, 0.0, 1.0);
+    float colourInk = smoothstep(0.012, 0.05, edge) * (1.0 - painted);
+    float ink = mix(shapeInk(uv) * (1.0 - ownPaint), colourInk, uColourInk);
 
     float l = lum(inputColor.rgb);
 
@@ -115,13 +153,32 @@ const fragment = /* glsl */ `
   }
 `;
 
+/**
+ * The tone mapping that runs before the style pass. postprocessing orders the effects in a pass by
+ * their attributes, highest first, so an effect that reads depth jumps ahead of one that does not:
+ * the style pass ran before tone mapping and every painted colour came out grey. Declaring the same
+ * attribute here (and on the lens) keeps the written order.
+ */
+export class OrderedToneMappingEffect extends ToneMappingEffect {
+  constructor(options?: ConstructorParameters<typeof ToneMappingEffect>[0]) {
+    super(options);
+    this.setAttributes(this.getAttributes() | EffectAttribute.DEPTH);
+  }
+}
+
 export class StyleBlendEffect extends Effect {
+  /** True when the lens bends the picture in an earlier pass (the full post chain). */
+  lensAhead = false;
+
   constructor() {
     super('StyleBlendEffect', fragment, {
       blendFunction: BlendFunction.NORMAL,
-      uniforms: new Map([
+      attributes: EffectAttribute.DEPTH,
+      uniforms: new Map<string, Uniform>([
         ['uStyle', new Uniform(0)],
         ['uBackdrop', new Uniform(0)],
+        ['uColourInk', new Uniform(0)],
+        ['uLens', new Uniform(new Vector4(0.5, 0.5, 0, 1.6))],
       ]),
     });
   }
@@ -142,5 +199,20 @@ export class StyleBlendEffect extends Effect {
   set backdrop(value: number) {
     const u = this.uniforms.get('uBackdrop');
     if (u) u.value = value;
+  }
+
+  get colourInk(): number {
+    return (this.uniforms.get('uColourInk')?.value as number | undefined) ?? 0;
+  }
+
+  set colourInk(value: number) {
+    const u = this.uniforms.get('uColourInk');
+    if (u) u.value = value;
+  }
+
+  /** Called by the composer before each render: follow the black hole's lens. */
+  override update(): void {
+    const lens = this.uniforms.get('uLens')?.value as Vector4 | undefined;
+    lens?.set(lensState.x, lensState.y, this.lensAhead ? lensState.re : 0, lensState.aspect);
   }
 }
