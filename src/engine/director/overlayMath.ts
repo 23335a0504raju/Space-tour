@@ -26,6 +26,22 @@ export function restOpacity(
   return (half - d) / ramp;
 }
 
+/** Seconds a card takes to make its entrance, and to leave. */
+export const CARD_IN_S = 0.9;
+export const CARD_OUT_S = 0.35;
+
+/**
+ * The card's visibility on screen, following the scroll's answer (`wanted`, 0 or 1) over a short
+ * minimum time. Scrubbed straight from the scroll, the whole entrance fitted inside one wheel notch
+ * and cards popped in (Raju, 2026-11-27). Where the page rests, the result is still decided by the
+ * scroll position alone, in either direction; only the way there takes its own time.
+ */
+export function easeVisibility(shown: number, wanted: number, seconds: number): number {
+  const span = wanted > shown ? CARD_IN_S : CARD_OUT_S;
+  const step = Math.max(0, seconds) / span;
+  return wanted > shown ? Math.min(wanted, shown + step) : Math.max(wanted, shown - step);
+}
+
 /**
  * Dip-to-colour at chapter boundaries, masking grey-box hard cuts. 1 = fully covered.
  * No dip at the very start or very end of the journey, nor across a seamless boundary.

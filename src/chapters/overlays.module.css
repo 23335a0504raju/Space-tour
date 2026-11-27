@@ -28,17 +28,19 @@
   max-height: calc(100svh - 12.25rem);
   overflow: auto;
   padding: calc(var(--pad) * var(--fit));
-  /* see-through (Raju, 2026-11-27): the scene stays visible behind the text. Without frosting
-     (Low) it is a little denser, so text keeps its contrast over a bright sky */
-  background: rgb(9 11 17 / 76%);
+  /* see-through (Raju, 2026-11-27, on every screen): the scene stays visible behind the text.
+     Without frosting (Low) it is denser, so text keeps its contrast over a bright sky */
+  background: rgb(9 11 17 / 58%);
   border: 1px solid rgb(233 231 225 / 14%);
-  text-shadow: 0 1px 3px rgb(3 4 8 / 75%);
+  text-shadow:
+    0 1px 2px rgb(3 4 8 / 90%),
+    0 0 8px rgb(3 4 8 / 55%);
   border-radius: 6px;
   box-shadow: 0 40px 90px -50px rgb(0 0 0 / 80%);
   opacity: 0;
   visibility: hidden;
+  /* never `overscroll-behavior: contain`: a swipe on a card must carry on to the page */
   pointer-events: auto;
-  overscroll-behavior: contain;
 }
 
 /* a card's content: scaled as one piece, so type, spacing and shape shrink together */
@@ -79,8 +81,8 @@
 /* frosted only on the High tier, where the GPU has room for it; never animated */
 :root[data-tier='balanced'] .panel:not(.editorial) {
   /* the glass dims what is behind it, so the tint itself can stay light */
-  background: rgb(9 11 17 / 44%);
-  backdrop-filter: blur(9px) brightness(0.52) saturate(1.1);
+  background: rgb(9 11 17 / 24%);
+  backdrop-filter: blur(6px) brightness(0.62) saturate(1.1);
 }
 
 /* compact reading sizes inside a card; secondary text is brighter, for the lighter glass */
@@ -723,10 +725,6 @@
    wrapped chips). A vertical swipe that reaches the end of a panel carries on to the page, so a
    panel never traps the scroll. */
 @media (max-width: 720px) {
-  .showcase {
-    overscroll-behavior: auto;
-  }
-
   /* let the column shrink below its content: the one-line chips row would otherwise stretch
      the panel's grid wider than the panel and clip every line on the right */
   .showcase,
@@ -770,11 +768,6 @@
     font-size: 0.875rem;
     line-height: 1.4;
   }
-
-  .left:has(.rings),
-  .right:has(.rings) {
-    max-height: calc(100svh - 12.5rem);
-  }
 }
 
 /* Short phones (about 800 px tall or less): one more step tighter, so the last group is not cut. */
@@ -797,6 +790,104 @@
   }
 }
 
+/*
+ * Phones (Raju, 2026-11-27: the cards stood in the middle of the screen and swiping on them did not
+ * scroll the story). Each card is a compact sheet in the lower half, so the scene stays in view, and
+ * none is a scroll container: every swipe moves the page. Nothing may be cut off, so the type is
+ * smaller, a few secondary lines are left to the full views, and src/ui/fitCards.ts scales down
+ * whatever still does not fit. Last, so these win over the rules above.
+ */
+@media (max-width: 720px) {
+  .left,
+  .right,
+  .center {
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: 5.25rem;
+    max-height: 52svh;
+  }
+
+  /* the editorial intro already overflows visibly (its vignette reaches past it) */
+  .panel:not(.editorial, .card, .world) {
+    overflow: clip;
+  }
+
+  .panel:not(.editorial, .card, .world) {
+    --text-body: 0.8125rem;
+    --text-card: 1.25rem;
+    padding: var(--space-4);
+  }
+
+  .panel .fit {
+    gap: var(--space-2);
+  }
+
+  .editorial .display {
+    font-size: 2.25rem;
+  }
+
+  .editorial .lead,
+  .record p:not(.meta),
+  .showcase .showLead {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    line-height: 1.45;
+  }
+
+  .record {
+    gap: var(--space-3);
+  }
+
+  .record h3 {
+    font-size: 0.9375rem;
+  }
+
+  .work li {
+    padding: var(--space-1) 0;
+  }
+
+  .work h3 {
+    font-size: 0.8438rem;
+  }
+
+  .work p,
+  .work ~ .showList,
+  .panel .showList {
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .work ~ .showList li:nth-child(n + 3),
+  .showcase .showList li:nth-child(n + 3) {
+    display: none;
+  }
+
+  .showcase .showTitle {
+    font-size: 1.1875rem;
+  }
+
+  .showcase .role {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-size: 0.75rem;
+  }
+
+  .strengths li,
+  .lines li {
+    padding: var(--space-1) 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+
+  .rings dd {
+    font-size: 0.75rem;
+  }
+}
+
 /* ── The final card (SC13 contact, after the user's "Lunar Gravity" reference) ─────────────────
  * One wide card: the copy on the left over a scrim that fades out to the right, and an empty
  * right half where the Moon and its ring hang in the 3D scene (LunarMoon places them by this
@@ -816,9 +907,9 @@
   text-align: left;
   background: linear-gradient(
     90deg,
-    rgb(5 6 10 / 84%) 0%,
-    rgb(5 6 10 / 72%) 36%,
-    rgb(5 6 10 / 30%) 54%,
+    rgb(5 6 10 / 68%) 0%,
+    rgb(5 6 10 / 55%) 36%,
+    rgb(5 6 10 / 22%) 54%,
     rgb(5 6 10 / 0%) 70%
   );
   border: 1px solid rgb(233 231 225 / 8%);
@@ -829,9 +920,9 @@
 :root[data-tier='balanced'] .panel.card {
   background: linear-gradient(
     90deg,
-    rgb(5 6 10 / 84%) 0%,
-    rgb(5 6 10 / 72%) 36%,
-    rgb(5 6 10 / 30%) 54%,
+    rgb(5 6 10 / 68%) 0%,
+    rgb(5 6 10 / 55%) 36%,
+    rgb(5 6 10 / 22%) 54%,
     rgb(5 6 10 / 0%) 70%
   );
   backdrop-filter: none;
@@ -883,7 +974,7 @@
   .card {
     grid-template-columns: minmax(0, 1fr);
     height: calc(100svh - 11rem);
-    background: rgb(5 6 10 / 92%);
+    background: rgb(5 6 10 / 60%);
     border-radius: 1.25rem;
   }
 
@@ -893,5 +984,7 @@
 
   .cardCopy {
     padding: var(--space-6);
+    /* the copy scales to the card (container queries): not a scroll container, so swipes pass */
+    overflow: clip;
   }
 }

@@ -120,6 +120,54 @@ test('journey: in a short laptop window no card scrolls inside itself', async ({
   }
 });
 
+test('journey: on a phone a swipe on any card moves the page, and nothing is cut off', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'phone-portrait', 'touch only');
+  await page.goto('/?gate=off');
+  await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
+  const vp = page.viewportSize() ?? { width: 412, height: 839 };
+  const track = buildTrack(chapters, classifyAspect(vp.width, vp.height));
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+    });
+  for (const [id, r, label] of [
+    ['sc04-crew-record', 0.525, /Work at Spotmies/],
+    ['sc08-jupiter', 0.5, /DocumentDB/],
+    ['sc09-saturn', 0.75, /Technology stack/],
+    ['sc11a-discipline', 0.55, /Certifications/],
+    ['sc13-transmission', 0.9, /Contact/],
+  ] as const) {
+    await scrollToProgress(page, progressFor(track, id, r));
+    await page.waitForTimeout(SETTLE_MS);
+    const card = page.getByRole('region', { name: label });
+    await expect(card).toBeVisible();
+    const cut = await card.evaluate((el) =>
+      Math.max(
+        el.scrollHeight - el.clientHeight,
+        ...[...el.querySelectorAll('[data-fit]')].map(
+          (f) => f.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom,
+        ),
+      ),
+    );
+    expect(cut, String(label)).toBeLessThanOrEqual(1);
+    const box = (await card.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height * 0.7;
+    const before = await page.evaluate(() => window.scrollY);
+    // swipe down: back up the story (the last card has nothing below it to move to)
+    await touch('touchStart', x, y);
+    for (let k = 1; k <= 8; k += 1) await touch('touchMove', x, y + k * 14);
+    await touch('touchEnd', x, y);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), { message: String(label) })
+      .toBeLessThan(before - 40);
+  }
+});
+
 test('journey: each anime world opens with its title, in flight order', async ({ page }) => {
   await page.goto('/?gate=off');
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });

@@ -5,12 +5,15 @@
  * (overlays.module.css), so a card keeps its shape and just gets smaller.
  *
  * Measured, not guessed: content differs per card. Runs once the fonts are in and again whenever
- * the window changes size; never on scroll. Phones keep their own sheet layout.
+ * the window changes size; never on scroll. Phones use the same measure for their bottom sheets,
+ * which may not scroll inside either (a swipe on a card has to move the page).
  */
 const PHONE = '(max-width: 720px)';
 /** The header with its progress line, and the bottom bar (rem; matches .left / .right). */
 const TOP_REM = 7;
 const BOTTOM_REM = 5.25;
+/** A phone sheet's share of the screen height (matches max-height in overlays.module.css). */
+const PHONE_SHEET = 0.52;
 /** Below this the text would be too small to read: the card may scroll instead. */
 export const MIN_FIT = 0.6;
 
@@ -46,12 +49,13 @@ export function fitCards(root: HTMLElement): () => void {
     if (!live) return;
     const phone = window.matchMedia(PHONE).matches;
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const room = root.clientHeight - (TOP_REM + BOTTOM_REM) * rem;
+    const room = phone
+      ? root.clientHeight * PHONE_SHEET
+      : root.clientHeight - (TOP_REM + BOTTOM_REM) * rem;
     for (const body of root.querySelectorAll<HTMLElement>('[data-fit]')) {
       const panel = body.parentElement;
       if (!panel) continue;
-      if (phone) panel.style.removeProperty('--fit');
-      else fit(panel, body, room);
+      fit(panel, body, room);
     }
   };
   const queue = () => {

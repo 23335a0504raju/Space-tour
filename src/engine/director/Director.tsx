@@ -10,7 +10,7 @@ import { dwell, resolve } from '../scroll/resolver.ts';
 import type { Track } from '../scroll/resolver.ts';
 import type { ScrollMasterState } from '../scroll/useScrollMaster.ts';
 import { useJourneyStore } from '../store.ts';
-import { restOpacity } from './overlayMath.ts';
+import { easeVisibility, restOpacity } from './overlayMath.ts';
 
 /**
  * Portrait screens put the text panel in the bottom half and the header at the top, leaving a
@@ -66,7 +66,7 @@ export function Director({ master, frame, links }: Props) {
   // size the lens shift was last applied for (so it is only rewritten when something changes)
   const lens = useMemo(() => ({ w: 0, h: 0, shift: 0 }), []);
 
-  useFrame(({ camera, scene, size, gl }) => {
+  useFrame(({ camera, scene, size, gl }, delta) => {
     const progress = master.progress;
     const r = resolve(links.track, progress);
     const meta = chapters[r.index];
@@ -134,12 +134,16 @@ export function Director({ master, frame, links }: Props) {
     }
 
     // Overlays: direct style writes, only when values change.
+    // (a long frame must not swallow the entrance: no single step is longer than 50 ms)
+    const seconds = Math.min(delta, 0.05);
     for (const entry of links.overlays.values()) {
-      const o =
-        entry.chapterId === r.id
-          ? restOpacity(r.localT, entry.rest, { half: entry.half, holdToEnd: entry.holdToEnd })
+      const wanted =
+        entry.chapterId === r.id &&
+        restOpacity(r.localT, entry.rest, { half: entry.half, holdToEnd: entry.holdToEnd }) >= 0.5
+          ? 1
           : 0;
-      if (Math.abs(o - entry.last) < 0.002) continue;
+      const o = easeVisibility(entry.last, wanted, seconds);
+      if (o === entry.last) continue;
       entry.last = o;
       // one value per panel; CSS derives the panel fade and the staged reveal of its parts from
       // it (overlays.module.css), so the stagger is still a pure function of progress
