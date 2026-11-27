@@ -7,7 +7,7 @@ import { gltfExtender } from '../../engine/assets/loaders.ts';
 import type { JourneyFrame } from '../contract.ts';
 import { hazed } from './haze.ts';
 import type { Haze } from './haze.ts';
-import { painted } from './painted.ts';
+import { painted, paintedAtlas } from './painted.ts';
 import type { Paint } from './painted.ts';
 
 /**
@@ -29,10 +29,12 @@ export const ANIME_MODELS = {
   deathNote: '/assets/models/anime_deathnote.glb',
   ryuk: '/assets/models/anime_ryuk.glb',
   kinnaird: '/assets/models/anime_kinnaird.glb',
+  kinnairdLow: '/assets/models/anime_kinnaird_lo.glb',
   tanjiro: '/assets/models/anime_tanjiro.glb',
   nezuko: '/assets/models/anime_nezuko.glb',
   katana: '/assets/models/anime_katana.glb',
   farm: '/assets/models/anime_farm.glb',
+  farmLow: '/assets/models/anime_farm_lo.glb',
   town: '/assets/models/anime_town.glb',
   rural: '/assets/models/anime_rural.glb',
 } as const;
@@ -53,6 +55,8 @@ interface Props {
   readonly haze?: Haze;
   /** paint it (painted.ts) in place of the chapter's lighting; needs `haze` */
   readonly paint?: Paint;
+  /** how it is painted: the town's boards and dirt, or the model's own colours (default boards) */
+  readonly finish?: 'boards' | 'own';
   /** static props: let three cull them (skinned models stay unculled: their bounds lie) */
   readonly cull?: boolean;
   readonly id: string;
@@ -72,6 +76,7 @@ export function AnimeModel({
   animate = false,
   haze,
   paint,
+  finish = 'boards',
   cull = false,
   id,
   frame,
@@ -87,7 +92,8 @@ export function AnimeModel({
       if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
       mesh.frustumCulled = cull && !(mesh as THREE.SkinnedMesh).isSkinnedMesh;
       if (haze) {
-        const skin = (m: THREE.Material) => (paint ? painted(m, haze, paint) : hazed(m, haze));
+        const brush = finish === 'own' ? paintedAtlas : painted;
+        const skin = (m: THREE.Material) => (paint ? brush(m, haze, paint) : hazed(m, haze));
         mesh.material = Array.isArray(mesh.material)
           ? mesh.material.map(skin)
           : skin(mesh.material);
@@ -118,7 +124,7 @@ export function AnimeModel({
     root.scale.multiplyScalar(scale);
     const clips = gltf.animations.filter((a) => a.name.includes('Anim_'));
     return { holder, root, clips };
-  }, [gltf, size, fit, haze, paint, cull]);
+  }, [gltf, size, fit, haze, paint, finish, cull]);
 
   const mixer = useMemo(() => {
     if (!animate || built.clips.length === 0) return null;

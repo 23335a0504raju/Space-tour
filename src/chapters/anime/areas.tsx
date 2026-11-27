@@ -179,7 +179,6 @@ function Discipline({ frame, id, haze, paint }: WorldProps) {
         />
       </Ranges>
       {/* the forest floor round the village island (it covers the model's outer water ring) */}
-
       <Ground y={VILLAGE.forestFloor} color="#4d7d45" haze={haze} />
       <Trees
         items={FOREST_TREES}
@@ -199,14 +198,18 @@ function Discipline({ frame, id, haze, paint }: WorldProps) {
 
 // ── Proof: the frontier town ─────────────────────────────────────────────────
 
+/** Rural buildings drawn on the lower tier (the farthest are specks behind the haze). */
+const LOW_RURAL = 10;
+
 function Proof({ frame, id, haze, paint }: WorldProps) {
   const g = GROUND.proof;
+  const low = useJourneyStore((s) => s.tier !== 'balanced');
+  // the lower tier keeps the near street and a lighter Kinnaird House (budget: webgl-performance)
+  const rural = low ? RURAL.slice(0, LOW_RURAL) : RURAL;
   return (
     <>
       {/* the desert floor beyond the town's own terrain (just below it, so the town wins) */}
-
       <PaintedGround y={g - 0.4} width={5000} from={2200} to={-2800} haze={haze} paint={paint} />
-
       <AnimeModel
         url={ANIME_MODELS.town}
         size={TOWN.scale}
@@ -219,7 +222,7 @@ function Proof({ frame, id, haze, paint }: WorldProps) {
         frame={frame}
       />
       {/* the street runs on past the town: the rural set lines it out to Kinnaird House */}
-      {RURAL.map((r) => (
+      {rural.map((r) => (
         <ModelPart
           key={r.name}
           url={ANIME_MODELS.rural}
@@ -232,7 +235,7 @@ function Proof({ frame, id, haze, paint }: WorldProps) {
         />
       ))}
       <AnimeModel
-        url={ANIME_MODELS.kinnaird}
+        url={low ? ANIME_MODELS.kinnairdLow : ANIME_MODELS.kinnaird}
         size={KINNAIRD.size}
         fit="max"
         position={[KINNAIRD.x, g, KINNAIRD.z]}
@@ -298,31 +301,33 @@ function Proof({ frame, id, haze, paint }: WorldProps) {
 
 // ── Horizon: the blossom valley ──────────────────────────────────────────────
 
-function Horizon({ frame, id, haze }: WorldProps) {
+function Horizon({ frame, id, haze, paint }: WorldProps) {
   const g = GROUND.horizon;
   const low = useJourneyStore((s) => s.tier !== 'balanced');
   const farms = low ? FARMS.filter((f) => !f.far) : FARMS;
   return (
     <>
-      <Ground y={g} color="#8ea477" haze={haze} />
+      <Ground y={g} color="#7ea85f" haze={haze} />
       <Strip y={g} halfWidth={8} from={160} to={-900} color="#d8b08a" haze={haze} />
       <LightRoad y={g + 0.4} from={150} to={-880} step={11} color="#ffd23f" />
       <Fields
         items={FIELDS}
         y={g}
-        colors={['#b9c97a', '#d8c07a', '#9cbf86', '#c7d9a0']}
+        colors={['#a9cc62', '#dcbc6a', '#82b872', '#bcd985']}
         haze={haze}
       />
 
       {farms.map((f) => (
         <AnimeModel
           key={`${f.x},${f.z}`}
-          url={ANIME_MODELS.farm}
+          url={low ? ANIME_MODELS.farmLow : ANIME_MODELS.farm}
           size={FARM_SIZE}
           fit="max"
           position={[f.x, g, f.z]}
           rotationY={f.rotY}
           haze={haze}
+          paint={paint}
+          finish="own"
           cull
           id={id}
           frame={frame}
@@ -393,7 +398,7 @@ interface WorldProps {
   readonly frame: JourneyFrame;
   readonly id: string;
   readonly haze: Haze;
-  /** the painted materials' shared uniforms (the village and the frontier town) */
+  /** the painted materials' shared uniforms (every world's buildings) */
   readonly paint: Paint;
 }
 

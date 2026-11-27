@@ -40,6 +40,11 @@ interface Job {
   readonly tris?: number;
   /** longest texture side */
   readonly tex: number;
+  /**
+   * UASTC instead of ETC1S: for tiny swatch textures, where ETC1S's shared colour codebook blends
+   * neighbouring swatches (a green ground came out straw)
+   */
+  readonly uastc?: boolean;
   /** skinned: never join or palette (the skeleton must stay intact) */
   readonly skinned?: boolean;
   /** flat-colour materials merged into one palette texture */
@@ -66,6 +71,8 @@ interface Job {
   readonly recolor?: Readonly<Record<string, string>>;
   /** raise coplanar decal layers (a road painted on the terrain) by `dy` world units */
   readonly lift?: { readonly material: RegExp; readonly dy: number };
+  /** swatch textures: exact sRGB hex → replacement hex (a pastel palette repainted) */
+  readonly swatches?: Readonly<Record<string, string>>;
   /** richer, brighter base-colour textures (photo-flat exports read grey under tone mapping) */
   readonly boost?: { readonly saturation: number; readonly brightness: number };
   /** rigged in an A-pose: swing the upper arms down by this many degrees to a standing pose */
@@ -77,6 +84,29 @@ interface Job {
     readonly shoulderY: number;
   };
 }
+
+/**
+ * The farm's pastel swatches, repainted as an anime farm: green grass, red barn, warm timber.
+ */
+const FARM_SWATCHES: Readonly<Record<string, string>> = {
+  '#f9e79f': '#dcbc82',
+  // the ground plate
+  '#ffd54f': '#7fb25a',
+  '#e59866': '#c98a4e',
+  '#9e9d24': '#3f8038',
+  '#afb42b': '#4f9440',
+  '#c0ca33': '#62a844',
+  '#d4e157': '#86c250',
+  '#827717': '#33682e',
+  '#ef9a9a': '#c9463c',
+  '#ffcdd2': '#d9695a',
+  '#ec7063': '#c23f34',
+  '#cd6155': '#a5342c',
+  '#795548': '#664539',
+  '#8d6e63': '#7a5750',
+  '#5d4037': '#46302a',
+  '#6d4c41': '#573b32',
+};
 
 const JOBS: readonly Job[] = [
   // Naruto world (SC11a): the whole Hidden Leaf village the ship flies over (one atlas, one draw)
@@ -101,7 +131,8 @@ const JOBS: readonly Job[] = [
     bendArms: { degrees: 68, shoulderX: 0.17, shoulderY: 1.36 },
   },
   // Death Note world (SC11b)
-  { zip: 'deathnote/death_note.zip', out: 'anime_deathnote.glb', tex: 256 },
+  // a 3 m prop on the sand: a few hundred triangles are plenty
+  { zip: 'deathnote/death_note.zip', out: 'anime_deathnote.glb', tex: 256, tris: 1200 },
   {
     zip: 'deathnote/ryuk_from_death_note.zip',
     out: 'anime_ryuk.glb',
@@ -109,13 +140,16 @@ const JOBS: readonly Job[] = [
     tex: 512,
     skinned: true,
   },
-  {
+  // Kinnaird House closes the town's vista; the lower tier gets a lighter copy
+  ...([22000, 6000] as const).map((tris): Job => ({
     zip: 'deathnote/free_london_kinnaird_house.zip',
-    out: 'anime_kinnaird.glb',
-    tris: 22000,
-    tex: 1024,
+    out: tris < 10000 ? 'anime_kinnaird_lo.glb' : 'anime_kinnaird.glb',
+    tris,
+    tex: tris < 10000 ? 512 : 1024,
     smooth: true,
-  },
+    // hundreds of loose parts: edge collapse alone cannot get it down
+    pruneSmall: tris < 10000,
+  })),
   // Demon Slayer world (SC11c)
   {
     zip: 'demonslayer/inosuke_free_fire_original_rig.zip',
@@ -143,14 +177,18 @@ const JOBS: readonly Job[] = [
     smooth: true,
   },
   { zip: 'demonslayer/blossom_katana.zip', out: 'anime_katana.glb', tris: 5000, tex: 512 },
-  {
+  // the farm tiles: every triangle on Balanced (simplifying them ate the pine crowns, the barn
+  // roof's ridges and the windmill's blades); a simplified copy for the lower tier
+  ...([undefined, 20000] as const).map((tris): Job => ({
     zip: 'demonslayer/low_poly_farm_v2.zip',
-    out: 'anime_farm.glb',
-    tris: 20000,
+    out: tris ? 'anime_farm_lo.glb' : 'anime_farm.glb',
+    swatches: FARM_SWATCHES,
+    uastc: true,
+    ...(tris ? { tris } : {}),
     tex: 1024,
     palette: true,
     smooth: true,
-  },
+  })),
   // Death Note world (SC11b): the town the ship flies through, and its outskirts
   {
     zip: 'deathnote/west_street.zip',
@@ -314,6 +352,36 @@ function pruneSimplify(doc: Awaited<ReturnType<typeof io.read>>, target: number)
   }
 }
 
+/** Replace exact swatch colours in every base-colour texture. */
+async function repaintSwatches(
+  doc: Awaited<ReturnType<typeof io.read>>,
+  swatches: NonNullable<Job['swatches']>,
+): Promise<void> {
+  const rgb = (hex: string) => parseInt(hex.slice(1), 16);
+  const to = new Map(Object.entries(swatches).map(([a, b]) => [rgb(a), rgb(b)]));
+  const used = new Set<number>();
+  for (const tex of doc.getRoot().listTextures()) {
+    const image = tex.getImage();
+    if (!image) continue;
+    const { data, info } = await sharp(Buffer.from(image))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    for (let i = 0; i < data.length; i += info.channels) {
+      const from = (data[i]! << 16) | (data[i + 1]! << 8) | data[i + 2]!;
+      const next = to.get(from);
+      if (next === undefined) continue;
+      used.add(from);
+      data[i] = next >> 16;
+      data[i + 1] = (next >> 8) & 255;
+      data[i + 2] = next & 255;
+    }
+    const out = await sharp(data, { raw: info }).png().toBuffer();
+    tex.setImage(new Uint8Array(out)).setMimeType('image/png');
+  }
+  if (used.size !== to.size)
+    throw new Error(`swatches: found ${used.size} of ${to.size} colours in the textures`);
+}
+
 /** Saturate and brighten every base-colour texture. */
 async function boostTextures(
   doc: Awaited<ReturnType<typeof io.read>>,
@@ -437,6 +505,7 @@ for (const job of JOBS) {
     const before = tris(doc);
     if (job.relaxArms) relaxArms(doc, job.relaxArms);
     if (job.bendArms) bendArms(doc, job.bendArms);
+    if (job.swatches) await repaintSwatches(doc, job.swatches);
     if (job.boost) await boostTextures(doc, job.boost);
     if (job.clean) cleanPrimitives(doc);
     if (job.lift) liftLayer(doc, job.lift);
@@ -476,7 +545,7 @@ for (const job of JOBS) {
     if (process.argv.includes('--review'))
       await io.write(join(ROOT, 'raw-assets', '_work', job.out), doc);
     run(GLTF, ['resize', t1, t2, '--width', String(job.tex), '--height', String(job.tex)]);
-    run(GLTF, ['etc1s', t2, t1, '--quality', '150']);
+    run(GLTF, job.uastc ? ['uastc', t2, t1] : ['etc1s', t2, t1, '--quality', '150']);
     const file = join(OUT, job.out);
     run(GLTF, ['meshopt', t1, file]);
     const sha = createHash('sha256').update(readFileSync(file)).digest('hex').slice(0, 16);

@@ -35,8 +35,11 @@ export const T_OUT = 0.9;
  */
 export const styleAt = (t: number) => span(t, 0.74, 0.84) + span(t, 0.84, T_OUT);
 
-/** The space sky (stars, dust) is gone once the colour comes in: no inked dots on the painted sky. */
-export const spaceSkyAt = (t: number) => 1 - span(t, 0.8, 0.88);
+/**
+ * The space sky (stars, dust) is gone before the colour comes in (styleAt passes 1 at t 0.84): a
+ * star left at part strength is inked as a dark dot on the painted sky.
+ */
+export const spaceSkyAt = (t: number) => 1 - span(t, 0.76, 0.84);
 
 /**
  * Dark pixels are open space (the style pass paints sky over them) until the camera is out of the

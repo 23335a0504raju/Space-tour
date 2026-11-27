@@ -20,8 +20,8 @@
   (not `dist/`), and commit only your own hunks unless he says "commit all".
 
 ## State of the repo
-- Branch **`feat/anime-worlds-voyage`** (pushed 2026-11-27), from `main` at `9dc37aa`; not yet merged into `main`.
-- Checks at hand-off: `npm run verify` 145/145, `npm run build` OK, Playwright 27 passed, 1 skipped (phone).
+- Branch **`main`**: `feat/anime-worlds-voyage` merged and pushed on Raju's word (2026-11-27).
+- Checks at that merge: `npm run verify` 145/145, `npm run build` OK, Playwright 27 passed, 1 skipped (phone).
 - Git Bash notes: no backticks or `\n` escapes inside heredoc-written scripts (write scripts with the Write tool).
   Prettier reflows long lines, so string replacements written before formatting often miss: check every edit applied.
   `active` is a reserved word in GLSL.
@@ -77,13 +77,30 @@
 - **Ink lines from scene depth** (`styleBlend.ts`, `lens.ts`; a chapter may ask for colour ink with `colourInk(t)`,
   SC12's tunnel does): outlines and raised corners instead of texture noise. The checks and frames above include it.
 
+## Done (2026-11-27, after the first push)
+- SC10: the space stars fade out before the colour comes in (`spaceSkyAt`), no dark dots on the painted sky.
+- SC11c farm: it looked broken, not only dull. Simplifying had eaten the pine crowns, roof ridges and windmill
+  blades, and ETC1S blended its tiny colour swatches (green came out straw). Now repainted (`FARM_SWATCHES`),
+  UASTC, painted from its own colours (`AnimeModel` `finish="own"`), full detail on Balanced and the 25k copy
+  (`anime_farm_lo.glb`) on Low. Brighter farmland round it.
+- SC11b within the plan's Low budget: 58 draw calls, 194k triangles (was 74 / 236k): lighter Kinnaird House and 10
+  rural buildings on Low; the notebook prop is 1.2k triangles on both tiers.
+
+## Done (2026-11-27, cards and Spotmies)
+- Raju: cards were huge and the site showed little. Cards are narrower with compact type (`overlays.module.css`) and
+  see-through (Balanced: 44% tint over dimmed, blurred scene; Low: 76% tint).
+- New Crew Record card "Work at Spotmies LLP" (`src/chapters/WorkCard.tsx`, SC04 rest 0.525, SC04 2.5 screens): the
+  four projects and three results already in `src/content/experience.ts`.
+- LinkedIn was not re-read (needs his login); the content is from the 2026-11-24 read. Ask him to paste the Experience
+  and About text for anything newer.
+
 ## Remaining tasks, in order
-1. Small: star dots still show over the sky around SC10 t≈0.86, while the cel colour is coming in.
-2. SC11c farm tiles (animals, fences) still look dull and scratchy next to the painted village and town; the painted
-   material could take them.
-3. Ink lines from depth are in (committed on Raju's "push all"): review the line art in SC10–SC12 with him.
-4. SC11b on Low is near budget (draw calls ~74/80, 236k/250k triangles): trim before adding more there.
-5. Dev-only console warning `glGetProgramiv: Program object expected` mid-journey (StrictMode + warm-up path).
+1. Review the line art (ink from depth) in SC10-SC12 with Raju.
+2. The farm on Low still uses the simplified copy (thin trees and ridges): a better low variant if it matters.
+3. Dev-only console warning `glGetProgramiv: Program object expected` after a cold jump into SC11: no JS-side query
+   of a deleted program exists, and adding synchronous `getError` probes makes it vanish, so it is a timing quirk
+   inside the browser's GL layer. Not seen to affect anything; left as is.
+4. Entry hitches ~80-120 ms as SC11a and SC11c warm up (none over 250 ms).
 
 ## Parked until the end (content, mobile)
 - Content: Spotmies end date (LinkedIn "Present" vs resume "Jun 2026"); Sports Paramount spelling; Spotmies project

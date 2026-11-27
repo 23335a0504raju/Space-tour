@@ -199,7 +199,7 @@ export function painted(src: THREE.Material, haze: Haze, paint: Paint): THREE.Me
   return m;
 }
 
-/** A textured model painted from its own sheet (the village): its colours, with cel light. */
+/** A model painted from its own sheet (the village, the farm): its colours, with cel light. */
 export function paintedAtlas(
   src: THREE.Material,
   haze: Haze,
