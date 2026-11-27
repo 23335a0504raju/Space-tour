@@ -38,6 +38,15 @@ export const styleAt = (t: number) => span(t, 0.74, 0.84) + span(t, 0.84, T_OUT)
 /** The space sky (stars, dust) is gone once the colour comes in: no inked dots on the painted sky. */
 export const spaceSkyAt = (t: number) => 1 - span(t, 0.8, 0.88);
 
+/**
+ * Dark pixels are open space (the style pass paints sky over them) until the camera is out of the
+ * tunnel and only the ship and the clouds are left. From there the background is left empty for the
+ * painted sky, and dark pixels turn back into drawn things, as in SC11, so the ship's own colour
+ * carries across the join.
+ */
+export const emptySkyAt = (t: number) => t >= T_OUT;
+export const backdropAt = (t: number) => 1 - span(t, T_OUT, 0.97);
+
 /** The disk is already blazing when the story begins; it brightens a little on approach. */
 export const gateOpen = (t: number) => 0.9 + 0.1 * span(t, 0, 0.3);
 

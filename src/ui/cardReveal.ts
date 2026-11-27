@@ -48,10 +48,11 @@ function classify(node: HTMLElement, parts: Parts): void {
 
 export function buildReveal(
   el: HTMLElement,
-  opts: { editorial: boolean; reduced: boolean },
+  /** `plain`: only the card itself rises and fades (its parts have their own motion) */
+  opts: { editorial: boolean; reduced: boolean; plain?: boolean },
 ): Reveal {
   const parts: Parts = { kicker: [], heading: [], body: [], items: [], cta: [] };
-  classify(el, parts);
+  if (!opts.plain) classify(el, parts);
   const move = opts.reduced ? 0 : 1;
   const tl = gsap.timeline({ paused: true, defaults: { ease: 'power3.out' } });
 

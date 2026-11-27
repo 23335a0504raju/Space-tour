@@ -1,4 +1,4 @@
-# Next session: full context and tasks (updated 2026-11-25)
+# Next session: full context and tasks (updated 2026-11-27)
 
 ## How to work with Raju (rules he has set)
 - Read `CLAUDE.md` first. Load the matching `.claude/skills/` skill (r3f-scenes, cinematic-ui, scroll-cinematics,
@@ -20,9 +20,9 @@
   (not `dist/`), and commit only your own hunks unless he says "commit all".
 
 ## State of the repo
-- Branch **`feat/sc11-fly-through-worlds`**, pushed to origin (github.com/23335a0504raju/Space-tour), all work
-  committed. Not merged to `main` (a PR can be opened from the branch).
-- Checks at hand-off: `npm run verify` 130/130, `npm run build` OK, Playwright 24/24.
+- Branch **`main`** (`feat/sc11-fly-through-worlds` was merged, PR #1). The 2026-11-27 work below is committed
+  on `main`; check `git status -sb` for whether it has been pushed.
+- Checks at hand-off: `npm run verify` 137/137, `npm run build` OK, Playwright 27 passed, 1 skipped (phone).
 - Git Bash notes: no backticks or `\n` escapes inside heredoc-written scripts (write scripts with the Write tool).
   Prettier reflows long lines, so string replacements written before formatting often miss: check every edit applied.
   `active` is a reserved word in GLSL.
@@ -47,14 +47,27 @@
 - Performance sweep, every chapter at its rest points: 60 fps both tiers; draw calls ≤122 Balanced / ≤74 Low;
   triangles ≤416k / ≤236k (all within budget).
 
+## Done (2026-11-27)
+- **Purple-pink anime worlds (root cause):** the style pass swapped every dark pixel for its painted sky and
+  crushed anything under 0.125 luminance to black. Chapters now say when dark means open space (`backdrop(t)`,
+  default 0; only SC10 uses it) and drawn darks keep their colour on a violet shadow floor. SC10 leaves its
+  background empty once painted (`emptyBackground(t)`), so the sky no longer depends on that rule at the join.
+- **West Street (SC11b) repainted:** frontier palette per material (`recolor` in `scripts/optimize-anime.ts`) and a
+  self-lit painted material (`src/chapters/anime/painted.ts`): cel light, planks, shingle rows, dirt street with ruts.
+- SC10→SC11a leftovers (star dots at t≈0.95, tunnel wall) were fixed in `caa6f8e`; checked in frames.
+- **World titles:** each anime world opens with its series name floating in the sky, in flight order
+  (`src/chapters/anime/titles.tsx`, an overlay at local t 0.22). Our own SVG lettering with the site's and system
+  fonts: Raju sent the official logos as the reference; they are not shipped (not free to use).
+- **Cards fit the window:** desktop cards scale down (`--fit`, `src/ui/fitCards.ts`) instead of scrolling inside
+  themselves, and stay between the header and the bottom bar. Checked 1180x620, 1280x720, 1536x730, 1920x950.
+
 ## Remaining tasks, in order
-1. SC10→SC11a join leftovers: dark inked star dots over the painted sky at t≈0.95, the tunnel's grey wall in the
-   right third (anime files). (The dark band across SC11a's sky is fixed: painted dome.)
-2. SC11b West Street town buildings (A049/A050 models): their textures render purple-pink and the street is flat
-   orange; repaint them in the painted style (Raju's screenshot, 2026-11-25).
+1. Small: star dots still show over the sky around SC10 t≈0.86, while the cel colour is coming in.
+2. Anime models still look dull or scratchy next to the painted town: SC11c farm tiles (animals, fences), Ichiraku
+   Ramen, the ship. The painted material could take the farm; ink is task 3.
 3. Needs Raju's approval: ink lines from depth/normals instead of luminance (`styleBlend.ts`), to clear the scratchy
    ink on detailed models (Ichiraku Ramen, the ship). Changes the line art in every anime world.
-4. SC11b on Low is near budget (74/80 draw calls, 236k/250k triangles): trim before adding more there.
+4. SC11b on Low is near budget (draw calls ~74/80, 236k/250k triangles): trim before adding more there.
 5. Dev-only console warning `glGetProgramiv: Program object expected` mid-journey (StrictMode + warm-up path).
 
 ## Parked until the end (content, mobile)

@@ -17,6 +17,8 @@ export interface JourneyFrame {
   t: number;
   /** Art-style blend: 0 realistic, 1 ink line art, 2 cel colour (a pure function of progress). */
   style: number;
+  /** How far dark pixels count as open space for the style pass, 0..1 (see `backdrop` below). */
+  backdrop: number;
   aspect: AspectClass;
 }
 
@@ -27,6 +29,7 @@ export const createJourneyFrame = (): JourneyFrame => ({
   localT: 0,
   t: 0,
   style: 0,
+  backdrop: 0,
   aspect: 'landscape',
 });
 
@@ -47,6 +50,16 @@ export interface ChapterImpl {
   readonly portraitShift?: number;
   /** Art-style blend at story time t (0 realistic, 1 line art, 2 cel). Default: the chapter art style. */
   style?(t: number): number;
+  /**
+   * 1 while dark pixels are open space that the painted sky replaces (the SC10 crossing), 0 where
+   * they are drawn things that keep their colour (the anime worlds). Default 0.
+   */
+  backdrop?(t: number): number;
+  /**
+   * True where the background is left empty (cleared with no alpha) so the style pass paints its
+   * sky there whatever is drawn in front. Default false: `background` is drawn.
+   */
+  emptyBackground?(t: number): boolean;
   readonly background: string;
   /** Colour of the dip when leaving this chapter (default black; white for the door → hatch cut). */
   readonly exitColor?: string;

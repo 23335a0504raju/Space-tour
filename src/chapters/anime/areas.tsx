@@ -11,6 +11,8 @@ import { PAINTED_CLOUDS, SUN_BEYOND } from './clouds.ts';
 import { ANIME_MODELS, AnimeModel } from './AnimeModel.tsx';
 import { createHaze, horizonColor } from './haze.ts';
 import type { Haze } from './haze.ts';
+import { createPaint } from './painted.ts';
+import type { Paint } from './painted.ts';
 import {
   DEATH_NOTE,
   DROP,
@@ -45,7 +47,16 @@ import {
   SkyDome,
   Torii,
 } from './parts.tsx';
-import { CloudSea, Fields, Ground, Houses, ModelPart, Strip, Trees } from './world.tsx';
+import {
+  CloudSea,
+  Fields,
+  Ground,
+  Houses,
+  ModelPart,
+  PaintedGround,
+  Strip,
+  Trees,
+} from './world.tsx';
 
 /**
  * SC11 · The Anime-Inspired Universe: three whole worlds crossed in one continuous flight
@@ -182,33 +193,34 @@ function Discipline({ frame, id, haze }: WorldProps) {
 
 // ── Proof: the frontier town ─────────────────────────────────────────────────
 
-function Proof({ frame, id, haze }: WorldProps) {
+function Proof({ frame, id, haze, paint }: WorldProps) {
   const g = GROUND.proof;
   return (
     <>
       {/* the desert floor beyond the town's own terrain (just below it, so the town wins) */}
-      <Ground y={g - 0.4} color="#d99c5e" haze={haze} />
+      <PaintedGround y={g - 0.4} width={5000} from={2200} to={-2800} haze={haze} paint={paint} />
       <AnimeModel
         url={ANIME_MODELS.town}
         size={TOWN.scale}
         fit="none"
         position={TOWN.position}
         haze={haze}
+        paint={paint}
         cull
         id={id}
         frame={frame}
       />
       {/* the street runs on past the town: the rural set lines it out to Kinnaird House */}
-      <Strip y={g} halfWidth={TOWN.street - 6} from={-330} to={-700} color="#b98a62" haze={haze} />
       {RURAL.map((r) => (
         <ModelPart
           key={r.name}
           url={ANIME_MODELS.rural}
           name={r.name}
           scale={RURAL_SCALE}
-          position={[r.x, g, r.z]}
+          position={[r.x, g - 0.4, r.z]}
           rotationY={r.rotY}
           haze={haze}
+          paint={paint}
         />
       ))}
       <AnimeModel
@@ -394,6 +406,8 @@ interface WorldProps {
   readonly frame: JourneyFrame;
   readonly id: string;
   readonly haze: Haze;
+  /** the painted materials' shared uniforms (the frontier town) */
+  readonly paint: Paint;
 }
 
 function World({ area, ...props }: WorldProps & { area: AreaId }): ReactNode {
@@ -443,6 +457,7 @@ function makeArea(area: AreaId): ChapterImpl {
     const sunTarget = useMemo(() => new THREE.Object3D(), []);
     const haze = useMemo(() => createHaze(HAZE_NEAR, HAZE_FAR), []);
     const sun = useRef<THREE.Group>(null);
+    const paint = useMemo(() => createPaint(GROUND[area], SUN_DIR), []);
     const live = useMemo(
       () => ({ current: [0, 1, 2, 3].map(() => new THREE.Color()) as THREE.Color[] }),
       [],
@@ -481,6 +496,7 @@ function makeArea(area: AreaId): ChapterImpl {
         world.current.visible = k > 0.002;
         world.current.position.y = -(1 - k) * DROP;
       }
+      paint.drop.value = -(1 - k) * DROP;
       // a leaving world also dissolves into the horizon (no inked ground line left in the sky)
       haze.near.value = HAZE_NEAR * k;
       haze.far.value = 40 + (HAZE_FAR - 40) * k;
@@ -514,7 +530,7 @@ function makeArea(area: AreaId): ChapterImpl {
           </>
         )}
         <group ref={world} visible={false}>
-          <World area={area} frame={frame} id={id} haze={haze} />
+          <World area={area} frame={frame} id={id} haze={haze} paint={paint} />
         </group>
         <CloudSea
           level={SEA_LEVEL}

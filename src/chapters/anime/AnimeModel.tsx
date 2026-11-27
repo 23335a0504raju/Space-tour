@@ -7,6 +7,8 @@ import { gltfExtender } from '../../engine/assets/loaders.ts';
 import type { JourneyFrame } from '../contract.ts';
 import { hazed } from './haze.ts';
 import type { Haze } from './haze.ts';
+import { painted } from './painted.ts';
+import type { Paint } from './painted.ts';
 
 /**
  * One anime-world model (SC11), fitted by measurement: the Sketchfab exports come in every scale
@@ -46,6 +48,8 @@ interface Props {
   readonly animate?: boolean;
   /** fade into this world's horizon (haze.ts) */
   readonly haze?: Haze;
+  /** paint it (painted.ts) in place of the chapter's lighting; needs `haze` */
+  readonly paint?: Paint;
   /** static props: let three cull them (skinned models stay unculled: their bounds lie) */
   readonly cull?: boolean;
   readonly id: string;
@@ -66,6 +70,7 @@ export function AnimeModel({
   bob = 0,
   animate = false,
   haze,
+  paint,
   cull = false,
   id,
   frame,
@@ -80,10 +85,12 @@ export function AnimeModel({
       // normals were dropped for welding and simplifying (scripts/optimize-anime.ts)
       if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
       mesh.frustumCulled = cull && !(mesh as THREE.SkinnedMesh).isSkinnedMesh;
-      if (haze)
+      if (haze) {
+        const skin = (m: THREE.Material) => (paint ? painted(m, haze, paint) : hazed(m, haze));
         mesh.material = Array.isArray(mesh.material)
-          ? mesh.material.map((m) => hazed(m, haze))
-          : hazed(mesh.material, haze);
+          ? mesh.material.map(skin)
+          : skin(mesh.material);
+      }
     });
     root.updateMatrixWorld(true);
     root.traverse((o) => {
@@ -110,7 +117,7 @@ export function AnimeModel({
     root.scale.multiplyScalar(scale);
     const clips = gltf.animations.filter((a) => a.name.includes('Anim_'));
     return { holder, root, clips };
-  }, [gltf, size, fit, haze, cull]);
+  }, [gltf, size, fit, haze, paint, cull]);
 
   const mixer = useMemo(() => {
     if (!animate || built.clips.length === 0) return null;

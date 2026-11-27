@@ -89,6 +89,57 @@ test('journey: every rest point shows its content (screenshots for review)', asy
   expect(errors).toEqual([]);
 });
 
+test('journey: in a short laptop window no card scrolls inside itself', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'phones use their own sheet layout');
+  const size = { width: 1180, height: 620 };
+  await page.setViewportSize(size);
+  await page.goto('/?gate=off');
+  await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
+  const track = buildTrack(chapters, classifyAspect(size.width, size.height));
+  // the tallest cards
+  for (const [id, r, label] of [
+    ['sc08-jupiter', 0.5, /DocumentDB/],
+    ['sc09-saturn', 0.75, /Technology stack/],
+    ['sc11a-discipline', 0.55, /Certifications/],
+  ] as const) {
+    await scrollToProgress(page, progressFor(track, id, r));
+    await page.waitForTimeout(SETTLE_MS);
+    const card = page.getByRole('region', { name: label });
+    await expect(card).toBeVisible();
+    const box = await card.evaluate((el) => ({
+      overflow: el.scrollHeight - el.clientHeight,
+      top: el.getBoundingClientRect().top,
+      bottom: el.getBoundingClientRect().bottom,
+    }));
+    expect(box.overflow).toBeLessThanOrEqual(1);
+    // between the header's progress line and the bottom bar
+    expect(box.top).toBeGreaterThan(100);
+    expect(box.bottom).toBeLessThan(size.height - 70);
+  }
+});
+
+test('journey: each anime world opens with its title, in flight order', async ({ page }) => {
+  await page.goto('/?gate=off');
+  await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
+  const vp = page.viewportSize() ?? { width: 1440, height: 900 };
+  const track = buildTrack(chapters, classifyAspect(vp.width, vp.height));
+  for (const [i, [id, name]] of (
+    [
+      ['sc11a-discipline', 'Naruto'],
+      ['sc11b-proof', 'Death Note'],
+      ['sc11c-horizon', 'Demon Slayer'],
+    ] as const
+  ).entries()) {
+    await scrollToProgress(page, progressFor(track, id, 0.22));
+    await page.waitForTimeout(SETTLE_MS);
+    await expect(panel(page, name)).toBeVisible();
+    await expect(panel(page, name).getByRole('heading', { name })).toBeAttached();
+    await expect(panel(page, name)).toContainText(`World ${i + 1} of 3`);
+    // only this one is on screen: it never overlaps a card or a neighbour
+    await expect(page.locator('section[aria-label]:not([aria-hidden="true"])')).toHaveCount(1);
+  }
+});
+
 test('journey: flight plan jumps straight to a chapter', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/?gate=off');

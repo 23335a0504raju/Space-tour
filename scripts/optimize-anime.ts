@@ -133,12 +133,44 @@ const JOBS: readonly Job[] = [
     smooth: true,
     pruneSmall: true,
     lift: { material: /^Wood__Floor_2$/, dy: 0.6 },
-    // pure black walls and a sand texture that averages out grey
+    // The textures average out to near-identical dark browns (and the sand to grey), so every
+    // material gets a painted frontier colour: warm timber, barn red, cream, sage, dusty blue,
+    // slate roofs, blue window dark (the runtime adds light, planks and dirt: anime/painted.ts).
     recolor: {
-      black: '#4b3a32',
       LightGray: '#d99c5e',
       Groundcover_Sand_Smooth: '#d99c5e',
       Groundcover_Sand_Smooth_2: '#d99c5e',
+      Wood__Floor_2: '#c98a58',
+      // walls
+      Wood_Lumber_ButtJoined_3: '#d6a56b',
+      Wood__Floor_4: '#b8604a',
+      Wood_Cherry_Original: '#9c5a40',
+      Wood_Lumber_ButtJoined_7: '#e3bd7a',
+      Wood__Floor_5: '#7fa393',
+      Wood_Lumber_ButtJoined: '#cc6f4c',
+      Wood_Cherry_Original_4_5: '#b34a3c',
+      Wood_Lumber_ButtJoined_4: '#7d9fba',
+      Wood_Lumber_ButtJoined_6_7: '#ecdab4',
+      Wood_Lumber_ButtJoined_2: '#dfa564',
+      Wood_Lumber_ButtJoined_8: '#6e4638',
+      Wood_Lumber_ButtJoined_9: '#b07a50',
+      Wood_Lumber_ButtJoined_9_8: '#b07a50',
+      Wood_Cherry_Original_2: '#d4866a',
+      Wood_Cherry_Original_3: '#94543a',
+      Metal_Rusted: '#b8735a',
+      // porches, boards, shutters
+      Wood__Floor: '#cf9058',
+      Wood__Floor_1: '#cf9058',
+      Wood__Floor_3: '#bd8c5c',
+      Blinds_Wood_Natural: '#a46a42',
+      // roofs
+      Roofing_Shingles_Variable: '#5c7e99',
+      Roofing_Shingles_Variable_1: '#5f8f83',
+      Roofing_Shingles_Wood: '#96564c',
+      Metal_Seamed: '#76899a',
+      // sign boards and window openings
+      Wood_Board_Cork_1: '#4a2f2a',
+      black: '#34405e',
     },
   },
   {

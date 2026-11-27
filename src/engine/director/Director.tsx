@@ -66,7 +66,7 @@ export function Director({ master, frame, links }: Props) {
   // size the lens shift was last applied for (so it is only rewritten when something changes)
   const lens = useMemo(() => ({ w: 0, h: 0, shift: 0 }), []);
 
-  useFrame(({ camera, scene, size }) => {
+  useFrame(({ camera, scene, size, gl }) => {
     const progress = master.progress;
     const r = resolve(links.track, progress);
     const meta = chapters[r.index];
@@ -79,6 +79,7 @@ export function Director({ master, frame, links }: Props) {
     frame.localT = r.localT;
     frame.t = dwell(r.localT, meta.restPoints);
     frame.style = impl.style ? impl.style(frame.t) : meta.artStyle === 'anime' ? 2 : 0;
+    frame.backdrop = impl.backdrop?.(frame.t) ?? 0;
 
     // Discrete: only when the chapter actually changes (mounting/unmounting neighbours).
     const store = useJourneyStore.getState();
@@ -95,7 +96,10 @@ export function Director({ master, frame, links }: Props) {
 
     const bg = backgrounds.get(r.id);
     if (bg) {
-      if (scene.background instanceof THREE.Color) scene.background.copy(bg);
+      if (impl.emptyBackground?.(frame.t)) {
+        scene.background = null;
+        gl.setClearColor(bg, 0);
+      } else if (scene.background instanceof THREE.Color) scene.background.copy(bg);
       else scene.background = bg.clone();
     }
 

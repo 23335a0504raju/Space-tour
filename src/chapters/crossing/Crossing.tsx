@@ -20,6 +20,8 @@ import {
   gateOpen,
   shipZ,
   spaceSkyAt,
+  backdropAt,
+  emptySkyAt,
   styleAt,
 } from './crossing.ts';
 
@@ -126,5 +128,7 @@ export const sc10Crossing: ChapterImpl = {
   Scene: CrossingScene,
   shot: crossingShot,
   style: styleAt,
+  backdrop: backdropAt,
+  emptyBackground: emptySkyAt,
   background: '#020308',
 };

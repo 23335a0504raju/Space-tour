@@ -42,6 +42,7 @@ import { usePacedWheel } from '../scroll/usePacedWheel.ts';
 import { useScrollMaster } from '../scroll/useScrollMaster.ts';
 import { preloadJourney } from '../assets/preload.ts';
 import { compileChapter, POST_OUTPUT, SCREEN_OUTPUT } from '../assets/warm.ts';
+import { fitCards } from '../../ui/fitCards.ts';
 import { prepaintCards } from '../../ui/prepaint.ts';
 import { uploadGeometry } from '../assets/uploadGeometry.ts';
 import type { Output } from '../assets/warm.ts';
@@ -118,7 +119,9 @@ function StyleSync({
   effect: RefObject<StyleBlendEffect | null>;
 }) {
   useFrame(() => {
-    if (effect.current) effect.current.style = frame.style;
+    if (!effect.current) return;
+    effect.current.style = frame.style;
+    effect.current.backdrop = frame.backdrop;
   });
   return null;
 }
@@ -318,7 +321,12 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
   // first paint of every card at load, not mid-scroll (src/ui/prepaint.ts)
   useEffect(() => {
     if (!layer.current) return;
-    return prepaintCards(layer.current, overlayStyles.prepaint ?? 'prepaint');
+    const stopFit = fitCards(layer.current);
+    const stopPaint = prepaintCards(layer.current, overlayStyles.prepaint ?? 'prepaint');
+    return () => {
+      stopFit();
+      stopPaint();
+    };
   }, []);
   return (
     <div ref={layer} className={overlayStyles.layer}>
@@ -345,7 +353,8 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
                 half: def.band ?? DEFAULT_BAND,
                 holdToEnd: def.holdToEnd ?? false,
                 reveal: buildReveal(el, {
-                  editorial: def.variant === 'editorial',
+                  editorial: def.variant === 'editorial' || def.variant === 'world',
+                  plain: def.variant === 'world',
                   reduced: prefersReducedMotion(),
                 }),
                 last: 0,
@@ -356,7 +365,13 @@ function OverlayLayer({ links }: { links: DirectorLinks }) {
             // whole layer only unmounts with the Journey, taking the links object with it)
           }}
         >
-          {def.render()}
+          {def.variant === 'card' || def.variant === 'world' ? (
+            def.render()
+          ) : (
+            <div className={overlayStyles.fit} data-fit="">
+              {def.render()}
+            </div>
+          )}
         </section>
       ))}
     </div>

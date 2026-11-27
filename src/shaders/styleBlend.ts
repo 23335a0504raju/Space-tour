@@ -5,11 +5,14 @@ import { Uniform } from 'three';
  * Screen-space art-style blend (SC10 crossing, SC11 anime universe, SC12 return).
  *   uStyle 0 = realistic (untouched), 1 = the scene inked (lines, hatching), 2 = flat cel colour
  *   with ink lines. No paper-white stage: the ramp never flashes bright between dark and painted.
+ *   uBackdrop 1 = dark pixels are open space and take the painted sky (the SC10 crossing),
+ *               0 = they are drawn things (dark wood, a black coat) and keep their own colour
  * It runs after tone mapping, on the final image, and is a pure function of `uStyle`, which the
  * Director derives from scroll progress, so the transition reverses exactly.
  */
 const fragment = /* glsl */ `
   uniform float uStyle;
+  uniform float uBackdrop;
 
   float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
@@ -73,7 +76,12 @@ const fragment = /* glsl */ `
     // towards white (a screen curve, which keeps their tone order)
     vec3 lifted = 1.0 - (1.0 - inputColor.rgb) * (1.0 - inputColor.rgb);
     base = mix(base, lifted, cloud);
-    vec3 cel = mix(sky, base, smoothstep(0.025, 0.1, l));
+    // A drawn dark surface: the first posterise band would crush it to black, so it keeps its own
+    // colour on a violet shadow floor (an anime shadow, never a hole in the picture).
+    vec3 shadow = inputColor.rgb * 1.3 + vec3(0.07, 0.045, 0.095) * (1.0 - smoothstep(0.0, 0.125, l));
+    vec3 drawn = mix(base, shadow, (1.0 - step(0.125, l)) * (1.0 - cloud));
+    // over open space, dark pixels are the backdrop instead and take the painted sky
+    vec3 cel = mix(drawn, mix(sky, base, smoothstep(0.025, 0.1, l)), uBackdrop);
     cel = mix(cel, sky + inputColor.rgb * 0.6, empty);
     // a painted surface over empty space (alpha between 0 and 0.5: a soft halo, a cloud's edge)
     // was blended over black. Undo that and lay it over the painted sky instead, or the partial
@@ -93,7 +101,7 @@ const fragment = /* glsl */ `
       if (under < 0.05) {
         vec3 own = inputColor.rgb / max(cov, 0.02);
         vec3 ownLifted = 1.0 - (1.0 - own) * (1.0 - own);
-        cel = mix(sky, ownLifted, clamp(cov, 0.0, 1.0));
+        cel = mix(cel, mix(sky, ownLifted, clamp(cov, 0.0, 1.0)), uBackdrop);
       }
     }
     cel = mix(cel, inkCol, ink * 0.9);
@@ -111,7 +119,10 @@ export class StyleBlendEffect extends Effect {
   constructor() {
     super('StyleBlendEffect', fragment, {
       blendFunction: BlendFunction.NORMAL,
-      uniforms: new Map([['uStyle', new Uniform(0)]]),
+      uniforms: new Map([
+        ['uStyle', new Uniform(0)],
+        ['uBackdrop', new Uniform(0)],
+      ]),
     });
   }
 
@@ -121,6 +132,15 @@ export class StyleBlendEffect extends Effect {
 
   set style(value: number) {
     const u = this.uniforms.get('uStyle');
+    if (u) u.value = value;
+  }
+
+  get backdrop(): number {
+    return (this.uniforms.get('uBackdrop')?.value as number | undefined) ?? 0;
+  }
+
+  set backdrop(value: number) {
+    const u = this.uniforms.get('uBackdrop');
     if (u) u.value = value;
   }
 }

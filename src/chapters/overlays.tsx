@@ -4,6 +4,7 @@ import type { Project } from '../content/index.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
 import { CARD_REST, MOON_ANCHOR } from './homecoming/homecoming.ts';
+import { WORLD_TITLES, WorldTitleCard } from './anime/titles.tsx';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
 import { PROJECT_MEDIA } from '../ui/projectMedia.ts';
 import styles from './overlays.module.css';
@@ -17,8 +18,11 @@ export interface OverlayDef {
   readonly chapterId: string;
   readonly rest: number;
   readonly placement: 'center' | 'left' | 'right' | 'bottom';
-  /** 'editorial': large type straight over the scene on a soft vignette, no panel box. */
-  readonly variant?: 'editorial' | 'showcase' | 'card';
+  /**
+   * 'editorial': large type straight over the scene on a soft vignette, no panel box.
+   * 'world': an anime world's floating title.
+   */
+  readonly variant?: 'editorial' | 'showcase' | 'card' | 'world';
   /** Half-width of the readable band around the rest point, in local t (default 0.12). */
   readonly band?: number;
   readonly label: string;
@@ -326,6 +330,17 @@ const allOverlayDefs: readonly OverlayDef[] = [
       </>
     ),
   },
+  // each anime world opens with its series' name, gone before the world's card arrives
+  ...Object.entries(WORLD_TITLES).map(([chapterId, title]): OverlayDef => ({
+    key: `world-${chapterId}`,
+    chapterId,
+    rest: 0.22,
+    band: 0.18,
+    placement: 'center',
+    variant: 'world',
+    label: title.name,
+    render: () => <WorldTitleCard title={title} />,
+  })),
   {
     key: 'certifications',
     chapterId: 'sc11a-discipline',

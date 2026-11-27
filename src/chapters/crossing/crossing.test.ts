@@ -7,7 +7,9 @@ import {
   T_OUT,
   TRAVEL,
   TUNNEL,
+  backdropAt,
   crossingShot,
+  emptySkyAt,
   shipZ,
   spaceSkyAt,
   styleAt,
@@ -38,6 +40,17 @@ describe('SC10 crossing', () => {
   it('the stars are gone before the sky is painted', () => {
     expect(spaceSkyAt(0.7)).toBe(1);
     expect(spaceSkyAt(T_OUT)).toBe(0);
+  });
+  it('dark pixels stay open space until the sky is left empty, then become drawn things', () => {
+    // while the tunnel and space are on screen the painted sky replaces whatever is dark
+    expect(backdropAt(0)).toBe(1);
+    expect(backdropAt(T_OUT)).toBe(1);
+    // the ship's own colour is back before the join, so SC11 (backdrop 0) matches the last frame
+    expect(backdropAt(1)).toBe(0);
+    // and the sky never relies on the dark rule once that starts to fade
+    for (let t = 0; t <= 1; t += 0.005) if (backdropAt(t) < 1) expect(emptySkyAt(t)).toBe(true);
+    // the switch to an empty sky happens only once the picture is fully painted
+    expect(emptySkyAt(T_OUT - 0.01)).toBe(false);
   });
   it('the blend is monotonic and passes through line art (1) on the way', () => {
     let prev = -1;

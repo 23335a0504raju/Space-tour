@@ -8,6 +8,8 @@ import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { applyHaze, hazed as hazedClone } from './haze.ts';
 import type { Haze } from './haze.ts';
 import type { Block } from './layout.ts';
+import { painted, paintedGround } from './painted.ts';
+import type { Paint } from './painted.ts';
 import { PaintedPuffs, foliagePalette } from './parts.tsx';
 
 /**
@@ -144,6 +146,31 @@ export function Ground({ y, color, haze }: { y: number; color: string; haze: Haz
   return (
     <mesh material={mat} position={[0, y, -300]} rotation={[-Math.PI / 2, 0, 0]}>
       <planeGeometry args={[5000, 5000]} />
+    </mesh>
+  );
+}
+
+/** A stretch of painted dirt (painted.ts): the frontier town's street and desert floor. */
+export function PaintedGround({
+  y,
+  width,
+  from,
+  to,
+  haze,
+  paint,
+}: {
+  y: number;
+  width: number;
+  from: number;
+  to: number;
+  haze: Haze;
+  paint: Paint;
+}) {
+  const mat = useMemo(() => paintedGround(haze, paint), [haze, paint]);
+  useDisposeOnUnmount(mat);
+  return (
+    <mesh material={mat} position={[0, y, (from + to) / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[width, from - to]} />
     </mesh>
   );
 }
@@ -562,6 +589,7 @@ export function ModelPart({
   position,
   rotationY = 0,
   haze,
+  paint,
 }: {
   url: string;
   name: string;
@@ -569,6 +597,7 @@ export function ModelPart({
   position: readonly [number, number, number];
   rotationY?: number;
   haze: Haze;
+  paint?: Paint;
 }) {
   const gl = useThree((st) => st.gl);
   const gltf = useGLTF(url, false, true, gltfExtender(gl));
@@ -589,12 +618,11 @@ export function ModelPart({
     part.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.material = Array.isArray(mesh.material)
-        ? mesh.material.map((m) => hazedClone(m, haze))
-        : hazedClone(mesh.material, haze);
+      const skin = (m: THREE.Material) => (paint ? painted(m, haze, paint) : hazedClone(m, haze));
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(skin) : skin(mesh.material);
     });
     return holder;
-  }, [gltf, name, haze]);
+  }, [gltf, name, haze, paint]);
   if (!obj) return null;
   return (
     <group position={[...position]} rotation={[0, rotationY, 0]} scale={scale}>
