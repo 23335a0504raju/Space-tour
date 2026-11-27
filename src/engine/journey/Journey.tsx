@@ -11,9 +11,9 @@ import type { RefObject } from 'react';
 import gsap from 'gsap';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Bloom, EffectComposer, SMAA, ToneMapping, wrapEffect } from '@react-three/postprocessing';
+import { Bloom, EffectComposer, SMAA, wrapEffect } from '@react-three/postprocessing';
 import type { EffectComposer as EffectComposerImpl } from 'postprocessing';
-import { StyleBlendEffect } from '../../shaders/styleBlend.ts';
+import { OrderedToneMappingEffect, StyleBlendEffect } from '../../shaders/styleBlend.ts';
 import { LensEffect } from '../../shaders/lens.ts';
 import { ToneMappingMode } from 'postprocessing';
 import { chapters } from '../../chapters/registry.ts';
@@ -103,6 +103,7 @@ function waitForChapter(links: DirectorLinks, id: string): Promise<void> {
  */
 const StyleBlend = wrapEffect(StyleBlendEffect);
 const Lens = wrapEffect(LensEffect);
+const ToneMapping = wrapEffect(OrderedToneMappingEffect);
 
 /** Copies the black hole's lens state to the lens pass each frame (no React state). */
 function LensSync({ effect }: { effect: RefObject<LensEffect | null> }) {
@@ -114,14 +115,19 @@ function LensSync({ effect }: { effect: RefObject<LensEffect | null> }) {
 function StyleSync({
   frame,
   effect,
+  lensAhead,
 }: {
   frame: JourneyFrame;
   effect: RefObject<StyleBlendEffect | null>;
+  /** the full post chain bends the picture in its own pass, before the style pass */
+  lensAhead: boolean;
 }) {
   useFrame(() => {
     if (!effect.current) return;
     effect.current.style = frame.style;
     effect.current.backdrop = frame.backdrop;
+    effect.current.colourInk = frame.colourInk;
+    effect.current.lensAhead = lensAhead;
   });
   return null;
 }
@@ -695,7 +701,7 @@ function JourneyCanvas() {
           }}
         >
           <ToneMappingOwner composer={composer} />
-          <StyleSync frame={frame} effect={styleRef} />
+          <StyleSync frame={frame} effect={styleRef} lensAhead={tier === 'balanced'} />
           <LensSync effect={lensRef} />
           <Director master={master.state} frame={frame} links={links} />
           <FirstFrame

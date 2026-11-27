@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { createShotState } from '../../engine/camera/shots.ts';
 import { crossingShot } from '../crossing/crossing.ts';
-import { EARTH, GATE, MOON, T_EXIT, T_GATE, TRAVEL, returnShot, shipZ, styleAt } from './return.ts';
+import {
+  EARTH,
+  GATE,
+  MOON,
+  T_EXIT,
+  T_GATE,
+  TRAVEL,
+  colourInkAt,
+  returnShot,
+  shipZ,
+  styleAt,
+} from './return.ts';
 
 describe('SC12 return', () => {
   it('passes the gate then leaves the tunnel into the real world, in order', () => {
@@ -36,6 +47,12 @@ describe('SC12 return', () => {
     crossingShot(0.3, a);
     returnShot(0.3, b);
     expect(Number.isFinite(a.position.x + b.position.x)).toBe(true);
+  });
+  it('inks shapes over the painted world and the light itself inside the gate', () => {
+    // SC11c hands over with shape ink; the tunnel keeps its drawn line art
+    expect(colourInkAt(0)).toBe(0);
+    expect(colourInkAt(T_GATE)).toBeCloseTo(1, 6);
+    expect(colourInkAt(1)).toBe(1);
   });
   it('is path independent (reverse scrolling is exact)', () => {
     const a = createShotState();

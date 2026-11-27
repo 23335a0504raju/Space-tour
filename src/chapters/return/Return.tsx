@@ -25,6 +25,7 @@ import {
   TUNNEL,
   gateOpen,
   holeRadiusAt,
+  colourInkAt,
   returnShot,
   shipZ,
   styleAt,
@@ -163,5 +164,6 @@ export const sc12Return: ChapterImpl = {
   Scene: ReturnScene,
   shot: returnShot,
   style: styleAt,
+  colourInk: colourInkAt,
   background: '#020308',
 };

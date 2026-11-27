@@ -19,6 +19,8 @@ export interface JourneyFrame {
   style: number;
   /** How far dark pixels count as open space for the style pass, 0..1 (see `backdrop` below). */
   backdrop: number;
+  /** How far ink follows colour boundaries instead of shapes, 0..1 (see `colourInk` below). */
+  colourInk: number;
   aspect: AspectClass;
 }
 
@@ -30,6 +32,7 @@ export const createJourneyFrame = (): JourneyFrame => ({
   t: 0,
   style: 0,
   backdrop: 0,
+  colourInk: 0,
   aspect: 'landscape',
 });
 
@@ -55,6 +58,11 @@ export interface ChapterImpl {
    * they are drawn things that keep their colour (the anime worlds). Default 0.
    */
   backdrop?(t: number): number;
+  /**
+   * 1 where ink should follow colour boundaries because there is no shape to draw (open space, a
+   * tunnel of light), 0 where it follows shapes. Default: the backdrop value.
+   */
+  colourInk?(t: number): number;
   /**
    * True where the background is left empty (cleared with no alpha) so the style pass paints its
    * sky there whatever is drawn in front. Default false: `background` is drawn.
