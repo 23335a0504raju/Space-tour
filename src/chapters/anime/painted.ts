@@ -117,7 +117,7 @@ function paintMaterial(
   mat: THREE.MeshBasicMaterial,
   haze: Haze,
   paint: Paint,
-  ground: boolean,
+  kind: 'wood' | 'ground' | 'atlas',
 ): THREE.MeshBasicMaterial {
   applyHaze(mat, haze);
   const hazeCompile = mat.onBeforeCompile;
@@ -130,11 +130,14 @@ function paintMaterial(
     shader.vertexShader =
       VERT_DECL + shader.vertexShader.replace('#include <project_vertex>', VERT_BODY);
     shader.fragmentShader =
-      (ground ? '#define PAINT_GROUND\n' : '') +
+      (kind === 'ground' ? '#define PAINT_GROUND\n' : '') +
       FRAG_DECL +
-      shader.fragmentShader.replace('#include <color_fragment>', FRAG_BODY);
+      shader.fragmentShader.replace(
+        '#include <color_fragment>',
+        kind === 'atlas' ? ATLAS_BODY : FRAG_BODY,
+      );
   };
-  mat.customProgramCacheKey = () => (ground ? 'sc11-painted-ground' : 'sc11-painted');
+  mat.customProgramCacheKey = () => `sc11-painted-${kind}`;
   // painted-surface mark, kept in the opaque pass (these are solid walls)
   Object.assign(mat, { ...PAINTED_BLEND, transparent: false });
   return mat;
@@ -146,8 +149,29 @@ export const paintedGround = (haze: Haze, paint: Paint): THREE.MeshBasicMaterial
     new THREE.MeshBasicMaterial({ polygonOffset: true, polygonOffsetFactor: -1 }),
     haze,
     paint,
-    true,
+    'ground',
   );
+
+const ATLAS_BODY = /* glsl */ `#include <color_fragment>
+  {
+    vec3 p = vPaintPos - vec3(0.0, uDrop, 0.0);
+    vec3 n = normalize(cross(dFdx(vPaintPos), dFdy(vPaintPos)));
+    vec3 facing = dot(n, cameraPosition - vPaintPos) < 0.0 ? -n : n;
+    vec3 col = diffuseColor.rgb;
+    // anime colour: richer than the photo sheet, greens and roofs most
+    col = max(mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.3), 0.0);
+    // two-tone painted light: warm where the sun reaches, a cool soft shadow elsewhere
+    float d = dot(facing, uSunDir);
+    float lit = smoothstep(-0.02, 0.22, d);
+    vec3 shade = col * vec3(0.5, 0.5, 0.74) + vec3(0.008, 0.01, 0.03);
+    vec3 sunlit = col * vec3(1.16, 1.06, 0.9);
+    col = mix(shade, sunlit, lit);
+    // walls and cliffs: darker at the foot, bleached towards the top
+    float h = p.y - uGround;
+    float wall = 1.0 - smoothstep(0.45, 0.75, abs(n.y));
+    col *= mix(1.0, 0.8 + 0.3 * smoothstep(0.0, 60.0, h), wall);
+    diffuseColor.rgb = col;
+  }`;
 
 /** Per-paint cache, so every copy of a model shares one painted material per source. */
 const cache = new WeakMap<Paint, WeakMap<THREE.Material, THREE.MeshBasicMaterial>>();
@@ -168,7 +192,29 @@ export function painted(src: THREE.Material, haze: Haze, paint: Paint): THREE.Me
       }),
       haze,
       paint,
-      false,
+      'wood',
+    );
+    map.set(src, m);
+  }
+  return m;
+}
+
+/** A textured model painted from its own sheet (the village): its colours, with cel light. */
+export function paintedAtlas(
+  src: THREE.Material,
+  haze: Haze,
+  paint: Paint,
+): THREE.MeshBasicMaterial {
+  let map = cache.get(paint);
+  if (!map) cache.set(paint, (map = new WeakMap()));
+  let m = map.get(src);
+  if (!m) {
+    const s = src as THREE.MeshStandardMaterial;
+    m = paintMaterial(
+      new THREE.MeshBasicMaterial({ color: s.color, map: s.map, side: s.side }),
+      haze,
+      paint,
+      'atlas',
     );
     map.set(src, m);
   }

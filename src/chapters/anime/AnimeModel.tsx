@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -14,12 +14,18 @@ import type { Paint } from './painted.ts';
  * One anime-world model (SC11), fitted by measurement: the Sketchfab exports come in every scale
  * and unit (a character 0.02 or 130 units tall), so each is measured after skinning and scaled so
  * its height (or longest side) is `size` metres, centred, with its feet on y = 0 of the group.
+ * Everything stands on the ground: nothing hovers or spins (Raju, 2026-11-27).
  * Skinned models are cloned with SkeletonUtils (neighbouring chapters mount at the same time).
- * Ambient motion only (the looping pose clips, a slow spin, a bob): never story state.
+ * Ambient motion only (looping pose clips): never story state.
  */
 export const ANIME_MODELS = {
-  naruto: '/assets/models/anime_naruto.glb',
-  ichiraku: '/assets/models/anime_ichiraku.glb',
+  village: '/assets/models/anime_village.glb',
+  sage: '/assets/models/anime_sage.glb',
+  itachi: '/assets/models/anime_itachi.glb',
+  jiraiya: '/assets/models/anime_jiraiya.glb',
+  pain: '/assets/models/anime_pain.glb',
+  obito: '/assets/models/anime_obito.glb',
+  inosuke: '/assets/models/anime_inosuke.glb',
   deathNote: '/assets/models/anime_deathnote.glb',
   ryuk: '/assets/models/anime_ryuk.glb',
   kinnaird: '/assets/models/anime_kinnaird.glb',
@@ -41,9 +47,6 @@ interface Props {
   readonly fit?: 'height' | 'max' | 'none';
   readonly position: readonly [number, number, number];
   readonly rotationY?: number;
-  /** slow spin about the vertical (rad/s) and a gentle bob (m) */
-  readonly spin?: number;
-  readonly bob?: number;
   /** play the model's `Anim_*` clips on a loop */
   readonly animate?: boolean;
   /** fade into this world's horizon (haze.ts) */
@@ -66,8 +69,6 @@ export function AnimeModel({
   fit = 'height',
   position,
   rotationY = 0,
-  spin = 0,
-  bob = 0,
   animate = false,
   haze,
   paint,
@@ -138,15 +139,12 @@ export function AnimeModel({
     [built, mixer],
   );
 
-  const group = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
-    if (frame.id !== id || !group.current) return;
+    if (frame.id !== id) return;
     mixer?.update(Math.min(delta, 0.1));
-    if (spin) group.current.rotation.y += delta * spin;
-    if (bob) group.current.position.y = position[1] + Math.sin(performance.now() / 1000) * bob;
   });
   return (
-    <group ref={group} position={[...position]} rotation={[0, rotationY, 0]}>
+    <group position={[...position]} rotation={[0, rotationY, 0]}>
       <primitive object={built.holder} />
     </group>
   );

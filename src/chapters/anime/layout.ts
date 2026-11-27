@@ -5,10 +5,10 @@ import type { AreaId } from './anime.ts';
  * *through*: the ship keeps the flight line x = 0, y = 0 (keel), z 0 → -220, and the ground sits
  * below it, filled out to the horizon, where the haze dissolves it into the sky.
  *
- *   discipline: a lantern village street (procedural houses and towers round Ichiraku)
+ *   discipline: the Hidden Leaf village (one model: gate, river, main street, tower, stone faces)
  *   proof:      the West Street town (A049), its street extended by the rural set (A050), with
  *               Kinnaird House closing the vista
- *   horizon:    a farm valley (A048 tiles) under blossom trees, Tanjiro and Nezuko on the hill
+ *   horizon:    a farm valley (A048 tiles) under blossom trees, Tanjiro and friends on the road
  *
  * Everything is seeded: the same layout on every load, so frames and tests are reproducible.
  */
@@ -21,7 +21,7 @@ export function seeded(seed: number) {
 
 /** Ground height below the flight line (the ship keel flies at y = 0). */
 export const GROUND: Readonly<Record<AreaId, number>> = {
-  discipline: -30,
+  discipline: -34,
   proof: -10,
   horizon: -30,
 };
@@ -39,65 +39,72 @@ export interface Block {
   readonly h: number;
 }
 
-// ── Discipline: the village ──────────────────────────────────────────────────
+// ── Discipline: the Hidden Leaf village ──────────────────────────────────────
 
-export interface House extends Block {
-  readonly tower: boolean;
-  /** palette indices (wall, roof) */
-  readonly wall: number;
-  readonly roof: number;
+const VILLAGE_YAW = Math.PI / 4;
+const VILLAGE_SCALE = 160;
+/**
+ * The model's own measurements, after turning it 45° so its main axis runs along -z: the street
+ * level, the axis (gate → bridge → street → Hokage tower → faces) and the cliff face.
+ */
+const VILLAGE_SOURCE = { axisX: -1.17, faceZ: -4.7, street: -0.085 } as const;
+/** Where those sit in the chapter: the axis just right of the flight line, the faces far ahead. */
+const VILLAGE_AT = { axisX: 10, faceZ: -360 } as const;
+
+export const VILLAGE = {
+  scale: VILLAGE_SCALE,
+  yaw: VILLAGE_YAW,
+  position: [
+    VILLAGE_AT.axisX - VILLAGE_SOURCE.axisX * VILLAGE_SCALE,
+    GROUND.discipline - VILLAGE_SOURCE.street * VILLAGE_SCALE,
+    VILLAGE_AT.faceZ - VILLAGE_SOURCE.faceZ * VILLAGE_SCALE,
+  ] as const,
+  /** the forest plane: over the model's outer water ring, under its beach and its river */
+  forestFloor: GROUND.discipline - 0.1 * VILLAGE_SCALE,
+  /** the village island's middle and the radius the forest starts beyond */
+  island: { x: 20, z: -285, radius: 385 },
+} as const;
+
+export interface CastSpot {
+  readonly who: 'sage' | 'itachi' | 'jiraiya' | 'pain' | 'obito' | 'tanjiro' | 'nezuko' | 'inosuke';
+  /** feet, chapter frame: always on solid ground (tested in layout.test.ts) */
+  readonly position: readonly [number, number, number];
+  /** metres tall: about two storeys at the village's scale, so they read from the ship */
+  readonly size: number;
+  /** towards the oncoming ship */
+  readonly rotationY: number;
 }
 
-export const VILLAGE_WALLS = ['#f4e3c8', '#efd2b0', '#f7ead8', '#e8c9a8', '#f2dcc0'] as const;
-export const VILLAGE_ROOFS = ['#d6443f', '#e0703a', '#4f8f9a', '#b8504a', '#6a8fb8'] as const;
+/**
+ * The Hidden Leaf's people, gathered on the open street before the inner gate and looking back at
+ * the ship. Street heights measured on the model. Nobody hovers (Raju, 2026-11-27).
+ */
+export const VILLAGE_CAST: readonly CastSpot[] = [
+  { who: 'sage', position: [14, -35.25, -170], size: 13, rotationY: -0.05 },
+  { who: 'jiraiya', position: [7, -34.4, -186], size: 14, rotationY: 0.02 },
+  { who: 'itachi', position: [25, -35.3, -194], size: 13, rotationY: -0.18 },
+  { who: 'pain', position: [1, -34.4, -203], size: 13, rotationY: 0.06 },
+  { who: 'obito', position: [34, -35.3, -204], size: 14, rotationY: -0.23 },
+];
 
-/** Where the hero props stand in the village (kept clear of houses). */
-export const ICHIRAKU = { x: -40, z: -125, size: 34 } as const;
-export const NARUTO_TOWER = { x: 40, z: -205, h: 26, r: 7 } as const;
-export const TORII_Z = [-40, -175, -320] as const;
-/** Street half-width: the first row of houses starts beyond it. */
-export const STREET = 21;
-
-export const VILLAGE_HOUSES: readonly House[] = (() => {
-  const rand = seeded(31);
-  const out: House[] = [];
-  for (const side of [-1, 1])
-    for (let row = 0; row < 5; row += 1) {
-      let z = 90 - rand() * 20;
-      while (z > -820) {
-        const tower = row > 0 && rand() < 0.2;
-        const w = tower ? 14 + rand() * 6 : 16 + rand() * 12;
-        const d = tower ? w : 14 + rand() * 10;
-        const h = tower ? 34 + rand() * 22 : row === 0 ? 10 + rand() * 12 : 12 + rand() * 18;
-        const x = side * (STREET + w / 2 + 3 + row * 40 + rand() * 8);
-        const clearIchiraku = Math.hypot(x - ICHIRAKU.x, z - ICHIRAKU.z) > 34;
-        const clearTower = Math.hypot(x - NARUTO_TOWER.x, z - NARUTO_TOWER.z) > 22;
-        if (clearIchiraku && clearTower)
-          out.push({
-            x,
-            y: GROUND.discipline,
-            z,
-            w,
-            d,
-            h,
-            tower,
-            wall: Math.floor(rand() * VILLAGE_WALLS.length),
-            roof: Math.floor(rand() * VILLAGE_ROOFS.length),
-          });
-        z -= d + 6 + rand() * 10;
-      }
-    }
+/** The forest filling the land round the island, out to the painted ranges. */
+export const FOREST_TREES = (() => {
+  const rand = seeded(41);
+  const out: Array<{ x: number; y: number; z: number; s: number }> = [];
+  const { x, z, radius } = VILLAGE.island;
+  while (out.length < 380) {
+    const a = rand() * Math.PI * 2;
+    // denser near the island's edge, where each crown is seen
+    const r = radius + rand() ** 1.6 * 330;
+    out.push({
+      x: x + Math.cos(a) * r,
+      y: VILLAGE.forestFloor,
+      z: z + Math.sin(a) * r,
+      s: 0.8 + rand() * 0.8,
+    });
+  }
   return out;
 })();
-
-/** Round-crowned trees filling the village's back rows and the hills (x beyond the houses). */
-export const VILLAGE_TREES = scatter(41, 320, {
-  minX: 60,
-  maxX: 520,
-  z0: 160,
-  z1: -900,
-  y: GROUND.discipline,
-});
 
 // ── Proof: the town ──────────────────────────────────────────────────────────
 
@@ -153,8 +160,10 @@ export const RURAL: readonly RuralSpot[] = RURAL_NAMES.map((name, i) => {
 });
 
 export const KINNAIRD = { x: 0, z: -660, size: 90 } as const;
-export const RYUK = { x: 40, y: 14, z: -110, size: 20 } as const;
-export const DEATH_NOTE = { x: 9, y: 12, z: -58, size: 6 } as const;
+/** Ryuk, standing in the open street, low enough for the ship to pass over. */
+export const RYUK = { x: 8, y: -9.6, z: -103, size: 8.6 } as const;
+/** The notebook, dropped on the sand at Ryuk's feet. */
+export const DEATH_NOTE = { x: 13, y: -9.5, z: -104, size: 3 } as const;
 
 // ── Horizon: the farm valley ─────────────────────────────────────────────────
 
@@ -179,12 +188,15 @@ export const FARMS: readonly FarmTile[] = [
 /** The farm's footprint at FARM_SIZE (source 37.5 × 49.8, longest side along z). */
 export const FARM_FOOTPRINT = { x: FARM_SIZE * (37.5 / 49.8), z: FARM_SIZE } as const;
 
-/**
- * The hill where Tanjiro and Nezuko stand, right of the road ahead: at the rest point the ship's
- * bow fills the left of the frame and the panel the right, so they stand in the gap between, facing
- * the oncoming ship (the hill's top is at y = GROUND + height = 0).
- */
-export const HILL = { x: 50, z: -380, radius: 40, height: 30 } as const;
+/** The Demon Slayer three on the road ahead, facing the oncoming ship (it passes overhead). */
+export const VALLEY_CAST: readonly CastSpot[] = [
+  { who: 'inosuke', position: [-4, -30, -204], size: 14, rotationY: 0.12 },
+  { who: 'tanjiro', position: [5, -30, -192], size: 15, rotationY: 0.08 },
+  { who: 'nezuko', position: [13, -30, -202], size: 13, rotationY: 0.0 },
+];
+
+/** Tanjiro's sword stand, set down on the grass beside them. */
+export const SWORD_STAND = { position: [-17, -30, -196] as const, size: 12 } as const;
 
 /** Blossom trees lining the road, then scattered across the fields. */
 export const ROAD_TREES = (() => {
@@ -193,8 +205,7 @@ export const ROAD_TREES = (() => {
   for (let z = 120; z > -760; z -= 15 + rand() * 6)
     for (const side of [-1, 1]) {
       const x = side * (21 + rand() * 4);
-      const nearHill = Math.hypot(x - HILL.x, z - HILL.z) < HILL.radius + 4;
-      if (!nearHill) out.push({ x, y: GROUND.horizon, z, s: 0.85 + rand() * 0.4 });
+      out.push({ x, y: GROUND.horizon, z, s: 0.85 + rand() * 0.4 });
     }
   return out;
 })();
@@ -259,7 +270,7 @@ export function mountainRing(seed: number, count: number, radius: number) {
 }
 
 /**
- * Transitions between worlds (handoff): a world sinks below a sea of cloud as the ship climbs out
- * of it, and the next rises up out of the same cloud. 0 = gone (DROP below), 1 = in place.
+ * Transitions between worlds (voyage.ts): a world sinks away below as the ship climbs out of it,
+ * and the next rises up out of its planet's clouds. 0 = gone (DROP below), 1 = in place.
  */
 export const DROP = 520;

@@ -5,7 +5,7 @@ import type { ShotKey, ShotState } from '../../engine/camera/shots.ts';
  * SC11 anime-universe story data (no React; unit-tested). Three areas, each a chapter with its own
  * local frame: the ship flies down -z through it (a pure function of t) with a chase camera. The
  * overlay panel sits opposite the area's landmark at the rest point (right, left, right).
- * The worlds themselves are laid out in layout.ts.
+ * The worlds themselves are laid out in layout.ts; the travel between them is voyage.ts.
  */
 export const TRAVEL = 220;
 export const shipZ = (t: number) => -Math.min(1, Math.max(0, t)) * TRAVEL;
@@ -40,9 +40,10 @@ export const AREAS: Readonly<Record<AreaId, AreaDef>> = {
     keys: keys([
       // the first frame matches SC10's last frame, so the crossing flows straight in (no cut)
       { t: 0, position: [-22, 9, 52], target: [0, 3, -30], fov: 50 },
-      { t: 0.25, position: [10, 6, 50], target: [-10, 2, -50], fov: 54 },
-      // rest: the ring mandala fills the left, the panel sits on the right
-      { t: 0.55, position: [16, 7, 46], target: [-28, 4, -40], fov: 56 },
+      { t: 0.25, position: [4, 12, 50], target: [4, 6, -50], fov: 54 },
+      // rest: the villagers on the street, the tower and the stone faces behind, panel on the right
+      { t: 0.55, position: [18, 12, 52], target: [26, 3, -40], fov: 56 },
+      { t: 0.76, position: [8, 12, 50], target: [10, 4, -50], fov: 55 },
       { t: 1, position: [-6, 6, 40], target: [0, 2, -60], fov: 52 },
     ]),
   },
@@ -81,9 +82,9 @@ export function areaShot(area: AreaId, t: number, out: ShotState): void {
 
 /** Landmark positions (chapter frame) that the rest-point cameras look at; tested against the frame. */
 export const LANDMARKS: Readonly<Record<AreaId, readonly [number, number, number]>> = {
-  // Ichiraku Ramen on the village street, Ryuk perched over the town, the big ringed planet
-  discipline: [-40, -30, -125],
-  proof: [40, 14, -110],
+  // the stone faces over the village, Ryuk in the town street, the big ringed planet
+  discipline: [-8, 98, -362],
+  proof: [8, -5, -103],
   horizon: [-95, 22, -330],
 };
 
@@ -96,39 +97,5 @@ const smooth = (x: number) => {
   return c * c * (3 - 2 * c);
 };
 
-/**
- * Continuous flight between worlds (handoff): the sky and light of a world blend toward its
- * neighbour's, meeting at the same halfway colours on both sides of every boundary (this world at
- * t = 1 and the next at t = 0 both show mix(this, next, 0.5)). Result: sky = mix(a, b, k).
- */
-export function skyMix(area: AreaId, t: number): { a: AreaId; b: AreaId; k: number } {
-  const i = ORDER.indexOf(area);
-  const prev = ORDER[i - 1];
-  const next = ORDER[i + 1];
-  if (prev && t < 0.2) return { a: prev, b: area, k: 0.5 + 0.5 * smooth(t / 0.2) };
-  if (next && t > 0.8) return { a: area, b: next, k: 0.5 * smooth((t - 0.8) / 0.2) };
-  return { a: area, b: area, k: 0 };
-}
-
 /** How far a world has turned from its entry sky to its own, 0..1 (as SC11-A's deck sinks). */
 export const entrySky = (t: number) => smooth((t - 0.06) / 0.34);
-
-/**
- * How present a world is, 0..1: a world rises up into place round the ship as it enters and sinks
- * away below as it leaves (layout.ts DROP), so no model ever pops at a boundary.
- */
-export function presence(t: number): number {
-  return smooth(t / 0.18) * smooth((1 - t) / 0.16);
-}
-
-/**
- * Opacity of the sea of cloud the ship climbs through between two worlds: it hides the sinking
- * world and the rising one, and both sides of a boundary show it fully (the handoff picture).
- * SC10's painted cloud deck covers SC11-A's entry, and SC12 opens on clear sky, so the first
- * entry and the last exit have no sea.
- */
-export function cloudSea(area: AreaId, t: number): number {
-  const i = ORDER.indexOf(area);
-  if (t < 0.5) return i > 0 ? 1 - smooth(t / 0.18) : 0;
-  return i < ORDER.length - 1 ? 1 - smooth((1 - t) / 0.16) : 0;
-}

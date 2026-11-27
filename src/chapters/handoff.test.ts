@@ -10,7 +10,16 @@ import { HOLE_AHEAD, saturnShip, saturnShot } from './saturn/saturn.ts';
 import { GATE, crossingShot, shipZ as crossingZ } from './crossing/crossing.ts';
 import type { Vec3 } from './handoff.ts';
 import { departureShot } from './greybox/departure.ts';
-import { ORDER, areaShot, cloudSea, presence, skyMix } from './anime/anime.ts';
+import { ORDER, areaShot } from './anime/anime.ts';
+import {
+  aheadPlanet,
+  createPlanetState,
+  leavingPlanet,
+  presence,
+  shipPitch,
+  spaceAt,
+  voyageAt,
+} from './anime/voyage.ts';
 import { returnShot, shipZ as returnZ } from './return/return.ts';
 import { HANDOFF, homecomingShot } from './homecoming/homecoming.ts';
 import { LIFT } from './room/layout.ts';
@@ -47,17 +56,21 @@ describe('continuous flight between chapters (handoff.ts)', () => {
       const rel = (s: ShotState, z: number) => s.position.clone().sub(new THREE.Vector3(0, 0, z));
       close(rel(ea, -220).toArray(), rel(sb, 0).toArray());
       expect(ea.fov).toBeCloseTo(sb.fov, 6);
-      // the sky meets halfway on both sides
-      const m1 = skyMix(a, 1);
-      const m2 = skyMix(b, 0);
-      expect(m1.a).toBe(m2.a);
-      expect(m1.b).toBe(m2.b);
-      expect(m1.k).toBeCloseTo(m2.k, 9);
-      // worlds sink away below the cloud sea and rise out of it: nothing pops
-      expect(presence(1)).toBe(0);
-      expect(presence(0)).toBe(0);
-      expect(cloudSea(a, 1)).toBe(1);
-      expect(cloudSea(b, 0)).toBe(1);
+      // both sides are the same moment of one voyage, in open space, between the same planets
+      const leave = voyageAt(a, 1)!;
+      const reach = voyageAt(b, 0)!;
+      expect(leave).toEqual({ join: i, u: 0.5 });
+      expect(reach).toEqual({ join: i, u: 0.5 });
+      expect(spaceAt(leave)).toBe(1);
+      expect(shipPitch(leave)).toBeCloseTo(shipPitch(reach), 9);
+      const planet = createPlanetState();
+      for (const place of [leavingPlanet, aheadPlanet]) {
+        place(0.5, planet);
+        expect(planet.visible).toBe(true);
+      }
+      // both worlds are fully out of sight: nothing pops
+      expect(presence(a, 1)).toBe(0);
+      expect(presence(b, 0)).toBe(0);
     }
   });
 

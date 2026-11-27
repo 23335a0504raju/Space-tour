@@ -469,19 +469,47 @@ export function Brief() {
           to their authors:
         </p>
         <ul className={styles.credits}>
-          <li key="https://sketchfab.com/3d-models/naruto-shippuden-naruto-ea2e5dff481243b9973f2bb34a384031">
-            <a href="https://sketchfab.com/3d-models/naruto-shippuden-naruto-ea2e5dff481243b9973f2bb34a384031">
-              “Naruto Shippuden- Naruto”
+          <li key="https://sketchfab.com/3d-models/naruto-hiddenly-village-bd95c17d67c44756b4fa5097bce9a547">
+            <a href="https://sketchfab.com/3d-models/naruto-hiddenly-village-bd95c17d67c44756b4fa5097bce9a547">
+              “Naruto hiddenly village”
             </a>{' '}
-            by <a href="https://sketchfab.com/lopuh22721">#Anime resource!!!</a>,{' '}
+            by <a href="https://sketchfab.com/kyroxffx">kyrox</a>,{' '}
             <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
           </li>
-          <li key="https://sketchfab.com/3d-models/ichiraku-ramen-naruto-c57a7c0bdca4446aade5241cc621f56e">
-            <a href="https://sketchfab.com/3d-models/ichiraku-ramen-naruto-c57a7c0bdca4446aade5241cc621f56e">
-              “Ichiraku Ramen (Naruto)”
+          <li key="https://sketchfab.com/3d-models/naruto-sage-161369399a0d4b6e9657023a1bcbfb31">
+            <a href="https://sketchfab.com/3d-models/naruto-sage-161369399a0d4b6e9657023a1bcbfb31">
+              “Naruto Sage”
             </a>{' '}
-            by <a href="https://sketchfab.com/Doverlock">Doverlock</a>,{' '}
-            <a href="http://creativecommons.org/licenses/by-nc/4.0/">CC BY-NC 4.0</a>
+            by <a href="https://sketchfab.com/ninjatorent13">ninjatorent13</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/itachi-free-fire-original-rig-5ec9c62965e34b038c3b3fba009117e3">
+            <a href="https://sketchfab.com/3d-models/itachi-free-fire-original-rig-5ec9c62965e34b038c3b3fba009117e3">
+              “Itachi free fire original rig”
+            </a>{' '}
+            by <a href="https://sketchfab.com/rocklee.ff">rocklee.ff</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/jiraiya-free-fire-skin-original-rig-5cf6b12352bb4e6cbc90a3b35f3e4786">
+            <a href="https://sketchfab.com/3d-models/jiraiya-free-fire-skin-original-rig-5cf6b12352bb4e6cbc90a3b35f3e4786">
+              “Jiraiya free fire skin original rig”
+            </a>{' '}
+            by <a href="https://sketchfab.com/rocklee.ff">rocklee.ff</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/obito-free-fire-original-rig-a62d35db3a2e47b0a1039ab116e80987">
+            <a href="https://sketchfab.com/3d-models/obito-free-fire-original-rig-a62d35db3a2e47b0a1039ab116e80987">
+              “Obito free fire original rig”
+            </a>{' '}
+            by <a href="https://sketchfab.com/rocklee.ff">rocklee.ff</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/pain-free-fire-original-rig-feddc1e4826e4ab598623d9f351edb7e">
+            <a href="https://sketchfab.com/3d-models/pain-free-fire-original-rig-feddc1e4826e4ab598623d9f351edb7e">
+              “Pain free fire original rig”
+            </a>{' '}
+            by <a href="https://sketchfab.com/rocklee.ff">rocklee.ff</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
           </li>
           <li key="https://sketchfab.com/3d-models/death-note-17e2a68603464169b22ea5cdb8572f69">
             <a href="https://sketchfab.com/3d-models/death-note-17e2a68603464169b22ea5cdb8572f69">
@@ -516,6 +544,13 @@ export function Brief() {
               “Nezuko Kamado-Demon Slayer”
             </a>{' '}
             by <a href="https://sketchfab.com/atharvaj365">Atharva Jagtap</a>,{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+          </li>
+          <li key="https://sketchfab.com/3d-models/inosuke-free-fire-original-rig-a0a8736dba314539afe9f8458628b0a5">
+            <a href="https://sketchfab.com/3d-models/inosuke-free-fire-original-rig-a0a8736dba314539afe9f8458628b0a5">
+              “Inosuke free fire original rig”
+            </a>{' '}
+            by <a href="https://sketchfab.com/rocklee.ff">rocklee.ff</a>,{' '}
             <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
           </li>
           <li key="https://sketchfab.com/3d-models/blossom-katana-6cff8d381e2948ef9527d3d99e80520c">

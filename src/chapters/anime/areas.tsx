@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { ChapterImpl, ChapterSceneProps, JourneyFrame } from '../contract.ts';
 import { useJourneyStore } from '../../engine/store.ts';
 import { HelVela } from '../ship/HelVela.tsx';
-import { AREAS, areaShot, cloudSea, entrySky, presence, shipZ, skyMix } from './anime.ts';
+import { AREAS, ORDER, areaShot, entrySky, shipZ } from './anime.ts';
 import type { AreaId } from './anime.ts';
 import { PAINTED_CLOUDS, SUN_BEYOND } from './clouds.ts';
 import { ANIME_MODELS, AnimeModel } from './AnimeModel.tsx';
@@ -20,23 +20,20 @@ import {
   FARM_SIZE,
   FIELDS,
   FIELD_TREES,
+  FOREST_TREES,
   GROUND,
-  HILL,
-  ICHIRAKU,
   KINNAIRD,
-  NARUTO_TOWER,
   ROAD_TREES,
   RURAL,
   RURAL_SCALE,
   RYUK,
-  STREET,
-  TORII_Z,
+  SWORD_STAND,
   TOWN,
-  VILLAGE_HOUSES,
-  VILLAGE_ROOFS,
-  VILLAGE_TREES,
-  VILLAGE_WALLS,
+  VALLEY_CAST,
+  VILLAGE,
+  VILLAGE_CAST,
 } from './layout.ts';
+import type { CastSpot } from './layout.ts';
 import {
   Clouds,
   PaintedSun,
@@ -45,31 +42,27 @@ import {
   Motes,
   RingedPlanet,
   SkyDome,
-  Torii,
 } from './parts.tsx';
-import {
-  CloudSea,
-  Fields,
-  Ground,
-  Houses,
-  ModelPart,
-  PaintedGround,
-  Strip,
-  Trees,
-} from './world.tsx';
+import { Fields, Ground, ModelPart, PaintedGround, Strip, Trees, Village } from './world.tsx';
+import { VoyageSky } from './Voyage.tsx';
+import { arrival, presence, shipPitch, spaceAt, voyageAt } from './voyage.ts';
 
 /**
  * SC11 · The Anime-Inspired Universe: three whole worlds crossed in one continuous flight
  * (FINAL_STORYLINE SC11). The ship flies through each one: down a village street, down the main
  * street of a frontier town, along a blossom road through farmland (layout.ts). The screen-space
  * style pass (style 2) turns everything into cel colour with ink outlines. Between worlds the ship
- * climbs through a sea of cloud while one world sinks away and the next rises (anime.ts presence,
- * cloudSea). Spin, bob and cloud drift are ambient; everything else is a function of t.
+ * leaves one planet and flies to the next (voyage.ts, Voyage.tsx). Everything is a function of t;
+ * only the drifting motes are ambient.
  */
-const ENGINE = { current: 0.45 };
+/** Engine glow cruising low over a world; it opens up for the crossing. */
+const CRUISE = 0.45;
 const SUN_DIR = new THREE.Vector3(0.5, 0.45, 0.7).normalize().multiplyScalar(100);
-/** The cloud sea's level (below every world's ground while that world is in place). */
-const SEA_LEVEL = -42;
+/** How much further than their world the painted ranges fall (m). */
+const RANGE_SINK = 1500;
+/** Open space: the sky every world fades into overhead as the air runs out (horizon → zenith). */
+const SPACE_SKY = ['#1c1546', '#120f35', '#0a0824', '#050416'].map((c) => new THREE.Color(c));
+const SPACE_LIGHT = new THREE.Color('#dfe4ff');
 /** Haze band (m from the camera) while a world is fully present. */
 const HAZE_NEAR = 180;
 const HAZE_FAR = 1500;
@@ -93,31 +86,70 @@ function CloudDeck({ frame, id }: { frame: JourneyFrame; id: string }) {
   );
 }
 
-// ── Discipline: the lantern village ──────────────────────────────────────────
+// ── Discipline: the Hidden Leaf village ──────────────────────────────────────
 
-/** Keeps its children level with the ship (things on the horizon: painted ranges). */
-function FollowShip({
+/**
+ * The painted ranges, level with the ship. As the world is left or reached they fall further than
+ * the world itself, out of the frame, so none is left standing round the planet. (The flat ground
+ * needs no such help: fully hazed, it is the sky behind it, haze.ts.)
+ */
+function Ranges({
+  area,
   frame,
   id,
   children,
 }: {
+  area: AreaId;
   frame: JourneyFrame;
   id: string;
   children: ReactNode;
 }) {
   const g = useRef<THREE.Group>(null);
   useFrame(() => {
-    if (frame.id === id && g.current) g.current.position.z = shipZ(frame.t);
+    if (frame.id !== id || !g.current) return;
+    // cubed: nothing shifts against the buildings while the world is still close
+    const sink = (1 - presence(area, frame.t)) ** 3 * RANGE_SINK;
+    g.current.position.set(0, -sink, shipZ(frame.t));
   });
   return <group ref={g}>{children}</group>;
 }
 
-function Discipline({ frame, id, haze }: WorldProps) {
+/** The characters placed in a world (layout.ts), facing the oncoming ship. */
+function Cast({
+  list,
+  haze,
+  frame,
+  id,
+}: {
+  list: readonly CastSpot[];
+  haze: Haze;
+  frame: JourneyFrame;
+  id: string;
+}) {
+  return (
+    <>
+      {list.map((c) => (
+        <AnimeModel
+          key={c.who}
+          url={ANIME_MODELS[c.who]}
+          size={c.size}
+          position={c.position}
+          rotationY={c.rotationY}
+          haze={haze}
+          id={id}
+          frame={frame}
+        />
+      ))}
+    </>
+  );
+}
+
+function Discipline({ frame, id, haze, paint }: WorldProps) {
   const g = GROUND.discipline;
   return (
     <>
       {/* painted ranges on the horizon: a pale far range and a nearer forested one */}
-      <FollowShip frame={frame} id={id}>
+      <Ranges area="discipline" frame={frame} id={id}>
         <PaintedRange
           radius={1000}
           y={g - 90}
@@ -145,48 +177,22 @@ function Discipline({ frame, id, haze }: WorldProps) {
           aerial={0.04}
           soft={2}
         />
-      </FollowShip>
-      <Ground y={g} color="#e9c7a0" haze={haze} />
-      <Strip y={g} halfWidth={STREET - 4} from={160} to={-900} color="#d9a77f" haze={haze} />
-      <Houses houses={VILLAGE_HOUSES} walls={VILLAGE_WALLS} roofs={VILLAGE_ROOFS} haze={haze} />
+      </Ranges>
+      {/* the forest floor round the village island (it covers the model's outer water ring) */}
+
+      <Ground y={VILLAGE.forestFloor} color="#4d7d45" haze={haze} />
       <Trees
-        items={VILLAGE_TREES}
-        crowns={['#6fbf6a', '#f2a7b8', '#9ad27f', '#4f9e62']}
-        size={1.6}
+        items={FOREST_TREES}
+        crowns={['#4f9e4a', '#3f8a52', '#74b455', '#2f7048']}
+        size={1.5}
         haze={haze}
         painted
       />
-      {/* the gates the ship flies through */}
-      {TORII_Z.map((z) => (
-        <Torii key={z} position={[0, g, z]} scale={1.6} />
-      ))}
-      {/* Ichiraku Ramen on the street, Naruto on the watch tower across from it */}
-      <AnimeModel
-        url={ANIME_MODELS.ichiraku}
-        size={ICHIRAKU.size}
-        fit="max"
-        position={[ICHIRAKU.x, g, ICHIRAKU.z]}
-        rotationY={Math.PI / 2}
-        haze={haze}
-        cull
-        id={id}
-        frame={frame}
-      />
-      <mesh position={[NARUTO_TOWER.x, g + NARUTO_TOWER.h / 2, NARUTO_TOWER.z]}>
-        <cylinderGeometry args={[NARUTO_TOWER.r, NARUTO_TOWER.r * 1.15, NARUTO_TOWER.h, 10]} />
-        <meshStandardMaterial color="#efd2b0" roughness={1} flatShading />
-      </mesh>
-      <AnimeModel
-        url={ANIME_MODELS.naruto}
-        size={14}
-        position={[NARUTO_TOWER.x, g + NARUTO_TOWER.h, NARUTO_TOWER.z]}
-        rotationY={-Math.PI / 3}
-        haze={haze}
-        id={id}
-        frame={frame}
-      />
-      {/* paper lanterns drifting down the street */}
-      <Motes count={180} box={[44, 30, 900]} center={[0, g + 18, -350]} color="#ffd08a" seed={4} />
+
+      <Village url={ANIME_MODELS.village} haze={haze} paint={paint} />
+      <Cast list={VILLAGE_CAST} haze={haze} frame={frame} id={id} />
+      {/* leaves drifting over the roofs */}
+      <Motes count={140} box={[160, 70, 520]} center={[0, g + 45, -180]} color="#bfe27a" seed={4} />
     </>
   );
 }
@@ -198,7 +204,9 @@ function Proof({ frame, id, haze, paint }: WorldProps) {
   return (
     <>
       {/* the desert floor beyond the town's own terrain (just below it, so the town wins) */}
+
       <PaintedGround y={g - 0.4} width={5000} from={2200} to={-2800} haze={haze} paint={paint} />
+
       <AnimeModel
         url={ANIME_MODELS.town}
         size={TOWN.scale}
@@ -234,7 +242,7 @@ function Proof({ frame, id, haze, paint }: WorldProps) {
         frame={frame}
       />
       {/* painted ranges: warm sandstone buttes far off, sage hills nearer */}
-      <FollowShip frame={frame} id={id}>
+      <Ranges area="proof" frame={frame} id={id}>
         <PaintedRange
           radius={1000}
           y={g - 100}
@@ -262,14 +270,13 @@ function Proof({ frame, id, haze, paint }: WorldProps) {
           aerial={0.06}
           soft={2}
         />
-      </FollowShip>
-      {/* Ryuk watching from above the rooftops; the notebook drifting beside the ship */}
+      </Ranges>
+      {/* Ryuk standing in the street, the notebook at their feet */}
       <AnimeModel
         url={ANIME_MODELS.ryuk}
         size={RYUK.size}
         position={[RYUK.x, RYUK.y, RYUK.z]}
-        rotationY={-Math.PI / 2.4}
-        bob={0.8}
+        rotationY={-0.65}
         haze={haze}
         id={id}
         frame={frame}
@@ -279,8 +286,8 @@ function Proof({ frame, id, haze, paint }: WorldProps) {
         size={DEATH_NOTE.size}
         fit="max"
         position={[DEATH_NOTE.x, DEATH_NOTE.y, DEATH_NOTE.z]}
-        spin={0.5}
-        bob={0.5}
+        rotationY={0.5}
+        haze={haze}
         id={id}
         frame={frame}
       />
@@ -306,6 +313,7 @@ function Horizon({ frame, id, haze }: WorldProps) {
         colors={['#b9c97a', '#d8c07a', '#9cbf86', '#c7d9a0']}
         haze={haze}
       />
+
       {farms.map((f) => (
         <AnimeModel
           key={`${f.x},${f.z}`}
@@ -335,7 +343,7 @@ function Horizon({ frame, id, haze }: WorldProps) {
         painted
       />
       {/* painted ranges at dusk: blue-violet peaks far off, green hills nearer */}
-      <FollowShip frame={frame} id={id}>
+      <Ranges area="horizon" frame={frame} id={id}>
         <PaintedRange
           radius={1000}
           y={g - 90}
@@ -363,37 +371,16 @@ function Horizon({ frame, id, haze }: WorldProps) {
           aerial={0.05}
           soft={2}
         />
-      </FollowShip>
-      {/* the blossom hill: Tanjiro and Nezuko look out over the road */}
-      <mesh position={[HILL.x, g - HILL.radius + HILL.height, HILL.z]} scale={[1, 1, 1]}>
-        <sphereGeometry args={[HILL.radius, 16, 10]} />
-        <meshStandardMaterial color="#9cc08a" roughness={1} flatShading />
-      </mesh>
-      <AnimeModel
-        url={ANIME_MODELS.tanjiro}
-        size={32}
-        position={[HILL.x - 5, g + HILL.height - 0.6, HILL.z + 2]}
-        rotationY={-0.35}
-        haze={haze}
-        id={id}
-        frame={frame}
-      />
-      <AnimeModel
-        url={ANIME_MODELS.nezuko}
-        size={26}
-        position={[HILL.x + 6, g + HILL.height - 0.8, HILL.z - 1]}
-        rotationY={-0.15}
-        haze={haze}
-        id={id}
-        frame={frame}
-      />
+      </Ranges>
+      {/* Tanjiro, Nezuko and Inosuke on the road, their sword stand on the grass beside them */}
+      <Cast list={VALLEY_CAST} haze={haze} frame={frame} id={id} />
       <AnimeModel
         url={ANIME_MODELS.katana}
-        size={13}
+        size={SWORD_STAND.size}
         fit="max"
-        position={[-14, 14, -120]}
-        spin={0.6}
-        bob={0.6}
+        position={SWORD_STAND.position}
+        rotationY={0.35}
+        haze={haze}
         id={id}
         frame={frame}
       />
@@ -406,7 +393,7 @@ interface WorldProps {
   readonly frame: JourneyFrame;
   readonly id: string;
   readonly haze: Haze;
-  /** the painted materials' shared uniforms (the frontier town) */
+  /** the painted materials' shared uniforms (the village and the frontier town) */
   readonly paint: Paint;
 }
 
@@ -431,6 +418,7 @@ const SKY_COLORS = Object.fromEntries(
   { sky: THREE.Color[]; light: THREE.Color; entrySky?: THREE.Color[]; entryLight?: THREE.Color }
 >;
 const tmpColor = new THREE.Color();
+const tmpSky = new THREE.Color();
 
 /** The ringed planets of the horizon (SC12 opens with the big one at the same place, handoff). */
 export const HORIZON_PLANETS = {
@@ -448,8 +436,12 @@ function HorizonPlanets() {
 
 function makeArea(area: AreaId): ChapterImpl {
   const def = AREAS[area];
+  const previous = ORDER[ORDER.indexOf(area) - 1];
+  const next = ORDER[ORDER.indexOf(area) + 1];
   function AreaScene({ id, frame }: ChapterSceneProps) {
     const ship = useRef<THREE.Group>(null);
+    const planets = useRef<THREE.Group>(null);
+    const engine = useMemo(() => ({ current: CRUISE }), []);
     const dome = useRef<THREE.Group>(null);
     const light = useRef<THREE.DirectionalLight>(null);
     const world = useRef<THREE.Group>(null);
@@ -462,42 +454,46 @@ function makeArea(area: AreaId): ChapterImpl {
       () => ({ current: [0, 1, 2, 3].map(() => new THREE.Color()) as THREE.Color[] }),
       [],
     );
-    const sea = useMemo(
-      () => ({ opacity: { current: 0 }, tint: { current: new THREE.Color() }, z: { current: 0 } }),
-      [],
-    );
     useFrame(() => {
       if (frame.id !== id) return;
       const t = frame.t;
       const z = shipZ(t);
+      const voyage = voyageAt(area, t);
+      const space = spaceAt(voyage);
       ship.current?.position.set(0, 0, z);
+      ship.current?.rotation.set(shipPitch(voyage), 0, 0);
+      engine.current = CRUISE + 0.55 * space;
       dome.current?.position.set(0, 0, z);
       light.current?.position.set(SUN_DIR.x, SUN_DIR.y, SUN_DIR.z + z);
       sunTarget.position.set(0, 0, z);
-      // sky and light meet the neighbouring world halfway at each boundary (anime.ts)
-      const m = skyMix(area, t);
-      for (let i = 0; i < 4; i += 1)
-        live.current[i]!.copy(SKY_COLORS[m.a].sky[i]!).lerp(SKY_COLORS[m.b].sky[i]!, m.k);
-      light.current?.color.copy(SKY_COLORS[m.a].light).lerp(SKY_COLORS[m.b].light, m.k);
-      // a world that opens on its neighbour's palette turns to its own (SC11-A: sunset to day)
-      const entry = SKY_COLORS[area];
-      if (entry.entrySky && entry.entryLight) {
-        const e = entrySky(t);
-        for (let i = 0; i < 4; i += 1)
-          live.current[i]!.copy(tmpColor.copy(entry.entrySky[i]!).lerp(live.current[i]!, e));
-        light.current?.color.copy(tmpColor.copy(entry.entryLight).lerp(light.current.color, e));
+      // the world's own sky and light, turning to open space on the way to its neighbours (both
+      // sides of a boundary are fully in space, so the join cannot be seen)
+      const own = SKY_COLORS[area];
+      // SC11-A opens on SC10's sunset palette and turns to day
+      const e = own.entrySky ? entrySky(t) : 1;
+      for (let i = 0; i < 4; i += 1) {
+        tmpSky.copy(own.sky[i]!);
+        if (own.entrySky) tmpSky.copy(tmpColor.copy(own.entrySky[i]!).lerp(tmpSky, e));
+        live.current[i]!.copy(tmpSky).lerp(SPACE_SKY[i]!, space);
+      }
+      if (light.current) {
+        light.current.color.copy(own.light);
+        if (own.entryLight)
+          light.current.color.copy(tmpColor.copy(own.entryLight).lerp(light.current.color, e));
+        light.current.color.lerp(SPACE_LIGHT, space);
       }
       fill.current?.groundColor.copy(live.current[1]!);
       horizonColor(live.current, haze.color.value);
       for (let i = 0; i < 4; i += 1) haze.sky.value[i]!.copy(live.current[i]!);
-      // the world rises into place round the ship, and sinks away below the cloud sea
-      const k = presence(t);
+      // the world rises into place round the ship, and sinks away below it
+      const k = presence(area, t);
       if (world.current) {
         world.current.visible = k > 0.002;
         world.current.position.y = -(1 - k) * DROP;
       }
       paint.drop.value = -(1 - k) * DROP;
-      // a leaving world also dissolves into the horizon (no inked ground line left in the sky)
+      // a leaving world also sinks into the air: its ground is lost in the horizon colour before
+      // the planet's cloud cover comes up through it (no flat land left round the globe)
       haze.near.value = HAZE_NEAR * k;
       haze.far.value = 40 + (HAZE_FAR - 40) * k;
       // the painted sun of the first world leaves with it
@@ -506,9 +502,12 @@ function makeArea(area: AreaId): ChapterImpl {
         // at infinity: it travels with the ship (at t = 0 it sits exactly where SC10 left it)
         sun.current.position.z = SUN_BEYOND[2] + 220 + z;
       }
-      sea.opacity.current = cloudSea(area, t);
-      sea.tint.current.copy(live.current[1]!);
-      sea.z.current = z;
+      // the ringed planets of the last world come into view with it
+      if (planets.current) {
+        const a = arrival(area, t);
+        planets.current.visible = a > 0.002;
+        planets.current.position.set(0, -(1 - a) * DROP * 0.35, 0);
+      }
     });
     return (
       <group>
@@ -532,15 +531,15 @@ function makeArea(area: AreaId): ChapterImpl {
         <group ref={world} visible={false}>
           <World area={area} frame={frame} id={id} haze={haze} paint={paint} />
         </group>
-        <CloudSea
-          level={SEA_LEVEL}
-          opacity={sea.opacity}
-          tint={sea.tint}
-          haze={haze}
-          follow={sea.z}
-        />
-        {area === 'horizon' && <HorizonPlanets />}
-        <HelVela ref={ship} engine={ENGINE} rotation={[0, -Math.PI / 2, 0]} />
+        <VoyageSky area={area} previous={previous} next={next} frame={frame} id={id} />
+        {area === 'horizon' && (
+          <group ref={planets} visible={false}>
+            <HorizonPlanets />
+          </group>
+        )}
+        <group ref={ship}>
+          <HelVela engine={engine} rotation={[0, -Math.PI / 2, 0]} />
+        </group>
       </group>
     );
   }
@@ -548,8 +547,6 @@ function makeArea(area: AreaId): ChapterImpl {
     Scene: AreaScene,
     shot: (t, out) => areaShot(area, t, out),
     background: def.sky[1],
-    // a warm white flash carries the visitor from one area to the next
-    exitColor: '#fff3e2',
   };
 }
 

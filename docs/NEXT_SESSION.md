@@ -20,9 +20,8 @@
   (not `dist/`), and commit only your own hunks unless he says "commit all".
 
 ## State of the repo
-- Branch **`main`** (`feat/sc11-fly-through-worlds` was merged, PR #1). The 2026-11-27 work below is committed
-  on `main`; check `git status -sb` for whether it has been pushed.
-- Checks at hand-off: `npm run verify` 137/137, `npm run build` OK, Playwright 27 passed, 1 skipped (phone).
+- Branch **`feat/anime-worlds-voyage`** (pushed 2026-11-27), from `main` at `9dc37aa`; not yet merged into `main`.
+- Checks at hand-off: `npm run verify` 145/145, `npm run build` OK, Playwright 27 passed, 1 skipped (phone).
 - Git Bash notes: no backticks or `\n` escapes inside heredoc-written scripts (write scripts with the Write tool).
   Prettier reflows long lines, so string replacements written before formatting often miss: check every edit applied.
   `active` is a reserved word in GLSL.
@@ -61,12 +60,28 @@
 - **Cards fit the window:** desktop cards scale down (`--fit`, `src/ui/fitCards.ts`) instead of scrolling inside
   themselves, and stay between the header and the bottom bar. Checked 1180x620, 1280x720, 1536x730, 1920x950.
 
+## Done (2026-11-27, anime worlds)
+- **SC11a is the whole Hidden Leaf village** (A054, `anime_village.glb`, one draw call): turned 45° and scaled 160 so
+  the main street runs down the flight line to the Hokage tower and the stone faces (`layout.ts` `VILLAGE`),
+  painted from its own atlas (`painted.ts` `paintedAtlas`), forest round the island. The procedural houses, torii,
+  tower, Ichiraku Ramen (A041) and the old Naruto (A040) are gone.
+- **Cast** (A055–A060): Naruto (sage), Jiraiya, Itachi, Pain, Obito on the village street; Tanjiro, Nezuko, Inosuke on
+  the farm road; Ryuk and the notebook in the town street. **Raju: nobody floats** — everyone stands on solid ground,
+  in a natural pose (tested in `layout.test.ts`). A-pose / T-pose rigs are posed by `optimize-anime.ts`.
+- **World-to-world travel** (`voyage.ts` pure and tested, `Voyage.tsx`): each world sinks under its planet's clouds,
+  the planet falls away as a globe, stars and streaks, the next planet grows ahead, the next world rises out of it.
+  Replaces the cloud sea and the sky blend. SC11 chapters are 1.65 screens.
+- Checks: verify 145/145, build OK, Playwright 27 passed, 1 skipped; 60 fps both tiers (Balanced ≤104 draw calls,
+  ≤368k triangles; Low ≤74 / ≤236k). Entry hitches (`measure-freezes`): SC11a ~83 ms (was ~33 before this work),
+  SC11b ~50–67 ms, SC11c ~100–117 ms (was ~167); none over 250 ms.
+- **Ink lines from scene depth** (`styleBlend.ts`, `lens.ts`; a chapter may ask for colour ink with `colourInk(t)`,
+  SC12's tunnel does): outlines and raised corners instead of texture noise. The checks and frames above include it.
+
 ## Remaining tasks, in order
 1. Small: star dots still show over the sky around SC10 t≈0.86, while the cel colour is coming in.
-2. Anime models still look dull or scratchy next to the painted town: SC11c farm tiles (animals, fences), Ichiraku
-   Ramen, the ship. The painted material could take the farm; ink is task 3.
-3. Needs Raju's approval: ink lines from depth/normals instead of luminance (`styleBlend.ts`), to clear the scratchy
-   ink on detailed models (Ichiraku Ramen, the ship). Changes the line art in every anime world.
+2. SC11c farm tiles (animals, fences) still look dull and scratchy next to the painted village and town; the painted
+   material could take them.
+3. Ink lines from depth are in (committed on Raju's "push all"): review the line art in SC10–SC12 with him.
 4. SC11b on Low is near budget (draw calls ~74/80, 236k/250k triangles): trim before adding more there.
 5. Dev-only console warning `glGetProgramiv: Program object expected` mid-journey (StrictMode + warm-up path).
 
