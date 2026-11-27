@@ -3,7 +3,7 @@ import type { ChapterMeta } from './types.ts';
 /**
  * Ordered journey (FINAL_STORYLINE.md + SCROLL_EXPERIENCE_MAP.md).
  * SC01 "Signal" is the pre-scroll HTML shell, so it is not a scroll chapter.
- * Lengths are tuned for pace: 23.6 screens in all (was 33.5; UI_SCROLL_AUDIT.md step 1; SC06 +1 on review).
+ * Lengths are tuned for pace: about 25 screens in all (was 33.5; UI_SCROLL_AUDIT.md step 1; SC06 +1 on review).
  */
 export const chapters: readonly ChapterMeta[] = [
   {
@@ -32,8 +32,8 @@ export const chapters: readonly ChapterMeta[] = [
     title: 'Crew Record',
     act: 'launch',
     artStyle: 'realistic',
-    screens: 2,
-    restPoints: [0.35, 0.7],
+    screens: 2.5, // three cards: experience, the work there, education
+    restPoints: [0.35, 0.525, 0.7],
     navLabel: 'Crew Record',
     briefAnchor: 'experience',
   },

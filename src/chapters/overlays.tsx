@@ -7,6 +7,7 @@ import { CARD_REST, MOON_ANCHOR } from './homecoming/homecoming.ts';
 import { WORLD_TITLES, WorldTitleCard } from './anime/titles.tsx';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
 import { PROJECT_MEDIA } from '../ui/projectMedia.ts';
+import { WorkCard } from './WorkCard.tsx';
 import styles from './overlays.module.css';
 
 /**
@@ -186,6 +187,7 @@ const allOverlayDefs: readonly OverlayDef[] = [
     key: 'experience',
     chapterId: 'sc04-crew-record',
     rest: 0.35,
+    band: 0.1,
     placement: 'right',
     label: 'Experience',
     render: () => (
@@ -216,10 +218,24 @@ const allOverlayDefs: readonly OverlayDef[] = [
       </>
     ),
   },
+  // what was done there: one card for each job that has projects it may show
+  ...experience
+    .filter((job) => job.projects.some((p) => shouldShow(p.name)))
+    .slice(0, 1)
+    .map((job): OverlayDef => ({
+      key: `work-${job.id}`,
+      chapterId: 'sc04-crew-record',
+      rest: 0.525,
+      band: 0.075,
+      placement: 'left',
+      label: `Work at ${job.organisation.value}`,
+      render: () => <WorkCard job={job} />,
+    })),
   {
     key: 'education',
     chapterId: 'sc04-crew-record',
     rest: 0.7,
+    band: 0.1,
     placement: 'left',
     label: 'Education',
     render: () => (
