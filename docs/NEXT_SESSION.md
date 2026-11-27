@@ -21,7 +21,9 @@
 
 ## State of the repo
 - Branch **`main`**: `feat/anime-worlds-voyage` merged and pushed on Raju's word (2026-11-27).
-- Checks at that merge: `npm run verify` 145/145, `npm run build` OK, Playwright 27 passed, 1 skipped (phone).
+- Latest checks (2026-11-27, after the cards, phone and stand-up work): `npm run verify` 147/147, `npm run build` OK,
+  Playwright 28 passed, 2 skipped (one desktop-only, one phone-only). `measure-freezes` Balanced: 0.1 s in hitches
+  over the whole journey (was 0.8 s), worst 67 ms.
 - Git Bash notes: no backticks or `\n` escapes inside heredoc-written scripts (write scripts with the Write tool).
   Prettier reflows long lines, so string replacements written before formatting often miss: check every edit applied.
   `active` is a reserved word in GLSL.
@@ -94,13 +96,28 @@
 - LinkedIn was not re-read (needs his login); the content is from the 2026-11-24 read. Ask him to paste the Experience
   and About text for anything newer.
 
+## Done (2026-11-27, cards, phone and stand-up)
+- **Cards animate in again** (Raju: they popped in). The scroll still decides whether a card shows; the entrance then
+  takes `CARD_IN_S` 0.9 s and the exit 0.35 s (`overlayMath.ts` `easeVisibility`, unit-tested).
+- **Stand-up stutter:** dressing each astronaut raycast the skinned mesh for ~90 ms per chapter (results now cached per
+  geometry, `suit.ts`); three's shader error checks are off in production (`Journey.tsx` `onCreated`); SC03 has no
+  dwell (it slowed time mid stand-up and has no card). Left: ~60-150 ms hitches while the cockpit and ascent mount and
+  compile in the background.
+- Loose parts of the removed bridge seat no longer hang round the astronaut's legs (`scripts/optimize-bridge.ts`).
+- **Phones** (Raju asked): cards are bottom sheets at most 52% tall, never scroll containers, so a swipe on a card moves
+  the page; compact type, fitted by `fitCards.ts`. Playwright covers it (`journey.spec.ts`).
+
+- **Cards more see-through on every screen** (Raju): Balanced 24% tint over a dimmed, lightly blurred scene; Low 58%.
+  Over the brightest skies the small grey text is the weakest: keep an eye on contrast before lightening further.
+- **One Sun** (Raju): SC06's sunrise now shows the same star as SC10's look back (`src/chapters/space/SunStar.tsx`).
+
 ## Remaining tasks, in order
 1. Review the line art (ink from depth) in SC10-SC12 with Raju.
 2. The farm on Low still uses the simplified copy (thin trees and ridges): a better low variant if it matters.
 3. Dev-only console warning `glGetProgramiv: Program object expected` after a cold jump into SC11: no JS-side query
    of a deleted program exists, and adding synchronous `getError` probes makes it vanish, so it is a timing quirk
    inside the browser's GL layer. Not seen to affect anything; left as is.
-4. Entry hitches ~80-120 ms as SC11a and SC11c warm up (none over 250 ms).
+4. Entry hitches are now small (worst 67 ms, headless Balanced run): re-measure after adding models.
 
 ## Parked until the end (content, mobile)
 - Content: Spotmies end date (LinkedIn "Present" vs resume "Jun 2026"); Sports Paramount spelling; Spotmies project
