@@ -9,6 +9,7 @@ import { createEarthMaterial, createLimbAtmosphereMaterial } from '../../shaders
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Starfield, seeded } from '../greybox/parts.tsx';
 import { HelVela } from '../ship/HelVela.tsx';
+import { SunStar } from '../space/SunStar.tsx';
 import { LIGHT_07, TRAVEL_STARS } from '../handoff.ts';
 import { TRAVEL_SKY } from '../space/skyFrame.ts';
 
@@ -74,29 +75,21 @@ function falloffTexture(size: number, alpha: (x: number, y: number) => number) {
   return t;
 }
 
-/** The Sun as a lens sees it: a white-hot disc, a tight bloom halo and a faint anamorphic streak. */
-function sunTextures() {
-  const edge = (r: number) => Math.max(0, 1 - r) ** 2; // forces every profile to 0 at the sprite edge
-  return {
-    core: falloffTexture(128, (x, y) => {
-      const r = Math.hypot(x, y);
-      return Math.min(1, Math.max(0, (0.36 - r) / 0.06) + Math.exp(-r * 9) * 0.6) * edge(r);
-    }),
-    halo: falloffTexture(512, (x, y) => {
-      const r = Math.hypot(x, y);
-      return (Math.exp(-r * 11) * 0.8 + Math.exp(-r * 4) * 0.12) * edge(r);
-    }),
-    streak: falloffTexture(512, (x, y) => {
-      return Math.exp(-Math.abs(x) * 5) * Math.exp(-((y / 0.018) ** 2)) * (1 - x * x);
-    }),
-  };
+/** The lens's faint anamorphic streak across the Sun, in its own warm light. */
+function streakTexture() {
+  return falloffTexture(512, (x, y) => {
+    return Math.exp(-Math.abs(x) * 5) * Math.exp(-((y / 0.018) ** 2)) * (1 - x * x);
+  });
 }
+
+/** The Sun's radius at SUN_DISTANCE (about 4 degrees across, as large as the look back's). */
+const SUN_RADIUS = 52;
 
 function SunriseScene({ id, frame }: ChapterSceneProps) {
   const gl = useThree((s) => s.gl);
   const low = useJourneyStore((s) => s.tier !== 'balanced');
   const [day, night, moonMap] = useLoader(getKTX2Loader(gl), [TEX.day, TEX.night, TEX.moon]);
-  const { earth, atmosphere, sun, earthRot, moon } = useMemo(() => {
+  const { earth, atmosphere, streak, earthRot, moon } = useMemo(() => {
     for (const t of [day, night, moonMap]) {
       if (t) {
         t.colorSpace = THREE.SRGBColorSpace;
@@ -107,7 +100,7 @@ function SunriseScene({ id, frame }: ChapterSceneProps) {
     return {
       earth: createEarthMaterial(day, night, low),
       atmosphere: createLimbAtmosphereMaterial(EARTH.radius, new THREE.Vector3(...EARTH.centre)),
-      sun: sunTextures(),
+      streak: streakTexture(),
       earthRot: new THREE.Euler().setFromQuaternion(EARTH_QUAT),
       // lit by the Sun alone (a crescent here) plus faint grey earthshine; the scene's cool earthshine
       // light would tint it blue
@@ -134,7 +127,7 @@ function SunriseScene({ id, frame }: ChapterSceneProps) {
       }),
     };
   }, [day, night, moonMap, low]);
-  useDisposeOnUnmount(earth, atmosphere, moon, sun.core, sun.halo, sun.streak);
+  useDisposeOnUnmount(earth, atmosphere, moon, streak);
 
   const sunLightRef = useRef<THREE.DirectionalLight>(null);
   const sunGroup = useRef<THREE.Group>(null);
@@ -186,30 +179,13 @@ function SunriseScene({ id, frame }: ChapterSceneProps) {
         <sphereGeometry args={[MOON.radius, 48, 32]} />
         <primitive object={moon} attach="material" />
       </mesh>
-      {/* the Earth hides the Sun until it clears the limb (depth-tested sprites) */}
+      {/* the Earth hides the Sun until it clears the limb (all of it is depth-tested) */}
       <group ref={sunGroup}>
-        <sprite scale={[520, 520, 1]} renderOrder={5}>
-          <spriteMaterial
-            map={sun.halo}
-            color={new THREE.Color(1.5, 1.38, 1.2)}
-            toneMapped={false}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </sprite>
+        <SunStar radius={SUN_RADIUS} />
         <sprite scale={[1100, 1100, 1]} renderOrder={6}>
           <spriteMaterial
-            map={sun.streak}
-            color={new THREE.Color(0.55, 0.58, 0.66)}
-            toneMapped={false}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </sprite>
-        <sprite scale={[60, 60, 1]} renderOrder={7}>
-          <spriteMaterial
-            map={sun.core}
-            color={new THREE.Color(4, 3.8, 3.4)}
+            map={streak}
+            color={new THREE.Color(0.5, 0.25, 0.1)}
             toneMapped={false}
             depthWrite={false}
             blending={THREE.AdditiveBlending}
