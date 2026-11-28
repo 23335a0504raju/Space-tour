@@ -2,6 +2,7 @@ import { content, isPublishable } from '../content/index.ts';
 import type { Experience, Project, WorkProject } from '../content/index.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
+import { Portrait } from '../ui/Portrait.tsx';
 import styles from './Brief.module.css';
 
 const {
@@ -226,6 +227,7 @@ export function Brief() {
       <main className={styles.main}>
         {/* not a landmark: the contact section is already named after Raju */}
         <div className={styles.hero}>
+          <Portrait className={styles.portrait} />
           <p className={styles.kicker}>Mission Brief</p>
           <h1 id="brief-name" className={styles.name}>
             <FactText fact={identity.name}>

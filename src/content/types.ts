@@ -2,6 +2,8 @@ import type { Fact } from './fact.ts';
 
 export interface Identity {
   readonly name: Fact<string>;
+  /** Head-and-shoulders photo (a square image under /assets/). */
+  readonly portrait: Fact<string>;
   readonly role: Fact<string>;
   /** Short role for the header brand line. */
   readonly shortRole: Fact<string>;
@@ -109,7 +111,7 @@ export interface PortfolioContent {
   readonly stack: readonly StackGroup[];
   readonly projects: readonly Project[];
   readonly certifications: Fact<readonly Certification[]>;
-  /** Course completions (Mission Brief only). */
+  /** Course completions (the SC11-A card and the Mission Brief). */
   readonly courses: Fact<readonly Certification[]>;
   readonly achievements: readonly Fact<string>[];
   readonly learning: Fact<string>;

@@ -3,6 +3,7 @@ import { content } from '../content/index.ts';
 import type { Project } from '../content/index.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
+import { Portrait } from '../ui/Portrait.tsx';
 import { CARD_REST, MOON_ANCHOR } from './homecoming/homecoming.ts';
 import { WORLD_TITLES, WorldTitleCard } from './anime/titles.tsx';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
@@ -41,6 +42,7 @@ const {
   stack,
   projects,
   certifications,
+  courses,
   achievements,
 } = content;
 
@@ -192,8 +194,14 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'Experience',
     render: () => (
       <>
-        <Kicker>Crew record</Kicker>
-        <h2 className={styles.heading}>Experience</h2>
+        {/* the crew member's file: the photo sits beside the heading, adding no height */}
+        <div className={styles.recordHead}>
+          <div>
+            <Kicker>Crew record</Kicker>
+            <h2 className={styles.heading}>Experience</h2>
+          </div>
+          <Portrait className={styles.badge} />
+        </div>
         <ol className={styles.record}>
           {experience.map((job) => (
             <li key={job.id}>
@@ -360,7 +368,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
   {
     key: 'certifications',
     chapterId: 'sc11a-discipline',
-    rest: 0.55,
+    rest: 0.48,
+    band: 0.08,
     placement: 'right',
     label: 'Certifications',
     render: () => (
@@ -382,10 +391,37 @@ const allOverlayDefs: readonly OverlayDef[] = [
         {certifications.value.length > PANEL_CERTS && (
           <p className={styles.metaInline}>
             <a href="/brief/#certifications">
-              {certifications.value.length - PANEL_CERTS} more, and courses, in the Mission Brief
+              {certifications.value.length - PANEL_CERTS} more in the Mission Brief
             </a>
           </p>
         )}
+      </>
+    ),
+  },
+  {
+    key: 'courses',
+    chapterId: 'sc11a-discipline',
+    rest: 0.66,
+    band: 0.08,
+    placement: 'left',
+    label: 'Courses',
+    available: () => shouldShow(courses),
+    render: () => (
+      <>
+        <Kicker>Discipline</Kicker>
+        <h2 className={styles.heading}>Courses</h2>
+        <ul className={styles.courses}>
+          {courses.value.map((c) => (
+            <li key={c.name}>
+              <FactText fact={courses}>
+                <span>{c.name}</span>
+                <span className={styles.date}>
+                  {c.issuer} · {c.year}
+                </span>
+              </FactText>
+            </li>
+          ))}
+        </ul>
       </>
     ),
   },

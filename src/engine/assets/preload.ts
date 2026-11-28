@@ -22,6 +22,8 @@ export const CRITICAL_ASSETS: readonly string[] = [
   '/assets/models/modern_ceiling_lamp_01.glb',
   // the bridge's screen
   '/assets/textures/earth_day_2k.ktx2',
+  // the hologram on the desk
+  '/assets/me/hologram.ktx2',
 ];
 
 /**
@@ -70,6 +72,8 @@ export const JOURNEY_ASSETS: readonly string[] = [
   '/assets/textures/neptune_1k.ktx2',
   // the closest views of Earth (SC12, SC13; Balanced)
   '/assets/textures/earth_day_4k.ktx2',
+  // the portrait on the crew record card (plain <img>)
+  '/assets/me/portrait.webp',
   // Project Bay images (plain <img>: these only warm the HTTP cache)
   '/assets/projects/smartway-traffic.webp',
   '/assets/projects/documentdb.webp',

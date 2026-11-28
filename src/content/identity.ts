@@ -11,6 +11,11 @@ export const identity: Identity = {
     [SRC.hero, SRC.connect, SRC.resume],
     `${DECISION_Q1}: given name first, as on the live site (resume header reads "CHOWDAVADA RAJU").`,
   ),
+  portrait: confirmed(
+    '/assets/me/portrait.webp',
+    [SRC.userPhoto],
+    'Raju asked for this photo to be shown across the portfolio.',
+  ),
   role: confirmed(
     'Full-Stack Software Engineer & AI Builder',
     [SRC.hero],

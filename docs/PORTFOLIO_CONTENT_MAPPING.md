@@ -16,7 +16,7 @@
 | Summary | "Software Engineer specializing in scalable web applications, APIs, and full-stack systems using Java, Python, React.js, and Node.js. Proficient in optimizing application performance." | `ResumeNew.jsx` | ✅ (wording may be shortened with your approval) | SC03 | Intro |
 | Location | Visakhapatnam, AP | `ResumeNew.jsx` | ✅ (optional to show) | SC13 | Contact |
 | Email | `smilyraju8464@gmail.com` | `ResumeNew.jsx`, `Contact.jsx` | ✅. Confirm it's the address you want recruiters to use. | SC13, contact sheet | Contact |
-| Photo | `src/assets/pro.jpeg`, `profile*.png/jpg` | assets | ✅ Not used in the journey (faceless astronaut); optional in the Brief | — | Header (optional) |
+| Photo | Supplied by Raju, 2026-11-28 | assets A061, A062 | ✅ Raju asked for it (2026-11-28, replaces "not used"): desk hologram (SC02/SC03), crew record (SC04), Mission Brief header | — | Header |
 
 ## 2. Experience
 | Item | Value | Source | Status | Journey | Brief |

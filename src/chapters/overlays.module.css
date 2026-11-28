@@ -309,6 +309,28 @@
 }
 
 /* ── Experience / education timeline ─────────────────────────────────────────── */
+/* the crew record's heading with the photo to its right */
+.recordHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.recordHead > div {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.badge {
+  flex: none;
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: cover;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+}
+
 .record {
   display: grid;
   gap: var(--space-4);
@@ -436,6 +458,28 @@
 }
 
 .lines li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* the courses card: each course's name, then who gave it and when, on its own line */
+.courses {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.courses li {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) 0;
+  font-size: 0.9063rem;
+  line-height: 1.4;
+  border-top: 1px solid var(--color-rule);
+}
+
+.courses li:first-child {
   border-top: 0;
   padding-top: 0;
 }

@@ -23,7 +23,7 @@ export const certifications: Fact<readonly Certification[]> = fromSource(
   'Deloitte simulations: LinkedIn, issued Jul 2025 (credential ID za8Qenw9cDxXJhyoH) and Jun 2025 (yuiNqJkzirAWvQcZr). The others are from the resume and are not on LinkedIn. Credential URLs not in any source.',
 );
 
-/** Course completions (Udemy certificates posted on LinkedIn). Mission Brief only. */
+/** Course completions (Udemy certificates posted on LinkedIn): SC11-A's card and the Mission Brief. */
 export const courses: Fact<readonly Certification[]> = fromSource(
   [
     {

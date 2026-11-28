@@ -26,6 +26,12 @@ export const KEYBOARD = { x: -0.01, z: -2.22, size: [0.38, 0.014, 0.18] } as con
 export const MOUSE = { x: 0.31, z: -2.2, pad: [0.22, 0.003, 0.24] } as const;
 
 /**
+ * The projector for Raju's hologram: right of the mouse pad, in front of the right monitor. The
+ * figure turns toward whoever sits at SEAT.
+ */
+export const FACE_HOLOGRAM = { x: 0.64, z: -2.37 } as const;
+
+/**
  * The launch-control bridge (Bridge.tsx, asset A036) placed around the desk. Its main deck lies at
  * y = 2.55 m in the model (measured by scripts/optimize-bridge.ts), so it is lowered by that much.
  * Unrotated: the desk sits in the south part of the deck facing north, so the hologram globe turns

@@ -111,6 +111,20 @@
   Over the brightest skies the small grey text is the weakest: keep an eye on contrast before lightening further.
 - **One Sun** (Raju): SC06's sunrise now shows the same star as SC10's look back (`src/chapters/space/SunStar.tsx`).
 
+## Done (2026-11-28, Raju's photo and courses)
+- Raju asked for his picture in the portfolio and supplied the photo (A061, A062, `scripts/prepare-portraits.ts`, raw
+  file in `raw-assets/me/`). Shown on: the desk (SC02/SC03) as a hologram, the Experience crew record (SC04) and the
+  Mission Brief header (`identity.portrait`, `ui/Portrait.tsx`).
+- **Not on the final contact card** (Raju: "don't show the image of me" there, after trying a round portrait and a
+  waist-up figure). The surname on that card was nearly invisible (inherited text shadow under the gradient): fixed.
+- The hologram (`room/Hologram.tsx`, `shaders/faceHologram.ts`, `shaders/projector.ts`), after Raju's written brief:
+  cyan projected light with silhouette glow, scan lines and a scan bar, faint flicker, a projector with ring, pulses,
+  beam and motes. Rejected before it: a bust facing the camera, the rectangular photo ("like a screen"), a plain
+  see-through figure, and a photo frame on the desk. It faces the astronaut, at most 41 degrees off the camera.
+  Keep the picture **flat**: a relief that pushed the face forward made it look swollen (Raju, 2026-11-28).
+- Courses now have their own card in SC11a (rest 0.66, after Certifications at 0.48; SC11a is 2.25 screens).
+- Cost at SC02's busiest frame: 127 draw calls Balanced (budget 150), 78 Low (plan 70; about 73 before this work).
+
 ## Remaining tasks, in order
 1. Review the line art (ink from depth) in SC10-SC12 with Raju.
 2. The farm on Low still uses the simplified copy (thin trees and ridges): a better low variant if it matters.
