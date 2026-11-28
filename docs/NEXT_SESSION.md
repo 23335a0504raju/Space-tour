@@ -125,6 +125,29 @@
 - Courses now have their own card in SC11a (rest 0.66, after Certifications at 0.48; SC11a is 2.25 screens).
 - Cost at SC02's busiest frame: 127 draw calls Balanced (budget 150), 78 Low (plan 70; about 73 before this work).
 
+## Done (2026-11-28, floating screens and the ignition button)
+- Raju asked for science-fiction air screens (Tony Stark style) at the desk, then in the cockpit. Shared parts in
+  `src/chapters/holo/` (panes, geometry, atlas drawing, `HoloPanes.tsx`) with `shaders/holoScreen.ts`; one mesh, one
+  draw call per set.
+  - Desk (SC02/SC03, `room/holo*.ts`): code, scroll engine, flight-plan radar, two dials, keys of light, a beam.
+  - Cockpit (SC04, `cockpit/holoLayout.ts`, `screens.ts`): the crew record and flight plan float over the dash, unfold
+    as the astronaut sits and fold away before the close-up (`arrival.ts` `screensOpen`).
+- Raju: the move to the ignition button looked bad. New control (`cockpit/Ignition.tsx`, `shaders/ignition.ts`):
+  recessed plate, domed button, hinged safety cover, arming rings, IGNITION → LAUNCH label, all from `ignitionAt(t)`;
+  angled camera approach, then out through the windscreen.
+- **Restyled after Raju's film references** (clear glass, layered HUD, globe): fine-edged glass panes, far and near
+  layers (`holo/hud.ts`: rings, hex field, node network, ship blueprint, data window; no words or figures), a globe of
+  light over the flight plan (`holo/HoloGlobe.tsx`, from `earth_day_2k`), atlases shared between copies and half size
+  on Low (`holo/atlasCache.ts`; far layers are left out on Low).
+- **Depth order** (Raju: "the starting screens dominating... blend everything"): each pane has `gain` and `soft`
+  (blur). Desk screens are dim and slightly soft; cockpit records stay sharp; everything else steps back. The windscreen
+  sill is dimmed so it does not cross the record text.
+- **No photo on the Experience card** (Raju, "my image is no need here"). The desk hologram and the Mission Brief still
+  show it.
+- Draw calls: SC02 t 0.6 113 Balanced / 66 Low; SC04 ≤111 / 64. GPU textures stable over SC02↔SC05 round trips; worst
+  entry hitch in SC02–SC04 67 ms (`measure-freezes`).
+- Checks: verify 159/159, build OK, Playwright 28 passed, 2 skipped.
+
 ## Remaining tasks, in order
 1. Review the line art (ink from depth) in SC10-SC12 with Raju.
 2. The farm on Low still uses the simplified copy (thin trees and ridges): a better low variant if it matters.

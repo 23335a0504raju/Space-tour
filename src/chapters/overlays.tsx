@@ -3,7 +3,6 @@ import { content } from '../content/index.ts';
 import type { Project } from '../content/index.ts';
 import { useJourneyStore } from '../engine/store.ts';
 import { ContactPanel } from '../ui/ContactPanel.tsx';
-import { Portrait } from '../ui/Portrait.tsx';
 import { CARD_REST, MOON_ANCHOR } from './homecoming/homecoming.ts';
 import { WORLD_TITLES, WorldTitleCard } from './anime/titles.tsx';
 import { FactText, shouldShow } from '../ui/FactText.tsx';
@@ -194,14 +193,8 @@ const allOverlayDefs: readonly OverlayDef[] = [
     label: 'Experience',
     render: () => (
       <>
-        {/* the crew member's file: the photo sits beside the heading, adding no height */}
-        <div className={styles.recordHead}>
-          <div>
-            <Kicker>Crew record</Kicker>
-            <h2 className={styles.heading}>Experience</h2>
-          </div>
-          <Portrait className={styles.badge} />
-        </div>
+        <Kicker>Crew record</Kicker>
+        <h2 className={styles.heading}>Experience</h2>
         <ol className={styles.record}>
           {experience.map((job) => (
             <li key={job.id}>

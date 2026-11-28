@@ -19,39 +19,28 @@ import {
   doorOpen,
   span,
   COCKPIT_OUT,
+  screensOpen,
+  ignitionAt,
 } from './arrival.ts';
 import type { Drive } from '../astronaut/Astronaut.tsx';
 import type { ChapterImpl, ChapterSceneProps } from '../contract.ts';
 import { Astronaut as StandIn, seeded } from '../greybox/parts.tsx';
 import { useCabinSurface } from '../room/surfaces.ts';
 import { RoomLighting } from '../room/RoomSet.tsx';
-import { educationScreen, experienceScreen, flightPlanScreen } from './screens.ts';
+import { HoloGlobe } from '../holo/HoloGlobe.tsx';
+import { HoloPanes } from '../holo/HoloPanes.tsx';
+import { ATLAS, GLOBE, PANES, SCREENS } from './holoLayout.ts';
+import { createCockpitAtlas } from './screens.ts';
+import { Ignition } from './Ignition.tsx';
 
 /**
  * SC04 Cockpit (P3 vertical slice): code-built near-future cockpit with Poly Haven CC0 panel
- * textures and diegetic Crew Record screens. Metres; origin = cockpit floor centre; nose → -z.
+ * textures and floating Crew Record screens. Metres; origin = cockpit floor centre; nose → -z.
  */
 
 /** Charcoal cabin (was pale grey, which read as an unfinished prototype next to the bridge). */
 const SHELL = { color: '#3b414c', roughness: 0.5, metalness: 0.4 } as const;
 const GRAPHITE = { color: '#1b1f26', roughness: 0.5, metalness: 0.4 } as const;
-
-/** A touchscreen set into the dash panel: bezel flush with the panel, glass inside it (dash-local frame). */
-function Screen({ texture, x }: { texture: THREE.Texture; x: number }) {
-  useDisposeOnUnmount(texture);
-  return (
-    <group position={[x, 0.1, 0.04]}>
-      <mesh position={[0, 0, 0.006]}>
-        <boxGeometry args={[0.7, 0.47, 0.012]} />
-        <meshStandardMaterial {...GRAPHITE} />
-      </mesh>
-      <mesh position={[0, 0, 0.013]}>
-        <planeGeometry args={[0.62, 0.3875]} />
-        <meshBasicMaterial map={texture} color="#e8e8e8" toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
 
 /** Rows of small indicator lights (one instanced draw call). */
 function SwitchBank({
@@ -357,21 +346,18 @@ function LiftCab() {
 
 function CockpitScene({ id, frame }: ChapterSceneProps) {
   const door = useMemo(() => ({ current: 0 }), []);
+  const screens = useMemo(() => ({ current: 0 }), []);
+  const ignition = useMemo(() => ({ show: 0, arm: 0, press: 0, fire: 0 }), []);
   useFrame(() => {
-    if (frame.id === id) door.current = doorOpen(frame.t);
+    if (frame.id !== id) return;
+    door.current = doorOpen(frame.t);
+    screens.current = screensOpen(frame.t);
+    ignitionAt(frame.t, ignition);
   });
   const shadows = useJourneyStore((s) => s.tier === 'balanced');
   const hull = useCabinSurface('wall', [5, 3], '#4a515c');
   const deck = useCabinSurface('floor', [4, 3], '#9aa0aa');
   const couch = useCouch();
-  const screens = useMemo(
-    () => ({
-      experience: experienceScreen(),
-      plan: flightPlanScreen(),
-      education: educationScreen(),
-    }),
-    [],
-  );
 
   return (
     <group>
@@ -418,7 +404,13 @@ function CockpitScene({ id, frame }: ChapterSceneProps) {
         </mesh>
       ))}
       {/* canopy frame: a lit sill and header, so the windscreen reads as a designed shape */}
-      <Trim position={[0, 1.31, -1.68]} size={[3.2, 0.025, 0.03]} color="#4fd8ff" />
+      {/* the sill is dim: it runs behind the floating records' text */}
+      <Trim
+        position={[0, 1.31, -1.68]}
+        size={[3.2, 0.018, 0.03]}
+        color="#4fd8ff"
+        intensity={0.25}
+      />
       <Trim position={[0, 2.39, -1.68]} size={[3.2, 0.02, 0.03]} color="#ffb870" intensity={0.8} />
       {[-1, 1].map((k) => (
         <Trim
@@ -444,9 +436,6 @@ function CockpitScene({ id, frame }: ChapterSceneProps) {
           <cylinderGeometry args={[0.1, 0.1, 3.1, 24, 1, false, 0, Math.PI]} />
           <meshStandardMaterial {...SHELL} />
         </mesh>
-        <Screen texture={screens.experience} x={-0.75} />
-        <Screen texture={screens.plan} x={0} />
-        <Screen texture={screens.education} x={0.75} />
         <SwitchBank position={[-1.28, 0, 0.056]} rotation={[0, 0, 0]} cols={4} rows={6} seed={3} />
         <SwitchBank position={[1.28, 0, 0.056]} rotation={[0, 0, 0]} cols={4} rows={6} seed={5} />
         <SwitchBank
@@ -464,18 +453,13 @@ function CockpitScene({ id, frame }: ChapterSceneProps) {
           seed={11}
         />
         <Trim position={[0, -0.365, 0.045]} size={[3.0, 0.012, 0.012]} color="#4fd8ff" />
-        {/* ignition switch (the close-up at the end of the chapter) */}
-        <group position={[0, -0.22, 0.04]}>
-          <mesh>
-            <boxGeometry args={[0.2, 0.11, 0.02]} />
-            <meshStandardMaterial {...SHELL} color="#454c58" />
-          </mesh>
-          <mesh position={[0, 0, 0.03]}>
-            <boxGeometry args={[0.05, 0.05, 0.04]} />
-            <meshStandardMaterial color="#8a1f18" emissive="#ff3b2e" emissiveIntensity={0.25} />
-          </mesh>
-        </group>
       </group>
+      <Ignition state={ignition} />
+      <Suspense fallback={null}>
+        <HoloGlobe position={GLOBE.position} radius={GLOBE.radius} open={screens} />
+      </Suspense>
+      {/* the crew record and flight plan, in the air above the dash */}
+      <HoloPanes panes={PANES} size={ATLAS} createAtlas={createCockpitAtlas} open={screens} />
       <SwitchBank
         position={[0, 2.62, -0.9]}
         rotation={[Math.PI / 2 + 0.4, 0, 0]}
@@ -516,9 +500,9 @@ function CockpitScene({ id, frame }: ChapterSceneProps) {
         decay={2}
       />
       <pointLight
-        position={[0, 1.35, -1.0]}
-        color="#86a8ff"
-        intensity={2.6}
+        position={[0, 1.72, -0.75]}
+        color="#62c4ff"
+        intensity={1.5}
         distance={3}
         decay={2}
       />
@@ -551,11 +535,14 @@ const cockpitKeys: ShotKey[] = [
   // the lift door (SC03's last frame), the arrival, the seat (arrival.ts)
   ...arrivalKeys,
   // over the shoulder onto the Experience screen (camera line checked to clear the astronaut's head)
-  { t: 0.35, position: [0.35, 1.75, 0.45], target: [-0.75, 1.11, -1.31], fov: 40 },
+  { t: 0.35, position: [0.35, 1.75, 0.45], target: SCREENS.experience.position, fov: 40 },
   // across to the Education screen (clears the astronaut and the empty seat back)
-  { t: 0.7, position: [-0.15, 1.78, 0.45], target: [0.75, 1.11, -1.31], fov: 40 },
-  // down onto the ignition switch
-  { t: 0.86, position: [0.05, 1.38, -0.3], target: [0, 0.88, -1.15], fov: 36 },
+  { t: 0.7, position: [-0.15, 1.78, 0.45], target: SCREENS.education.position, fov: 40 },
+  // down to the launch control from the right, easing closer while it arms and fires
+  { t: 0.84, position: [0.34, 1.38, -0.46], target: [-0.01, 0.9, -1.16], fov: 37 },
+  { t: 0.895, position: [0.27, 1.28, -0.57], target: [-0.01, 0.9, -1.16], fov: 35 },
+  // lift over the panel's lip, looking out
+  { t: 0.94, position: [0.03, 1.76, -1.25], target: [0, 1.62, -12], fov: 48 },
   // then up and out through the windscreen (cockpit → launch pad join: SC05 opens at this spot)
   { t: 1, position: COCKPIT_OUT.position, target: COCKPIT_OUT.target, fov: COCKPIT_OUT.fov },
 ];
