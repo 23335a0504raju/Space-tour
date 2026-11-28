@@ -102,7 +102,8 @@ test('journey: in a short laptop window no card scrolls inside itself', async ({
     ['sc04-crew-record', 0.525, /Work at Spotmies/],
     ['sc08-jupiter', 0.5, /DocumentDB/],
     ['sc09-saturn', 0.75, /Technology stack/],
-    ['sc11a-discipline', 0.55, /Certifications/],
+    ['sc11a-discipline', 0.48, /Certifications/],
+    ['sc11a-discipline', 0.66, /Courses/],
   ] as const) {
     await scrollToProgress(page, progressFor(track, id, r));
     await page.waitForTimeout(SETTLE_MS);
@@ -138,7 +139,8 @@ test('journey: on a phone a swipe on any card moves the page, and nothing is cut
     ['sc04-crew-record', 0.525, /Work at Spotmies/],
     ['sc08-jupiter', 0.5, /DocumentDB/],
     ['sc09-saturn', 0.75, /Technology stack/],
-    ['sc11a-discipline', 0.55, /Certifications/],
+    ['sc11a-discipline', 0.48, /Certifications/],
+    ['sc11a-discipline', 0.66, /Courses/],
     ['sc13-transmission', 0.9, /Contact/],
   ] as const) {
     await scrollToProgress(page, progressFor(track, id, r));

@@ -106,8 +106,8 @@ export const chapters: readonly ChapterMeta[] = [
     seamlessFromPrevious: true, // SC10 emerges into this very sky
     act: 'beyond',
     artStyle: 'anime',
-    screens: 1.65,
-    restPoints: [0.55],
+    screens: 2.25,
+    restPoints: [0.48, 0.66],
     navLabel: 'Beyond',
     briefAnchor: 'certifications',
   },

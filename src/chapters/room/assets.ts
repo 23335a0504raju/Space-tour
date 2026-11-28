@@ -10,3 +10,8 @@ export const ROOM_MODELS = {
 } as const;
 
 export const ROOM_HDRI = '/assets/env/empty_warehouse_01_1k.hdr';
+
+/** Raju's hologram on the desk (A062; `node scripts/prepare-portraits.ts`). */
+export const ROOM_PHOTOS = {
+  hologram: '/assets/me/hologram.ktx2',
+} as const;

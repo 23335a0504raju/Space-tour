@@ -11,6 +11,8 @@ export const SRC = {
   connect: `${C}/Connect.jsx`,
   footer: `${C}/Footer.jsx`,
   images: 'MainPortfolio/port/public/image',
+  /** The photo Raju pasted into the session for the portfolio (2026-11-28). */
+  userPhoto: 'Photo supplied by Raju, session 2026-11-28 (scripts/prepare-portraits.ts)',
   userBatch1: 'Batch 1 brief (user message)',
   userBatch3: 'Batch 3 / P0 instruction (user message)',
   userP4Sc06: 'P4 SC06 gate: user chose all five proposed strengths (2026-11-17)',

@@ -184,6 +184,27 @@
   color: var(--color-accent);
 }
 
+/* the photo: above the name on narrow screens, in the hero's open right side on wide ones */
+.portrait {
+  width: 8rem;
+  height: 8rem;
+  object-fit: cover;
+  border: 1px solid var(--color-accent);
+  border-radius: 50%;
+}
+
+@media (min-width: 62rem) {
+  .portrait {
+    position: absolute;
+    top: 50%;
+    right: 4%;
+    width: clamp(14rem, 22vw, 20rem);
+    height: auto;
+    aspect-ratio: 1;
+    translate: 0 -50%;
+  }
+}
+
 .name {
   font-family: var(--font-display);
   font-size: var(--text-display);

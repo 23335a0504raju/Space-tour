@@ -14,6 +14,7 @@ import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { CHAIR_REST, DESK, HOLOGRAM, KEYBOARD, LIFT, MOUSE } from './layout.ts';
 import { CrewChair, CrewDesk } from './Furniture.tsx';
 import { Bridge } from './Bridge.tsx';
+import { Hologram } from './Hologram.tsx';
 
 /**
  * SC02/SC03 set: a compact futuristic developer room (FINAL_STORYLINE.md SC02).
@@ -279,6 +280,10 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
         <CrewChair />
       </group>
       <Prop url={ROOM_MODELS.plant} position={[-0.85, DESK.top, -2.62]} />
+      {/* its own boundary: the room never waits on the photo */}
+      <Suspense fallback={null}>
+        <Hologram />
+      </Suspense>
 
       {/* developer workstation (code-built) */}
       <Monitor position={[0, DESK.top + 0.343, -2.7]} rotationY={0} firstLine={60} />
