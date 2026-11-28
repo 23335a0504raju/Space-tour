@@ -20,6 +20,42 @@ export const PILOT_SEAT: [number, number, number] = [-0.5, 0.06, -0.12];
 /** Beats (story time). */
 export const ARRIVAL = { walk: [0.08, 0.22], sit: [0.22, 0.31] } as const;
 
+/**
+ * The floating screens (0 folded into the dash, 1 open): they unfold as he sits, and fold away
+ * before the camera drops to the ignition switch and flies out through the windscreen.
+ */
+export const SCREENS_OPEN = { unfold: [0.23, 0.32], fold: [0.75, 0.83] } as const;
+export const screensOpen = (t: number) =>
+  span(t, SCREENS_OPEN.unfold[0], SCREENS_OPEN.unfold[1]) *
+  (1 - span(t, SCREENS_OPEN.fold[0], SCREENS_OPEN.fold[1]));
+
+/**
+ * The close-up on the launch control that ends the chapter (Ignition.tsx): the rings of light
+ * appear as the camera comes down, the safety cover lifts (arming), the button goes down and the
+ * light goes out from it, then the camera leaves through the windscreen.
+ */
+export const IGNITION = {
+  show: [0.775, 0.84],
+  arm: [0.815, 0.862],
+  press: [0.872, 0.884],
+  fire: [0.88, 0.93],
+} as const;
+
+export interface IgnitionState {
+  show: number;
+  arm: number;
+  press: number;
+  fire: number;
+}
+
+export function ignitionAt(t: number, out: IgnitionState): IgnitionState {
+  out.show = span(t, IGNITION.show[0], IGNITION.show[1]);
+  out.arm = span(t, IGNITION.arm[0], IGNITION.arm[1]);
+  out.press = span(t, IGNITION.press[0], IGNITION.press[1]);
+  out.fire = span(t, IGNITION.fire[0], IGNITION.fire[1]);
+  return out;
+}
+
 /** Out of the lift, round the left of the pilot seat (clear of the pedestal), to its front. */
 const PATH = new THREE.CatmullRomCurve3(
   [

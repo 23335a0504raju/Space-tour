@@ -9,12 +9,11 @@ import { gltfExtender } from '../../engine/assets/loaders.ts';
 import { registerEnvironment } from '../../engine/environment.ts';
 import { useJourneyStore } from '../../engine/store.ts';
 import { ROOM_HDRI, ROOM_MODELS } from './assets.ts';
-import { createCodeScreenTexture } from './codeScreen.ts';
-import { useDisposeOnUnmount } from '../../engine/lifecycle.ts';
 import { CHAIR_REST, DESK, HOLOGRAM, KEYBOARD, LIFT, MOUSE } from './layout.ts';
 import { CrewChair, CrewDesk } from './Furniture.tsx';
 import { Bridge } from './Bridge.tsx';
 import { Hologram } from './Hologram.tsx';
+import { HoloScreens } from './HoloScreens.tsx';
 
 /**
  * SC02/SC03 set: a compact futuristic developer room (FINAL_STORYLINE.md SC02).
@@ -127,46 +126,6 @@ function Prop({
     return c;
   }, [scene, shadows]);
   return <primitive object={object} position={position} rotation={rotation} scale={scale} />;
-}
-
-// ── Monitors with real code ───────────────────────────────────────────────────
-function Monitor({
-  position,
-  rotationY,
-  firstLine,
-}: {
-  position: [number, number, number];
-  rotationY: number;
-  firstLine: number;
-}) {
-  const texture = useMemo(() => createCodeScreenTexture(firstLine), [firstLine]);
-  useDisposeOnUnmount(texture);
-  return (
-    <group position={position} rotation={[0, rotationY, 0]}>
-      <mesh castShadow>
-        <boxGeometry args={[0.62, 0.37, 0.025]} />
-        <meshStandardMaterial color="#14161b" metalness={0.6} roughness={0.35} />
-      </mesh>
-      <mesh position={[0, 0, 0.0135]}>
-        <planeGeometry args={[0.6, 0.3375]} />
-        <meshStandardMaterial
-          color="#000000"
-          emissive="#ffffff"
-          emissiveMap={texture}
-          emissiveIntensity={1.15}
-          roughness={0.25}
-        />
-      </mesh>
-      <mesh position={[0, -0.25, -0.03]}>
-        <boxGeometry args={[0.04, 0.16, 0.04]} />
-        <meshStandardMaterial color="#2a2d33" metalness={0.8} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, -0.33, -0.03]}>
-        <boxGeometry args={[0.2, 0.012, 0.14]} />
-        <meshStandardMaterial color="#2a2d33" metalness={0.8} roughness={0.3} />
-      </mesh>
-    </group>
-  );
 }
 
 /** Spot light whose target is part of the scene graph (an un-added target always points at the origin). */
@@ -285,10 +244,8 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
         <Hologram />
       </Suspense>
 
-      {/* developer workstation (code-built) */}
-      <Monitor position={[0, DESK.top + 0.343, -2.7]} rotationY={0} firstLine={60} />
-      <Monitor position={[-0.64, DESK.top + 0.343, -2.6]} rotationY={0.32} firstLine={0} />
-      <Monitor position={[0.64, DESK.top + 0.343, -2.6]} rotationY={-0.32} firstLine={118} />
+      {/* developer workstation (code-built): floating screens, keyboard and mouse */}
+      <HoloScreens />
       <mesh
         position={[KEYBOARD.x, DESK.top + KEYBOARD.size[1] / 2, KEYBOARD.z]}
         castShadow={shadows}
@@ -330,7 +287,7 @@ export const RoomSet = forwardRef<RoomSetHandle, RoomSetProps>(function RoomSet(
       />
       <pointLight
         position={[0, 1.2, -2.35]}
-        color="#86a8ff"
+        color="#62c4ff"
         intensity={3.5}
         distance={3.2}
         decay={2}
